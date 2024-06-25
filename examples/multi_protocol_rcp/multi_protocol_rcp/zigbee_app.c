@@ -251,6 +251,25 @@ void zigbee_app_nwk_start(uint32_t channel_mask, uint32_t max_child,
     zb_zdo_set_aps_unsecure_join(ZB_TRUE);
     zb_bdb_set_legacy_device_support(ZB_TRUE);
 
+    // OT_THREAD_SAFE(
+    //     otInstance *instance = otrGetInstance();
+
+    //     if(otLinkRawIsEnabled(instance))
+    //     {
+    //         log_info("Thread radion enabled, Enable 2 channel scan (%d, %d)", otLinkGetChannel(instance), channel_mask);
+
+    //         lmac15p4_auto_state_set(false);
+
+    //         otLinkGetChannel(instance);
+
+    //         lmac15p4_2ch_scan_set(true, (otLinkGetChannel(instance)-11), (channel_mask-11));
+    //     }
+    //     else
+    //     {
+    //         lmac15p4_2ch_scan_set(false, 0, (channel_mask-11));
+    //     }
+    // )
+
     zbStartRun();
 }   
 static void dev_annce_cb(zb_zdo_device_annce_t *da)
@@ -321,7 +340,11 @@ static uint8_t zcl_cmd_handler(zb_uint8_t param)
         {
             // zigbee_app_zcl_report_attribute_cb_reg(_zcl_report_attribute_cb);
             // p_report_attribute_cb(cmd_info->cluster_id, src_addr, src_ep, pData, payload_size);
-            zigbee_gw_cmd_send(0x00028800, src_addr, 0, src_ep, pData, payload_size);
+            uint8_t report_data[100];
+            memcpy(report_data, &(cmd_info->cluster_id), sizeof(zb_uint16_t));
+            memcpy(report_data + sizeof(zb_uint16_t), pData, payload_size);
+            payload_size += sizeof(zb_uint16_t);
+            zigbee_gw_cmd_send(0x00028800, src_addr, 0, src_ep, report_data, payload_size);
         }
         else if(cmd_info->cmd_id == 0x0b) // defaut response
         {
@@ -350,7 +373,7 @@ static uint8_t zcl_cmd_handler(zb_uint8_t param)
                 {
                     ZB_ZCL_IAS_ZONE_SEND_ZONE_ENROLL_RES(zcl_cmd_buf, dst_addr,
                                                         ZB_APS_ADDR_MODE_16_ENDP_PRESENT, dst_ep,
-                                                        0x02, ZB_AF_HA_PROFILE_ID, ZB_FALSE, NULL,
+                                                        ZIGBEE_DEFAULT_ENDPOINT, ZB_AF_HA_PROFILE_ID, ZB_FALSE, NULL,
                                                         ZB_ZCL_IAS_ZONE_ENROLL_RESPONCE_CODE_SUCCESS, 7 /* ZONE_ID */);                
 
                     cmd_processed = 1;
@@ -362,6 +385,10 @@ static uint8_t zcl_cmd_handler(zb_uint8_t param)
                     zigbee_gw_cmd_send(0x00230000, src_addr, 0, src_ep, pData, payload_size);
                 }
             }
+        }
+        else if(cmd_info->cluster_id == ZB_ZCL_CLUSTER_ID_DOOR_LOCK)
+        {
+            zigbee_gw_cmd_send(0x00248000 | cmd_info->cmd_id, src_addr, 0, src_ep, pData, payload_size);
         }
     }
 

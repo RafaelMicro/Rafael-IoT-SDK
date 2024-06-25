@@ -1,5 +1,7 @@
 # Component Makefile
 #
+
+CFLAGS += -DLOG_LEVEL=1
 ## These include paths would be exported to project level
 COMPONENT_ADD_INCLUDEDIRS += ./
 
@@ -12,7 +14,6 @@ COMPONENT_SRCS := ./log.c
 COMPONENT_OBJS := $(patsubst %.c,%.o, $(COMPONENT_SRCS))
 
 COMPONENT_SRCDIRS := ./
-
 ##
 #CPPFLAGS +=
 ifdef CONFIG_CLI_CMD_ENABLE

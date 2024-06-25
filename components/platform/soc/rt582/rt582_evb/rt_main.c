@@ -7,7 +7,6 @@
 #include "cm3_mcu.h"
 #include "uart_stdio.h"
 #include "hosal_uart.h"
-#include "EnhancedFlashDataset.h"
 
 extern uint8_t _heap_start;
 extern uint8_t _heap_size;
@@ -286,7 +285,6 @@ int rt582_main(void)
     _dump_boot_info();
 
     dma_init();
-    enhanced_flash_dataset_init();
 
 #if (CONFIG_PLATOFRM_ENABLE_SLEEP == 1)   
     __init_sleep();

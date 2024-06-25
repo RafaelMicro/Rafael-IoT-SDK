@@ -18,19 +18,21 @@
 #include "cli.h"
 #include "log.h"
 
+#include "EnhancedFlashDataset.h"
+
 #define PHY_PIB_TURNAROUND_TIMER 192
 #define PHY_PIB_CCA_DETECTED_TIME 128 // 8 symbols
 #define PHY_PIB_CCA_DETECT_MODE 0
 #define PHY_PIB_CCA_THRESHOLD 75
 #define MAC_PIB_UNIT_BACKOFF_PERIOD 320
 #define MAC_PIB_MAC_ACK_WAIT_DURATION 544 // non-beacon mode; 864 for beacon mode
-#define MAC_PIB_MAC_MAX_BE 8
+#define MAC_PIB_MAC_MAX_BE 5
 #define MAC_PIB_MAC_MAX_FRAME_TOTAL_WAIT_TIME 16416
 #define MAC_PIB_MAC_MAX_FRAME_RETRIES 4
 #define MAC_PIB_MAC_MAX_CSMACA_BACKOFFS 10
-#define MAC_PIB_MAC_MIN_BE 3
+#define MAC_PIB_MAC_MIN_BE 2
 
-static uint32_t s_reboot_flag = 0;
+static volatile uint32_t s_reboot_flag = 0;
 extern hosal_uart_dev_t cpc_uart_dev;
 void cpc_system_reset(cpc_system_reboot_mode_t reboot_mode)
 {
@@ -42,7 +44,9 @@ void cpc_system_reset(cpc_system_reboot_mode_t reboot_mode)
 __STATIC_INLINE  void wdt_isr(void)
 {
     if(s_reboot_flag == 0)
+    {
         Wdt_Kick();
+    }
 }
 
 static void init_wdt_init(void)
@@ -78,21 +82,21 @@ void set_pta_grant_pin(uint8_t gpio)
 int main(void)
 {
     hosal_rf_pta_ctrl_t pta_ctrl;
-    hosal_rf_modem_t modem_type;
-    hosal_rf_tx_power_ch_comp_t tx_pwr_ch_comp_ctrl;
-    hosal_rf_tx_power_comp_seg_t tx_pwr_comp_seg_ctrl;
 
+    s_reboot_flag = 0;
+
+    enhanced_flash_dataset_init();
     init_wdt_init();
-    log_init();
-    cli_init();
 
     hosal_rf_init(HOSAL_RF_MODE_MULTI_PROTOCOL);
+    lmac15p4_init(LMAC15P4_2P4G_OQPSK);
 
     cpc_uart_init();
+
+    cli_init();
+
     cpc_hci_init();
     cpc_upgrade_init();
-
-    lmac15p4_init(LMAC15P4_2P4G_OQPSK);
 
     pta_ctrl.enable = 0;
     pta_ctrl.inverse = 1;
@@ -109,50 +113,17 @@ int main(void)
                        MAC_PIB_MAC_MAX_FRAME_TOTAL_WAIT_TIME, MAC_PIB_MAC_MAX_FRAME_RETRIES, 
                        MAC_PIB_MAC_MIN_BE);
 
-#if (CONFIG_TX_POWER_SET == 1)
-    // BLE
-    modem_type = HOSAL_RF_MODEM_BLE;
-    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_COMP_SET, (void*) &modem_type);
-
-    tx_pwr_ch_comp_ctrl.tx_power_stage0 = 31;
-    tx_pwr_ch_comp_ctrl.tx_power_stage1 = 28;
-    tx_pwr_ch_comp_ctrl.tx_power_stage2 = 25;
-    tx_pwr_ch_comp_ctrl.tx_power_stage3 = 19;
-    tx_pwr_ch_comp_ctrl.modem_type = modem_type;
-    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_CH_COMP_SET, (void*) &tx_pwr_ch_comp_ctrl);
-    
-    // 0~segmentA-1, segmentA~segmentB-1, segmentB~segmentC-1, segmentC~39
-    // 0=2402MHz ~ 39=2480MHz
-    tx_pwr_comp_seg_ctrl.segmentA = 35;
-    tx_pwr_comp_seg_ctrl.segmentB = 38;
-    tx_pwr_comp_seg_ctrl.segmentC = 39;
-    tx_pwr_comp_seg_ctrl.modem_type = modem_type;
-    hosal_rf_ioctl(HOSAL_RF_IOCTL_COMP_SEG_SET, (void *) &tx_pwr_comp_seg_ctrl);
-
-    // ZIGBEE
-    modem_type = HOSAL_RF_MODEM_2P4G_OQPSK;
-    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_COMP_SET, (void*) &modem_type);
-
-    tx_pwr_ch_comp_ctrl.tx_power_stage0 = 31;
-    tx_pwr_ch_comp_ctrl.tx_power_stage1 = 31;
-    tx_pwr_ch_comp_ctrl.tx_power_stage2 = 31;
-    tx_pwr_ch_comp_ctrl.tx_power_stage3 = 10;
-    tx_pwr_ch_comp_ctrl.modem_type = modem_type;
-    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_CH_COMP_SET, (void*) &tx_pwr_ch_comp_ctrl);
-    
-    // 0~segmentA-1, segmentA~segmentB-1, segmentB~segmentC-1, segmentC~39
-    // 0=2402MHz ~ 39=2480MHz
-    tx_pwr_comp_seg_ctrl.segmentA = 13;
-    tx_pwr_comp_seg_ctrl.segmentB = 26;
-    tx_pwr_comp_seg_ctrl.segmentC = 34;
-    tx_pwr_comp_seg_ctrl.modem_type = modem_type;
-    hosal_rf_ioctl(HOSAL_RF_IOCTL_COMP_SEG_SET, (void *) &tx_pwr_comp_seg_ctrl);
-#endif
-
     otrStart();
 #if (CONFIG_CPC_ENABLE_ZIGBEE_NCP == 1) 
     zbStart();
 #endif
+    // while(1)
+    // {
+    //     if(s_reboot_flag == 0)
+    //         Wdt_Kick();
+
+    //     vTaskDelay(250);
+    // }
     return 0;
 }
 void otrInitUser(otInstance * instance)

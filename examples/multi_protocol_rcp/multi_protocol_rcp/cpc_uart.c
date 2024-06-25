@@ -116,11 +116,11 @@ typedef struct
 //                  Global Data Definition
 //=============================================================================
 static int _cli_15p4_tx(int argc, char **argv, cb_shell_out_t log_out, void *pExtra);
-
+static int _cli_2chscan_en(int argc, char **argv, cb_shell_out_t log_out, void *pExtra);
 extern void cpc_drv_uart_loop(void);
 extern void cpc_drv_trnsmit_complete(void);
-static TaskHandle_t uart_taskHandle = NULL;
-static TaskHandle_t cpc_sys_taskHandle = NULL;
+TaskHandle_t uart_taskHandle = NULL;
+TaskHandle_t cpc_sys_taskHandle = NULL;
 static QueueHandle_t cpc_uart_handle;
 static uint8_t g_tx_buf[CPC_UART_RAW_BUFFER_SIZE];
 static uint8_t g_rx_buf[32];
@@ -130,7 +130,7 @@ static TimerHandle_t s15p4tx_timer;
 static volatile uint32_t g15p4_tx_count = 0, g15p4_tx_delay = 0;
 static StreamBufferHandle_t xStreamBuffer;
 
-static volatile uint32_t g_uart_tx_compelete = 1;
+static volatile uint32_t g_uart_tx_compelete = 1, g_uart_tx_start = 0;
 
 static hosal_uart_dma_cfg_t txdam_cfg = {
     .dma_buf = g_tx_buf,
@@ -146,9 +146,39 @@ static sh_cmd_t  g_cli_cmd_15p4_tx =
     "    e.g. 15p4tx 2405 10",
 };
 
+// static sh_cmd_t  g_cli_cmd_2chscan_en =
+// {
+//     .pCmd_name      = "2chscan",
+//     .cmd_exec       = _cli_2chscan_en,
+//     .pDescription   = "2chscan\n"
+//     "  usage: 2chscan [ch1] [ch2] [enable] \n"
+//     "    e.g. 2chscan 11 ~ 25 11 ~  25 1/0",
+// };
+
+
 //=============================================================================
 //                  Private Function Definition
 //=============================================================================
+// static int _cli_2chscan_en(int argc, char **argv, cb_shell_out_t log_out, void *pExtra)
+// {
+//     uint8_t ch1, ch2, en;
+//     do
+//     {
+//         if ((argc < 3))
+//         {
+//             break;
+//         }
+
+//         ch1 = utility_strtol(argv[1], 0);
+//         ch2 = utility_strtol(argv[2], 0);
+//         en = utility_strtol(argv[3], 0);
+
+//         log_info("%s 2 channel scan(%d, %d)", (en? "enable":"disable"), ch1, ch2);
+
+//         lmac15p4_2ch_scan_set(en, ch1-11, ch2-11);
+//     } while (0);
+//     return 0;
+// }
 static int _cli_15p4_tx(int argc, char **argv, cb_shell_out_t log_out, void *pExtra)
 {
     uint32_t freq ; 
@@ -211,10 +241,11 @@ static void __cpc_uart_signal(void)
 }
 static void _uart_tx_done_pend_cb(void *pvParameter1, uint32_t ulParameter2)
 {
+    // vTaskResume(cpc_sys_taskHandle);
     g_uart_tx_compelete = 1;
-    enter_critical_section();
-    cpc_drv_trnsmit_complete();
-    leave_critical_section();
+    // enter_critical_section();
+
+    // leave_critical_section();
     gpio_pin_set(20);
     CPC_UART_NOTIFY(CPC_UART_EVENT_TRIGGER);
 }
@@ -237,17 +268,113 @@ static int __reloc __uart_rx_callback(void *p_arg)
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
     cnt = hosal_uart_receive(p_arg, g_rx_buf, sizeof(g_rx_buf));
-
+    gpio_pin_toggle(21);
     if(cnt > 0)
     {
         xStreamBufferSendFromISR(xStreamBuffer, g_rx_buf, cnt, &xHigherPriorityTaskWoken);
     }
-    CPC_UART_NOTIFY_ISR(CPC_UART_EVENT_TRIGGER);
+    //CPC_UART_NOTIFY_ISR(CPC_UART_EVENT_TRIGGER);
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 
     return 0;
 }
+static void _tx_power_setting_fcc(void)
+{
+    hosal_rf_modem_t modem_type;
+    hosal_rf_tx_power_ch_comp_t tx_pwr_ch_comp_ctrl;
+    hosal_rf_tx_power_comp_seg_t tx_pwr_comp_seg_ctrl;    
+    // BLE
+    modem_type = HOSAL_RF_MODEM_BLE;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_COMP_SET, (void*) &modem_type);
+
+    tx_pwr_ch_comp_ctrl.tx_power_stage0 = 31;
+    tx_pwr_ch_comp_ctrl.tx_power_stage1 = 28;
+    tx_pwr_ch_comp_ctrl.tx_power_stage2 = 25;
+    tx_pwr_ch_comp_ctrl.tx_power_stage3 = 19;
+    tx_pwr_ch_comp_ctrl.modem_type = modem_type;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_CH_COMP_SET, (void*) &tx_pwr_ch_comp_ctrl);
+    
+    // 0~segmentA-1, segmentA~segmentB-1, segmentB~segmentC-1, segmentC~39
+    // 0=2402MHz ~ 39=2480MHz
+    tx_pwr_comp_seg_ctrl.segmentA = 35;
+    tx_pwr_comp_seg_ctrl.segmentB = 38;
+    tx_pwr_comp_seg_ctrl.segmentC = 39;
+    tx_pwr_comp_seg_ctrl.modem_type = modem_type;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_COMP_SEG_SET, (void *) &tx_pwr_comp_seg_ctrl);
+
+    // ZIGBEE
+    modem_type = HOSAL_RF_MODEM_2P4G_OQPSK;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_COMP_SET, (void*) &modem_type);
+
+    tx_pwr_ch_comp_ctrl.tx_power_stage0 = 31;
+    tx_pwr_ch_comp_ctrl.tx_power_stage1 = 31;
+    tx_pwr_ch_comp_ctrl.tx_power_stage2 = 31;
+    tx_pwr_ch_comp_ctrl.tx_power_stage3 = 10;
+    tx_pwr_ch_comp_ctrl.modem_type = modem_type;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_CH_COMP_SET, (void*) &tx_pwr_ch_comp_ctrl);
+    
+    // 0~segmentA-1, segmentA~segmentB-1, segmentB~segmentC-1, segmentC~39
+    // 0=2402MHz ~ 39=2480MHz
+    tx_pwr_comp_seg_ctrl.segmentA = 13;
+    tx_pwr_comp_seg_ctrl.segmentB = 26;
+    tx_pwr_comp_seg_ctrl.segmentC = 34;
+    tx_pwr_comp_seg_ctrl.modem_type = modem_type;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_COMP_SEG_SET, (void *) &tx_pwr_comp_seg_ctrl);
+}
+static void _tx_power_setting_ce(void)
+{
+    hosal_rf_modem_t modem_type;
+    hosal_rf_tx_power_ch_comp_t tx_pwr_ch_comp_ctrl;
+    hosal_rf_tx_power_comp_seg_t tx_pwr_comp_seg_ctrl;    
+    // BLE
+    modem_type = HOSAL_RF_MODEM_BLE;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_COMP_SET, (void*) &modem_type);
+
+    tx_pwr_ch_comp_ctrl.tx_power_stage0 = 29;
+    tx_pwr_ch_comp_ctrl.tx_power_stage1 = 30;
+    tx_pwr_ch_comp_ctrl.tx_power_stage2 = 30;
+    tx_pwr_ch_comp_ctrl.tx_power_stage3 = 30;
+    tx_pwr_ch_comp_ctrl.modem_type = modem_type;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_CH_COMP_SET, (void*) &tx_pwr_ch_comp_ctrl);
+    
+    // 0~segmentA-1, segmentA~segmentB-1, segmentB~segmentC-1, segmentC~39
+    // 0=2402MHz ~ 39=2480MHz
+    tx_pwr_comp_seg_ctrl.segmentA = 1;
+    tx_pwr_comp_seg_ctrl.segmentB = 38;
+    tx_pwr_comp_seg_ctrl.segmentC = 39;
+    tx_pwr_comp_seg_ctrl.modem_type = modem_type;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_COMP_SEG_SET, (void *) &tx_pwr_comp_seg_ctrl);
+
+    // ZIGBEE
+    modem_type = HOSAL_RF_MODEM_2P4G_OQPSK;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_COMP_SET, (void*) &modem_type);
+
+    tx_pwr_ch_comp_ctrl.tx_power_stage0 = 28;
+    tx_pwr_ch_comp_ctrl.tx_power_stage1 = 29;
+    tx_pwr_ch_comp_ctrl.tx_power_stage2 = 29;
+    tx_pwr_ch_comp_ctrl.tx_power_stage3 = 29;
+    tx_pwr_ch_comp_ctrl.modem_type = modem_type;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_CH_COMP_SET, (void*) &tx_pwr_ch_comp_ctrl);
+    
+    // 0~segmentA-1, segmentA~segmentB-1, segmentB~segmentC-1, segmentC~39
+    // 0=2402MHz ~ 39=2480MHz
+    tx_pwr_comp_seg_ctrl.segmentA = 8;
+    tx_pwr_comp_seg_ctrl.segmentB = 26;
+    tx_pwr_comp_seg_ctrl.segmentC = 34;
+    tx_pwr_comp_seg_ctrl.modem_type = modem_type;
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_COMP_SEG_SET, (void *) &tx_pwr_comp_seg_ctrl);
+}
+
+void cpc_set_secondary_rf_cert_band(uint32_t band)
+{   
+    log_info("cert band %d", band);
+    if(band == 1)
+        _tx_power_setting_fcc();
+    else if (band == 2)
+        _tx_power_setting_ce();
+}
+
 extern uint32_t cpc_drv_uart_push_header(uint8_t *pHeader);
 extern void cpc_drv_uart_push_data(uint8_t *p_data, uint16_t length);
 
@@ -297,7 +424,9 @@ static uint32_t __cpc_hdlc_pkt_parser(uint8_t *pBuf, uint16_t plen)
             if(hdr->len == 0)
             {
                 /* Notfiy cpc header with no data */
+                vTaskSuspend(cpc_sys_taskHandle);
                 cpc_drv_uart_push_header((uint8_t *)hdr);
+                vTaskResume(cpc_sys_taskHandle);
             }
             else
             {
@@ -311,8 +440,10 @@ static uint32_t __cpc_hdlc_pkt_parser(uint8_t *pBuf, uint16_t plen)
                 else
                 {
                     /* Notfiy cpc header with data */
+                    vTaskSuspend(cpc_sys_taskHandle);
                     cpc_drv_uart_push_header((uint8_t *)hdr);
                     cpc_drv_uart_push_data(hdr->data , hdr->len);
+                    vTaskResume(cpc_sys_taskHandle);
                 }
             }
             u32_len = i + CPC_HDLC_HEADER_RAW_SIZE + hdr->len;
@@ -338,6 +469,13 @@ static void _uart_proces(uint8_t *packet, uint16_t *packet_length)
     /* TX proc */
     if(g_uart_tx_compelete == 1)
     {
+        if(g_uart_tx_start == 1)
+        {
+            vTaskSuspend(cpc_sys_taskHandle);
+            cpc_drv_trnsmit_complete();
+            vTaskResume(cpc_sys_taskHandle);        
+            g_uart_tx_start = 0;
+        }
         if(xQueueReceive(cpc_uart_handle, (void*)&uart_data, 0) == pdPASS)
         {
             g_uart_tx_compelete = 0;
@@ -357,7 +495,9 @@ static void _uart_proces(uint8_t *packet, uint16_t *packet_length)
                 txdam_cfg.dma_buf_size = CPC_HDLC_HEADER_RAW_SIZE;
                 memcpy(txdam_cfg.dma_buf, buffer_handle->hdlc_header, CPC_HDLC_HEADER_RAW_SIZE);
             }
+            // vTaskSuspend(cpc_sys_taskHandle);
             hosal_uart_ioctl(&cpc_uart_dev, HOSAL_UART_DMA_TX_START, &txdam_cfg);
+            g_uart_tx_start = 1;
             gpio_pin_clear(20);
         }
     }
@@ -372,6 +512,7 @@ static void _uart_proces(uint8_t *packet, uint16_t *packet_length)
 
     if(xReceivedBytes > 0)
     {
+        // vTaskSuspend(cpc_sys_taskHandle);
         // log_info_hexdump("",  &packet[*packet_length], xReceivedBytes);
         *packet_length += xReceivedBytes;
 
@@ -398,6 +539,7 @@ static void _uart_proces(uint8_t *packet, uint16_t *packet_length)
             }
             *packet_length -= offset;
         }
+        // vTaskResume(cpc_sys_taskHandle);
     }
 }
 
@@ -448,6 +590,7 @@ static void __cpc_sys_task(void *parameters_ptr)
 const char *cpc_secondary_app_version(void)
 {
     return RAFAEL_SDK_VER;
+    // return "3.6.1";
 }
 int cpc_uart_data_send(cpc_buffer_handle_t *buffer_handle, uint16_t payload_tx_len)
 {
@@ -498,6 +641,8 @@ void cpc_uart_init(void)
     hosal_uart_init(&cpc_uart_dev);
 
     shell_register_cmd(&g_cli_cmd_15p4_tx);
+    // shell_register_cmd(&g_cli_cmd_2chscan_en);
+
     s15p4tx_timer = xTimerCreate("15p4_T", 10, true, NULL, __15p4_tx_cb);
 
     gpio_cfg_output(20);

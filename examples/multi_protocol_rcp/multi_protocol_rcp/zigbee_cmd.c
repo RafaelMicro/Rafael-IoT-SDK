@@ -319,6 +319,8 @@ static void _simple_descriptor_response(zb_uint8_t param)
     uint8_t total_cluster_count, i;
     uint32_t pkt_len;
 
+    // log_info("%s\r\n", __FUNCTION__);
+
     do
     {
         resp = (zb_zdo_simple_desc_resp_t *)zb_buf_begin(buf);
@@ -330,7 +332,8 @@ static void _simple_descriptor_response(zb_uint8_t param)
 
         total_cluster_count = resp->simple_desc.app_input_cluster_count + resp->simple_desc.app_output_cluster_count;
 
-        pkt_len = sizeof(zb_af_simple_desc_1_1_t) + (total_cluster_count * sizeof(uint16_t)) + 1 + 2 + 1;
+        // pkt_len = sizeof(zb_af_simple_desc_1_1_t) + (total_cluster_count * sizeof(uint16_t)) + 1 + 2 + 1;
+        pkt_len = sizeof(zb_af_simple_desc_1_1_t) + ((total_cluster_count) * sizeof(uint16_t)); // -4 Take into accout app_cluster_list
         prsp_pd = pvPortMalloc(pkt_len);
         if (!prsp_pd)
         {
@@ -340,7 +343,10 @@ static void _simple_descriptor_response(zb_uint8_t param)
 
         prsp_pd[0] = resp->hdr.status;
         memcpy(&prsp_pd[1], (uint8_t *)&resp->hdr.nwk_addr, 2);
-        prsp_pd[3] = sizeof(zb_af_simple_desc_1_1_t) + (total_cluster_count * sizeof(uint16_t));
+        prsp_pd[3] = sizeof(zb_af_simple_desc_1_1_t) + ((total_cluster_count) * sizeof(uint16_t)) - (sizeof(uint16_t) * 2); // -4 Take into accout app_cluster_list
+
+        // log_info("descriptro length: %d\r\n", prsp_pd[3]);
+
         zb_copy_simple_desc((zb_af_simple_desc_1_1_t *)&prsp_pd[4], &resp->simple_desc);
         zb_buf_free(param);
     } while (0);
@@ -725,7 +731,15 @@ static void __cmd_device_leave_request(zigbee_cmd_req_t *pt_cmd_req)
         memcpy(req_params->device_address, pdata, 8);
         req_params->remove_children = pdata[8];
         req_params->rejoin = pdata[9];
-        req_params->dst_addr = pt_cmd_req->cmd_dst_addr;
+        if (pt_cmd_req->cmd_dst_addr == 0x0000)
+        {
+            req_params->dst_addr = zb_address_short_by_ieee(req_params->device_address);
+            // log_info("target: %04x\r\n", req_params->dst_addr);
+        }
+        else
+        {
+            req_params->dst_addr = pt_cmd_req->cmd_dst_addr;
+        }
         tsn = zdo_mgmt_leave_req(buf, _device_leave_response);
 
         if (tsn < 0xFF)
@@ -896,16 +910,7 @@ static void __cmd_gateway_ext_address_request(zigbee_cmd_req_t *pt_cmd_req)
     uint8_t status = STATUS_SUCCESS;
     uint8_t extAddr[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
-    status = flash_read_sec_register((uint32_t)temp, 0x1100);
-    if (status == STATUS_SUCCESS)
-    {
-        memcpy(extAddr, temp + 8, 8);
-    }
-    // if((extAddr[0] == 0xFF) && (extAddr[1] == 0xFF) && (extAddr[2] == 0xFF) && (extAddr[3] == 0xFF) && 
-    //    (extAddr[4] == 0xFF) && (extAddr[5] == 0xFF) && (extAddr[6] == 0xFF) && (extAddr[7] == 0xFF))
-    // {
-    //     status = flash_get_unique_id((uint32_t)extAddr, 8);
-    // }
+    memcpy(extAddr, ZB_PIBCACHE_EXTENDED_ADDRESS(), 8);
 
     log_info("ext addr: %02x %02x %02x %02x %02x %02x %02x %02x", 
         extAddr[7],

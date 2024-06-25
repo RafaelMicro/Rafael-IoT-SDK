@@ -229,6 +229,7 @@ void upgrade_cmd_send(uint32_t cmd_id, uint16_t addr, uint8_t addr_mode, uint8_t
         if(status != STATUS_OK)
         {
             log_error("UPG Tx fail (%X)!\n", status);
+
             vPortFree(gateway_cmd_pkt);
         }
         else
@@ -345,9 +346,7 @@ static void upgrade_cmd_debug_handle(uint32_t cmd_id, uint8_t *pBuf)
 
         if(p_tmp_buf)
         {
-            while (flash_check_busy());
-            flash_read_page((uint32_t)p_tmp_buf, start_address);
-            while (flash_check_busy());
+            memcpy(p_tmp_buf, start_address, 0x100);
             upgrade_cmd_send(0xE0008002, 0, 0, 0, p_tmp_buf, 0x100);
             vPortFree(p_tmp_buf);
         }
@@ -624,8 +623,12 @@ static void upgrade_cpc_task(void *parameters_ptr)
 void cpc_upgrade_init(void)
 {
     uint8_t state;
-    cpc_open_user_endpoint(&upgrade_endpoint_handle, 
+    state = cpc_open_user_endpoint(&upgrade_endpoint_handle, 
                             CPC_ENDPOINT_USER_ID_0, 0, 10);
+
+    if(state == 0)
+        log_info("Opened Firmware upgrade EP");
+
     cpc_set_endpoint_option(&upgrade_endpoint_handle, 
                             CPC_ENDPOINT_ON_IFRAME_WRITE_COMPLETED, 
                             (void *)upgrade_cpc_tx_callback);

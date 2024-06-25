@@ -153,8 +153,8 @@ static void __cpc_hci_ep_proc(cpc_hci_event_t evt)
 
         log_error("cpc hci ep error %d", ep_state);
 
-        if(ep_state == CPC_STATE_ERROR_DESTINATION_UNREACHABLE)
-            cpc_system_reset(0);
+        // if(ep_state == CPC_STATE_ERROR_DESTINATION_UNREACHABLE)
+        //     cpc_system_reset(0);
 
         cpc_close_endpoint(&cpc_hci_ep_handle);
         cpc_set_state(&cpc_hci_ep_handle, CPC_STATE_OPEN);

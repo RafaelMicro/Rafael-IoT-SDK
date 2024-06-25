@@ -132,6 +132,23 @@ typedef enum
     GW_CMD_APP_SRV_COLOR_MOVE_COLOR_TEMPERATURE    = 0x0000004b,
     GW_CMD_APP_SRV_COLOR_STEP_COLOR_TEMPERATURE    = 0x0000004c,
 } e_color_ctrl;
+
+#define GW_CMD_APP_SRV_DOOR_LOCK_BASE              0x240000
+typedef enum
+{
+    GW_CMD_APP_SRV_LOCK_DOOR = 0x00,
+    GW_CMD_APP_SRV_UNLOCK_DOOR,
+    GW_CMD_APP_SRV_TOGGLE,
+    GW_CMD_APP_SRV_GET_LOG_RECORD,
+    GW_CMD_APP_SRV_SET_PIN_CODE = 0x05,
+    GW_CMD_APP_SRV_GET_PIN_CODE,
+    GW_CMD_APP_SRV_CLEAR_PIN_CODE,
+    GW_CMD_APP_SRV_CLEAR_ALL_PIN_CODES,
+    GW_CMD_APP_SRV_SET_USER_STATUS,
+    GW_CMD_APP_SRV_GET_USER_STATUS,
+    GW_CMD_APP_SRV_SET_USER_TYPE = 0x14,
+    GW_CMD_APP_SRV_GET_USER_TYPE,
+} e_door_lock;
 //=============================================================================
 //                Private Struct
 //=============================================================================
@@ -140,6 +157,7 @@ typedef struct __attribute__((packed))
     uint8_t header[4];
     uint8_t len;
 } gateway_cmd_hdr;
+
 typedef struct __attribute__((packed))
 {
     uint32_t command_id;
@@ -944,48 +962,31 @@ static void _cmd_dev_level_ctrl_handle(uint32_t cmd_id, uint8_t *pkt)
     {
     case GW_CMD_APP_SRV_LEVEL_MOVE_TO_LEVEL:
     case GW_CMD_APP_SRV_LEVEL_MOVE_TO_LEVEL_WITH_ONOFF:
-        attr_data_len = 3;
-        p_attr_data = pvPortMalloc(attr_data_len);
-
-        if (p_attr_data == NULL)
-        {
-            break;
-        }
-        disable_default_rsp = pt_pd->parameter[1];
-        memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
+        attr_data_len = 5;
         break;
-
     case GW_CMD_APP_SRV_LEVEL_MOVE:
     case GW_CMD_APP_SRV_LEVEL_MOVE_WITH_ONOFF:
-        attr_data_len = 2;
-        p_attr_data = pvPortMalloc(attr_data_len);
-
-        if (p_attr_data == NULL)
-        {
-            break;
-        }
-        disable_default_rsp = pt_pd->parameter[1];
-        memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
+        attr_data_len = 4;
         break;
     case GW_CMD_APP_SRV_LEVEL_STEP:
     case GW_CMD_APP_SRV_LEVEL_STEP_WITH_ONOFF:
-        attr_data_len = 4;
-        p_attr_data = pvPortMalloc(attr_data_len);
-
-        if (p_attr_data == NULL)
-        {
-            break;
-        }
-        disable_default_rsp = pt_pd->parameter[1];
-        memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
+        attr_data_len = 6;
         break;
     case GW_CMD_APP_SRV_LEVEL_STOP:
-        attr_data_len = 0;
-        disable_default_rsp = pt_pd->parameter[1];
+        attr_data_len = 2;
         break;
     default:
         break;
     }
+
+    p_attr_data = pvPortMalloc(attr_data_len);
+
+    if (p_attr_data == NULL)
+    {
+        return;
+    }
+    disable_default_rsp = pt_pd->parameter[1];
+    memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
 
     do
     {
@@ -1112,97 +1113,43 @@ static void _cmd_dev_color_ctrl_handle(uint32_t cmd_id, uint8_t *pkt)
     {
     case GW_CMD_APP_SRV_COLOR_MOVE_TO_HUE:
     case GW_CMD_APP_SRV_COLOR_MOVE_TO_HUE_AND_SATURATION:
-        attr_data_len = 4;
-        p_attr_data = pvPortMalloc(attr_data_len);
-
-        if (p_attr_data == NULL)
-        {
-            break;
-        }
-        disable_default_rsp = pt_pd->parameter[1];
-        memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
+        attr_data_len = 6;
         break;
-
     case GW_CMD_APP_SRV_COLOR_MOVE_HUE:
     case GW_CMD_APP_SRV_COLOR_MOVE_SATURATION:
-        attr_data_len = 2;
-        p_attr_data = pvPortMalloc(attr_data_len);
-
-        if (p_attr_data == NULL)
-        {
-            break;
-        }
-        disable_default_rsp = pt_pd->parameter[1];
-        memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
+        attr_data_len = 4;
         break;
-
     case GW_CMD_APP_SRV_COLOR_STEP_HUE:
     case GW_CMD_APP_SRV_COLOR_MOVE_TO_SATURATION:
     case GW_CMD_APP_SRV_COLOR_STEP_SATURATION:
-        attr_data_len = 3;
-        p_attr_data = pvPortMalloc(attr_data_len);
-
-        if (p_attr_data == NULL)
-        {
-            break;
-        }
-        disable_default_rsp = pt_pd->parameter[1];
-        memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
+        attr_data_len = 5;
         break;
-
     case GW_CMD_APP_SRV_COLOR_STEP_COLOR:
     case GW_CMD_APP_SRV_COLOR_MOVE_TO_COLOR:
-        attr_data_len = 6;
-        p_attr_data = pvPortMalloc(attr_data_len);
-
-        if (p_attr_data == NULL)
-        {
-            break;
-        }
-        disable_default_rsp = pt_pd->parameter[1];
-        memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
+        attr_data_len = 8;
         break;
-
     case GW_CMD_APP_SRV_COLOR_MOVE_COLOR:
     case GW_CMD_APP_SRV_COLOR_MOVE_TO_COLOR_TEMPERATURE:
-        attr_data_len = 4;
-        p_attr_data = pvPortMalloc(attr_data_len);
-
-        if (p_attr_data == NULL)
-        {
-            break;
-        }
-        disable_default_rsp = pt_pd->parameter[1];
-        memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
+        attr_data_len = 6;
         break;
-
     case GW_CMD_APP_SRV_COLOR_MOVE_COLOR_TEMPERATURE:
-        attr_data_len = 7;
-        p_attr_data = pvPortMalloc(attr_data_len);
-
-        if (p_attr_data == NULL)
-        {
-            break;
-        }
-        disable_default_rsp = pt_pd->parameter[1];
-        memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
-        break;
-
-    case GW_CMD_APP_SRV_COLOR_STEP_COLOR_TEMPERATURE:
         attr_data_len = 9;
-        p_attr_data = pvPortMalloc(attr_data_len);
-
-        if (p_attr_data == NULL)
-        {
-            break;
-        }
-        disable_default_rsp = pt_pd->parameter[1];
-        memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
         break;
-
+    case GW_CMD_APP_SRV_COLOR_STEP_COLOR_TEMPERATURE:
+        attr_data_len = 11;
+        break;
     default:
         break;
     }
+
+    p_attr_data = pvPortMalloc(attr_data_len);
+
+    if (p_attr_data == NULL)
+    {
+        return;
+    }
+    disable_default_rsp = pt_pd->parameter[1];
+    memcpy(p_attr_data, &pt_pd->parameter[2], attr_data_len);
 
     do
     {
@@ -1228,6 +1175,148 @@ static void _cmd_dev_color_ctrl_handle(uint32_t cmd_id, uint8_t *pkt)
         }
     } while (0);
 }
+
+
+static void _cmd_dev_door_lock_handle(uint32_t cmd_id, uint8_t *pkt)
+{
+    gateway_cmd_hdr *pt_hdr = (gateway_cmd_hdr *)pkt;
+    gateway_cmd_pd *pt_pd = (gateway_cmd_pd *)&pkt[5];
+
+    zcl_data_req_t *pt_data_req;
+
+    uint8_t disable_default_rsp = 1;
+    uint8_t attr_data_len = 0;
+    uint8_t *p_attr_data = NULL;
+    uint32_t address_mode = 0;
+    uint16_t user_id = 0;
+    uint8_t user_status = 0;
+    uint8_t user_type = 0;
+
+    // log_info("%s\r\n", __FUNCTION__);
+
+    address_mode = (pt_pd->address_mode == 0) ?ZB_APS_ADDR_MODE_16_ENDP_PRESENT :ZB_APS_ADDR_MODE_16_GROUP_ENDP_NOT_PRESENT;
+
+    switch (cmd_id)
+    {
+    case GW_CMD_APP_SRV_LOCK_DOOR:
+    case GW_CMD_APP_SRV_UNLOCK_DOOR:
+    case GW_CMD_APP_SRV_TOGGLE:
+        disable_default_rsp = 0x01;
+        attr_data_len = pt_pd->parameter[1] + 1;
+        p_attr_data = pvPortMalloc(attr_data_len);
+        if (p_attr_data == NULL)
+        {
+            break;
+        }
+        p_attr_data[0] = attr_data_len - 1;
+        memcpy(&p_attr_data[1], &pt_pd->parameter[2], attr_data_len);
+        // log_info("PIN Code: ");
+        // for (int i = 0; i < attr_data_len; i++)
+        // {
+        //     log_info("%02x ", p_attr_data[i]);
+        // }
+        // log_info("\r\n");
+        break;
+    case GW_CMD_APP_SRV_SET_PIN_CODE:
+        attr_data_len = pt_hdr->len - 8;
+        user_id = pt_pd->parameter[1] | pt_pd->parameter[2] >> 8;
+        user_status = pt_pd->parameter[3];
+        user_type = pt_pd->parameter[4];
+
+        // log_info("user id: %04x", user_id);
+        // log_info("user status: %02x", user_status);
+        // log_info("user type: %02x", user_type);
+        // log_info("pin code len: %d\r\n", pt_pd->parameter[5]);
+        // for (int i = 0; i < pt_pd->parameter[5]; i++)
+        // {
+        //     log_info("%c", pt_pd->parameter[6 + i]);
+        // }
+        // log_info("\r\n");
+        p_attr_data = pvPortMalloc(attr_data_len);
+
+        if (p_attr_data == NULL)
+        {
+            break;
+        }
+        disable_default_rsp = 0x01;
+        memcpy(p_attr_data, &pt_pd->parameter[1], attr_data_len);
+        break;
+    case GW_CMD_APP_SRV_GET_PIN_CODE:
+    case GW_CMD_APP_SRV_CLEAR_PIN_CODE:
+    case GW_CMD_APP_SRV_GET_USER_STATUS:
+    case GW_CMD_APP_SRV_GET_USER_TYPE:
+        attr_data_len = 2;
+        disable_default_rsp = 0x01;
+        user_id = pt_pd->parameter[1] | pt_pd->parameter[2] >> 8;
+        // log_info("user id: %04x", user_id);         
+        p_attr_data = pvPortMalloc(attr_data_len);
+        if (p_attr_data == NULL)
+        {
+            break;
+        }   
+        memcpy(p_attr_data, &pt_pd->parameter[1], attr_data_len);
+        break;
+    case GW_CMD_APP_SRV_CLEAR_ALL_PIN_CODES:
+        attr_data_len = 0;
+        disable_default_rsp = 0x01;
+        break;
+    case GW_CMD_APP_SRV_SET_USER_STATUS:
+        attr_data_len = 3;
+        disable_default_rsp = 0x01;
+        user_id = pt_pd->parameter[1] | pt_pd->parameter[2] >> 8;
+        user_status = pt_pd->parameter[3];
+        // log_info("user id: %04x", user_id);  
+        // log_info("user status: %02x", user_status);       
+        p_attr_data = pvPortMalloc(attr_data_len);
+        if (p_attr_data == NULL)
+        {
+            break;
+        }   
+        memcpy(p_attr_data, &pt_pd->parameter[1], attr_data_len);
+        break;
+    case GW_CMD_APP_SRV_SET_USER_TYPE:
+        attr_data_len = 3;
+        disable_default_rsp = 0x01;
+        user_id = pt_pd->parameter[1] | pt_pd->parameter[2] >> 8;
+        user_type = pt_pd->parameter[3];
+        // log_info("user id: %04x", user_id);  
+        // log_info("user type: %02x", user_type);       
+        p_attr_data = pvPortMalloc(attr_data_len);
+        if (p_attr_data == NULL)
+        {
+            break;
+        }   
+        memcpy(p_attr_data, &pt_pd->parameter[1], attr_data_len);
+        break;
+    default:
+        break;
+    }
+
+    do
+    {
+        ZIGBEE_ZCL_DATA_REQ(pt_data_req, pt_pd->address, address_mode,
+                            pt_pd->parameter[0], ZIGBEE_DEFAULT_ENDPOINT,
+                            ZB_ZCL_CLUSTER_ID_DOOR_LOCK,
+                            cmd_id,
+                            TRUE, disable_default_rsp,
+                            ZCL_FRAME_CLIENT_SERVER_DIR, 0, attr_data_len)
+
+        if (pt_data_req)
+        {
+            if (attr_data_len > 0 && p_attr_data)
+            {
+                memcpy(pt_data_req->cmdFormat, p_attr_data, attr_data_len);
+            }
+            zigbee_app_zcl_send_command(pt_data_req);
+            vPortFree(pt_data_req);
+        }
+        if (p_attr_data)
+        {
+            vPortFree(p_attr_data);
+        }
+    } while (0);
+}
+
 static void _gw_app_cmd_service_handle(uint32_t cmd_id, uint8_t *pkt)
 {
     log_info("cmd_id %04X, plen %d, %p", cmd_id, pkt[4], pkt);
@@ -1272,6 +1361,11 @@ static void _gw_app_cmd_service_handle(uint32_t cmd_id, uint8_t *pkt)
               (cmd_id < GW_CMD_APP_SRV_COLOR_CTRL_BASE + GW_CMD_APP_CMD_OFFSET))
     {
         _cmd_dev_color_ctrl_handle(cmd_id - GW_CMD_APP_SRV_COLOR_CTRL_BASE, pkt);
+    }
+    else if ( (cmd_id >= GW_CMD_APP_SRV_DOOR_LOCK_BASE) &&
+              (cmd_id < GW_CMD_APP_SRV_DOOR_LOCK_BASE + GW_CMD_APP_CMD_OFFSET))
+    {
+        _cmd_dev_door_lock_handle(cmd_id - GW_CMD_APP_SRV_DOOR_LOCK_BASE, pkt);
     }
 }
 static uint8_t _gateway_checksum_calc(uint8_t *pBuf, uint8_t len)
@@ -1354,6 +1448,7 @@ void zigbee_gw_cmd_send(uint32_t cmd_id, uint16_t addr, uint8_t addr_mode, uint8
     _zb_app_data_t *zb_data = NULL;
     uint8_t *gateway_cmd_pkt;
     uint32_t pkt_len;
+    uint32_t ep_len = 0;
     uint8_t idx = 0;
 
     do
@@ -1393,23 +1488,18 @@ void zigbee_gw_cmd_send(uint32_t cmd_id, uint16_t addr, uint8_t addr_mode, uint8
 
         if (src_endp != 0)
         {
+            ep_len = 1;
             ((gateway_cmd_pd *)(&gateway_cmd_pkt[idx]))->parameter[0] = src_endp;
-            memcpy(((gateway_cmd_pd *)(&gateway_cmd_pkt[idx]))->parameter + 1, pParam, len);
         }
-        else
-        {
-            memcpy(((gateway_cmd_pd *)(&gateway_cmd_pkt[idx]))->parameter, pParam, len);
-        }
+        memcpy(((gateway_cmd_pd *)(&gateway_cmd_pkt[idx]))->parameter + ep_len, pParam, len);
 
-        idx += sizeof(gateway_cmd_pd) + len;
-
-        if (src_endp != 0)
-        {
-            idx += 1;
-        }        
-
-        ((gateway_cmd_end *)(&gateway_cmd_pkt[idx]))->cs = _gateway_checksum_calc((uint8_t *) & (((gateway_cmd_hdr *)(gateway_cmd_pkt))->len),
-                (sizeof(gateway_cmd_pd) + len + 1));
+        idx += sizeof(gateway_cmd_pd) + len + ep_len;
+      
+        ((gateway_cmd_end *)(&gateway_cmd_pkt[idx]))->cs = 
+            _gateway_checksum_calc((uint8_t *) & (((gateway_cmd_hdr *)(gateway_cmd_pkt))->len),
+            sizeof(gateway_cmd_pd) + len + 1 + ep_len);
+        // log_info("sizeof(gateway_cmd_pd): %02x", sizeof(gateway_cmd_pd));
+        // log_info("len: %02x", (sizeof(gateway_cmd_pd) + len + 1 + ep_len));
         log_info_hexdump("GW_TX", gateway_cmd_pkt, pkt_len);
 
         if(xQueueSend(g_cmd_queue, (void *) &zb_data, 0) != pdPASS)
