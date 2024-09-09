@@ -1,2 +1,26 @@
 sdk_add_static_library(ble_host)
-sdk_add_include_directories(include)
+sdk_add_static_library(ble_cmd_api)
+sdk_add_static_library(ble_service)
+sdk_add_include_directories(
+    ${CMAKE_CURRENT_LIST_DIR}/ble-cmd-api/include
+    ${CMAKE_CURRENT_LIST_DIR}/hci/include
+    ${CMAKE_CURRENT_LIST_DIR}/lib-host/include
+)
+sdk_add_include_directories(
+    ${CMAKE_CURRENT_LIST_DIR}/ble-cmd-api/include
+)
+
+sdk_add_include_directories(
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/bas/include
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/bls/include
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/common/include
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/dis/include
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/fota/include
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/gaps/include
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/gatts/include
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/hids/include
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/hrs/include
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/mesh_prov/include
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/mesh_proxy/include
+    ${CMAKE_CURRENT_LIST_DIR}/ble-service/trsps/include
+)
