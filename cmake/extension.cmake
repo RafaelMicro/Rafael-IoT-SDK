@@ -378,13 +378,16 @@ endfunction()
 function(app_git_version git_version)
     execute_process(
         COMMAND git describe --dirty=-test --always --tags --long --match "${CONFIG_BUILD_PORJECT}*"
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         OUTPUT_VARIABLE GIT_REV OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
     )
-    message("${CONFIG_BUILD_PORJECT}-" "${GIT_REV}")
-    string(REPLACE "${CONFIG_BUILD_PORJECT}-" "" var ${GIT_REV}) 
-    set(${git_version} ${var} PARENT_SCOPE)
+    if(GIT_REV STREQUAL "")
+      set(${git_version} "auto-build")
+    else()
+      message("${CONFIG_BUILD_PORJECT}-" "${GIT_REV}")
+      string(REPLACE "${CONFIG_BUILD_PORJECT}-" "" var ${GIT_REV}) 
+      set(${git_version} ${var} PARENT_SCOPE)
+    endif()
 endfunction()
 
 function(show_banner) 
