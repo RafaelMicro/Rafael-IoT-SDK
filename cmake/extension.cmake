@@ -382,6 +382,7 @@ function(app_git_version git_version)
         OUTPUT_VARIABLE GIT_REV OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
     )
+    message("${CONFIG_BUILD_PORJECT}-" "${GIT_REV}")
     string(REPLACE "${CONFIG_BUILD_PORJECT}-" "" var ${GIT_REV}) 
     set(${git_version} ${var} PARENT_SCOPE)
 endfunction()
