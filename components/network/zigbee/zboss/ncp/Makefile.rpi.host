@@ -1,0 +1,121 @@
+#/* ZBOSS Zigbee software protocol stack
+# *
+# * Copyright (c) 2012-2020 DSR Corporation, Denver CO, USA.
+# * www.dsr-zboss.com
+# * www.dsr-corporation.com
+# * All rights reserved.
+# *
+# * This is unpublished proprietary source code of DSR Corporation
+# * The copyright notice does not evidence any actual or intended
+# * publication of such source code.
+# *
+# * ZBOSS is a registered trademark of Data Storage Research LLC d/b/a DSR
+# * Corporation
+# *
+# * Commercial Usage
+# * Licensees holding valid DSR Commercial licenses may use
+# * this file in accordance with the DSR Commercial License
+# * Agreement provided with the Software or, alternatively, in accordance
+# * with the terms contained in a written agreement between you and
+# * DSR.
+#
+# PURPOSE: ZBOSS NCP Host.
+# Makefile for RPI host-side shared library implementing Low Level protocol and SPI i/o.
+
+
+#RPI-TOOLCHAIN = $(HOME)/rpi/tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf
+# at dserver - in /opt. Got toolchain from url: codeload.github.com/raspberrypi/tools/zip/master
+RPI-TOOLCHAIN = /opt/toolchains/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf
+RPI-ARCH = arm-linux-gnueabihf
+CROSS-PREFIX = $(RPI-ARCH)-
+
+AS  = $(RPI-TOOLCHAIN)/bin/$(CROSS-PREFIX)as
+CC  = $(RPI-TOOLCHAIN)/bin/$(CROSS-PREFIX)gcc
+CXX = $(RPI-TOOLCHAIN)/bin/$(CROSS-PREFIX)g++
+LD  = $(RPI-TOOLCHAIN)/bin/$(CROSS-PREFIX)ld
+
+.PHONY: all clean
+.SUFFIXES: .c .o .d .shared.o .shared.d .so
+
+PROJECT_ROOT = ..
+
+NCP_HOME = $(PROJECT_ROOT)/ncp
+NCP_COMMON_INC = $(PROJECT_ROOT)/include/ncp
+
+LL_HOME = $(NCP_HOME)/low_level
+LL_INC = $(LL_HOME)/.. -I$(LL_HOME)
+LL_SRCS = \
+  $(LL_HOME)/zbncp_ll_impl.c \
+  $(LL_HOME)/zbncp_tr_impl.c \
+  $(LL_HOME)/zbncp_node.c \
+  $(LL_HOME)/zbncp_mem.c \
+  $(LL_HOME)/zbncp_utils.c \
+  $(LL_HOME)/zbncp_divider.c \
+  $(LL_HOME)/zbncp_reassembling.c \
+  $(LL_HOME)/zbncp_fragmentation.c \
+  $(LL_HOME)/zbncp_debug.c
+
+SPIDEV_HOME = $(NCP_HOME)/transport/rpi_spidev/linux_spi
+SPIDEV_SRCS = \
+  $(SPIDEV_HOME)/gpio_serve.c \
+  $(SPIDEV_HOME)/linux_spi_transport.c
+
+NCPLLHOST_SRCS = \
+  $(LL_SRCS) \
+  $(SPIDEV_SRCS) \
+  $(NCP_HOME)/transport/rpi_spidev/zb_ncp_tr_spidev.c \
+  $(NCP_HOME)/high_level/host-shared/ncp_ll_host.c
+NCPLLHOST_INC = $(NCP_HOME)/high_level/host-shared
+
+NCPLLHOST_OBJS_SHARED = $(NCPLLHOST_SRCS:.c=.shared.o)
+NCPLLHOST_SHARED_LIB = zbs_ncp_rpi.so
+
+OBJS = $(NCPLLHOST_OBJS_SHARED)
+BINS = $(NCPLLHOST_SHARED_LIB)
+
+DEPS = $(OBJS:.o=.d)
+DEPFLAGS = -MT $@ -MMD -MP -MF $(@:.o=.d)
+OPTFLAGS = -O0
+DBGFLAGS = -g3 -gdwarf-3
+WARNFLAGS = -std=c11 -pedantic -W -Wall -Wextra -Wconversion -W
+DEFINES =
+INCPATH = -I$(SPIDEV_HOME) -I$(LL_INC) -I$(NCP_COMMON_INC) -I$(NCPLLHOST_INC)
+
+CFLAGS_COMMON = $(DBGFLAGS) $(OPTFLAGS) $(DEPFLAGS) $(WARNFLAGS) $(DEFINES) $(INCPATH)
+CFLAGS = $(CFLAGS_COMMON)
+CFLAGS_SHARED = -fPIC $(CFLAGS_COMMON)
+
+LIBS = -lpthread
+LIBPATH =
+PROFFLAGS =
+MEMDEBUG =
+LFLAGS = $(PROFFLAGS)
+LFLAGS_SHARED = $(LFLAGS) -shared
+LFLAGS_EXTRA =  $(MEMDEBUG) $(LIBS) -Wl,--gc-sections
+
+LINK_BINARY = $(CC) $(LFLAGS) -o $@ $^ $(LFLAGS_EXTRA)
+LINK_BINARY_SHARED_LIB = $(CC) $(LFLAGS_SHARED) -o $@ $^ $(LFLAGS_EXTRA)
+
+%.o : %.c %.d
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+%.shared.o : %.c %.shared.d
+	$(CC) -c $(CFLAGS_SHARED) -o $@ $<
+
+.PRECIOUS: %.d
+%.d: ;
+
+# at RPi control CS manually to do packet hdr and body recv keeping CS low
+CFLAGS_SHARED += -DZB_CONTEXTS_IN_SEPARATE_FILE -DZB_NCP_HOST_RPI=1 -D_XOPEN_SOURCE=500 -DSPI_MANUAL_CS
+
+$(NCPLLHOST_SHARED_LIB) : $(NCPLLHOST_OBJS_SHARED)
+	$(LINK_BINARY_SHARED_LIB)
+
+all: $(BINS)
+
+clean:
+	$(RM) $(OBJS) $(DEPS) $(BINS)
+
+rebuild: clean all
+
+-include $(DEPS)

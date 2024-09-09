@@ -1,0 +1,7 @@
+menu "PROJECT CONFIG"
+
+config  CONFIG_MP_SECTOR
+    bool "CONFIG_MP_SECTOR"
+    default 1
+
+endmenu

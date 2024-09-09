@@ -1,0 +1,25 @@
+menu "CPC"
+depends on BUILD_COMPONENT_CPC
+config CPC_RX_PAYLOAD_MAX_LENGTH
+    int "Rx payload max length"
+	def_int 620
+    help
+        Rx payload max length
+
+config CPC_CRC_0
+    bool "CRC algorithm - 0"
+	def_bool false
+
+config CPC_ENABLE_ZIGBEE
+    bool "Suport ZIGBEE"
+	def_bool ture
+
+config CPC_ENABLE_THREAD
+    bool "Suport thread"
+	def_bool ture
+
+config CPC_ENABLE_BLUETOOTH
+    bool "Suport bluetooth"
+	def_bool ture
+
+endmenu

@@ -1,0 +1,6 @@
+menu "PLATFROM"
+
+source "components/platform/hosal/Kconfig"
+source "components/platform/soc/Kconfig"
+
+endmenu

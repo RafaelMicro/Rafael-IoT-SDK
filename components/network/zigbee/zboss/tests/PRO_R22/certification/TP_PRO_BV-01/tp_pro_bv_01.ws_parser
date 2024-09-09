@@ -1,0 +1,27 @@
+# TP-PRO-BV-01 (ZigBee Document 07-5035-07)
+
+# gZC address (wpan.src64): aa:aa:aa:aa:aa:aa:aa:aa
+# gZC short address (): 0x0000
+# DUT ZR address (wpan.src64): 00:00:00:01:00:00:00:00
+# PAN id (wpan.dst_pan): -
+
+# Pass verdict:
+
+# 1) DUT ZR shall issue a MLME_Beacon Request MAC command frame,
+# and gZC shall respond with beacon.
+wpan.cmd, Beacon Request, count, 2
+wpan, Beacon, zbee_beacon.ext_panid, aa:aa:aa:aa:aa:aa:aa:aa, wpan.src16, 0x00000000, wpan.assoc_permit, True
+
+# 2) Based on the active scan result DUT ZR is able to complete the MAC
+# association sequence with gZC and gets new short address from
+# Coordinator (Generated in a random manner within the range 1 to
+# 0xFFF7).
+wpan.cmd, Association Request, wpan.src64, 00:00:00:01:00:00:00:00
+wpan.cmd, Association Response, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst64, 00:00:00:01:00:00:00:00, wpan.assoc.status, 0x00000000, delta_time, -2
+
+# Optional: Check Device Annce from DUT ZR
+zbee_aps.zdp_cluster, Device Announcement, zbee_zdp.ext_addr, 00:00:00:01:00:00:00:00
+
+# Optional: Link Status (alive) check for both devices
+zbee_nwk.cmd.id, 0x00000008, zbee_nwk.src64, aa:aa:aa:aa:aa:aa:aa:aa
+zbee_nwk.cmd.id, 0x00000008, zbee_nwk.src64, 00:00:00:01:00:00:00:00

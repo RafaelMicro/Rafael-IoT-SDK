@@ -1,0 +1,25 @@
+{
+  "name" : "tp_pro_bv_03",
+
+  "instances" : [
+    {
+      "binary"      : "./zc",
+      "test_role"   : "dut1",
+      "start_idx"   : 0
+    },
+    {
+      "binary"      : "./zr",
+      "test_role"   : "dut2",
+      "start_idx"   : 1,
+      "wait_after_start"  : 10,
+      "kill_after" : 20
+    },
+    {
+      "binary"      : "./zed",
+      "test_role"   : "th1",
+      "start_idx"   : 2
+    }
+  ],
+
+  "timeout" : 120
+}

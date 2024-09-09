@@ -1,0 +1,29 @@
+{
+  "name" : "tp_pro_bv_04",
+
+  "instances" : [
+    {
+      "binary"      : "./tp_pro_bv_04_zc",
+      "test_role"   : "th1",
+      "start_idx"   : 0
+    },
+    {
+      "binary"      : "./tp_pro_bv_04_zr2",
+      "test_role"   : "dut1",
+      "start_idx"   : 1
+    },
+    {
+      "binary"      : "./tp_pro_bv_04_zr1",
+      "test_role"   : "dut2",
+      "start_idx"   : 2,
+      "wait_after_start": 20
+    },
+    {
+      "binary"      : "./tp_pro_bv_04_zed",
+      "test_role"   : "th2",
+      "start_idx"   : 3
+    }
+  ],
+
+  "timeout" : 120
+}

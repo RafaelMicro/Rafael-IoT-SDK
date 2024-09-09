@@ -1,0 +1,11 @@
+mainmenu "Rafael SDK Configuration"
+osource "${APPLICATION_SOURCE_DIR}/VERSION"
+menu "-------- USER SPACE --------"
+endmenu
+source "config/example.config"
+source "config/devices.config"
+source "config/components.config"
+menu "-------- KERNEL SPACE --------"
+endmenu
+source "config/compilier.config"
+source "components/Kconfig"

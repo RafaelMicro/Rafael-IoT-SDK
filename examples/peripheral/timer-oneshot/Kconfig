@@ -1,0 +1,2 @@
+config DEF_CHIP_TYPE_RT584
+    def_bool 1

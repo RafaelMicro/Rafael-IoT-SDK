@@ -1,0 +1,39 @@
+# TP-PRO-BV-05 (ZigBee Document 07-5035-07)
+
+# PANid=0x1AAA
+# gZC address (wpan.src64): aa:aa:aa:aa:aa:aa:aa:aa
+# gZC short address (): 0x0000
+# DUT ZR1 address (wpan.src64): 00:00:00:01:00:00:00:00
+# gZR2 address (wpan.src64): 00:00:00:02:00:00:00:00
+
+
+# >>> Initial Conditions
+# 1 Reset all nodes; SYMLINK=TRUE
+# 2 Set gZC under target stack profile. gZC as coordinator
+# starts a PAN = 0x1AAA network and is the Trust Centre for
+# the PAN.
+wpan.cmd, Beacon Request
+
+# 3 DUT ZR1 shall join PAN at gZC
+wpan.cmd, Beacon Request
+wpan, Beacon, zbee_beacon.ext_panid, aa:aa:aa:aa:aa:aa:aa:aa, wpan.src16, 0x00000000, wpan.assoc_permit, True
+wpan.cmd, Association Request, wpan.src64, 00:00:00:01:00:00:00:00, wpan.dst_pan, 0x00001aaa
+wpan.cmd, Association Response, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst64, 00:00:00:01:00:00:00:00, wpan.dst_pan, 0x00001aaa, wpan.assoc.status, 0x00000000, delta_time, -2
+zbee_aps.zdp_cluster, Device Announcement, zbee_zdp.ext_addr, 00:00:00:01:00:00:00:00, wpan.dst_pan, 0x00001aaa
+
+# gZR2 shall join PAN at gZC
+wpan.cmd, Beacon Request
+wpan, Beacon, zbee_beacon.ext_panid, aa:aa:aa:aa:aa:aa:aa:aa, wpan.src16, 0x00000000, wpan.assoc_permit, True
+wpan.cmd, Association Request, wpan.src64, 00:00:00:02:00:00:00:00, wpan.dst_pan, 0x00001aaa
+wpan.cmd, Association Response, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst64, 00:00:00:02:00:00:00:00, wpan.dst_pan, 0x00001aaa, wpan.assoc.status, 0x00000000, delta_time, -2
+zbee_aps.zdp_cluster, Device Announcement, zbee_zdp.ext_addr, 00:00:00:02:00:00:00:00, wpan.dst_pan, 0x00001aaa
+
+
+# >>> Test Procedure
+
+# 1 Wait 1 minute (or 4 x nwkLinkStatusPeriod if not using default values).
+# 1.1) gZC, DUT ZR1 and gZR2 shall broadcast (1 hop only) Link Status
+# commands every nwkLinkStatusPeriod (with random jitter).
+zbee_aps.zdp_cluster, Device Announcement, zbee_zdp.ext_addr, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst_pan, 0x00001aaa, count, -1, parallel, y
+zbee_aps.zdp_cluster, Device Announcement, zbee_zdp.ext_addr, 00:00:00:01:00:00:00:00, wpan.dst_pan, 0x00001aaa, count, -1, parallel, y
+zbee_aps.zdp_cluster, Device Announcement, zbee_zdp.ext_addr, 00:00:00:02:00:00:00:00, wpan.dst_pan, 0x00001aaa, count, -1, parallel, y

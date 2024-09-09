@@ -1,0 +1,10 @@
+menu "RT582 BOOTLOADER Configuration"
+
+config BOOTLOADER_DEBUG
+    bool "Enable bootloader debug"
+    default n
+    select BUILD_COMPONENT_UART_STDIO
+    help
+        Enable bootloader debug
+
+endmenu

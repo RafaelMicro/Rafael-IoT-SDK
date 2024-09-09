@@ -1,0 +1,77 @@
+# TP-NWK-BV-01 (ZigBee Document 07-5035-07)
+
+# DUT ZC 
+#    PAN ID = 0x1aaa    
+#    0x0000
+# Coordinator external address: aa:aa:aa:aa:aa:aa:aa:aa
+# DUT ZR1
+#    PAN ID = 0x1aaa
+#    00:00:00:01:00:00:00:00
+# DUT ZED1
+#    PAN ID = 0x1aaa
+#    00:00:00:00:00:00:00:01
+# gZC 
+#    PAN ID = 0x1aab
+#    0x0000
+# Coordinator external address: bb:bb:bb:bb:bb:bb:bb:bb
+# gZR1
+#    PAN ID = 0x1aab
+#    00:00:00:02:00:00:00:00
+# gZED1
+#    PAN ID = 0x1aab
+#    00:00:00:00:00:00:00:02
+
+# >>> Initial conditions
+# 1. Set up the golden unit network, and generate
+# packet traffic using ClusterId=0x0001, at two
+# second interval, length 60 bytes, from gZED1
+# to gZR1.
+
+# (start gZC)
+wpan.cmd, Beacon Request
+
+# (join device gZR1 to gZC)
+wpan.cmd, Beacon Request
+wpan.frame_type, Beacon, zbee_beacon.ext_panid, bb:bb:bb:bb:bb:bb:bb:bb, wpan.src_pan, 0x1aab, wpan.src16, 0x00000000, wpan.assoc_permit, True
+wpan.cmd, Association Request, wpan.src64, 00:00:00:02:00:00:00:00, wpan.dst_pan, 0x1aab
+wpan.cmd, Association Response, wpan.src64, bb:bb:bb:bb:bb:bb:bb:bb, wpan.dst64, 00:00:00:02:00:00:00:00, wpan.dst_pan, 0x1aab, wpan.assoc.status, 0x00000000, delta_time, -2
+zbee_aps.zdp_cluster, Device Announcement, zbee_nwk.dst, 0x0000fffd, wpan.dst_pan, 0x1aab, zbee_zdp.ext_addr, 00:00:00:02:00:00:00:00
+
+# (join device gZED1 to gZC)
+wpan.cmd, Beacon Request
+wpan.frame_type, Beacon, zbee_beacon.ext_panid, bb:bb:bb:bb:bb:bb:bb:bb, wpan.src_pan, 0x1aab, wpan.src16, 0x00000000, wpan.assoc_permit, True
+wpan.cmd, Association Request, wpan.src64, 00:00:00:00:00:00:00:02, wpan.dst_pan, 0x1aab
+wpan.cmd, Association Response, wpan.src64, bb:bb:bb:bb:bb:bb:bb:bb, wpan.dst64, 00:00:00:00:00:00:00:02, wpan.dst_pan, 0x1aab, wpan.assoc.status, 0x00000000, delta_time, -2
+zbee_aps.zdp_cluster, Device Announcement, zbee_nwk.dst, 0x0000fffd, wpan.dst_pan, 0x1aab, zbee_zdp.ext_addr, 00:00:00:00:00:00:00:02
+
+# (pkt exchange)
+zbee_aps.t2.cluster, 0x0001, wpan.src64, 00:00:00:00:00:00:00:02, wpan.dst64, bb:bb:bb:bb:bb:bb:bb:bb, zbee_nwk.src64, 00:00:00:00:00:00:00:02, zbee_nwk.dst64, 00:00:00:02:00:00:00:00, delta_time, -2.5, count, -1, parallel, y
+zbee_aps.t2.cluster, 0x0001, wpan.src64, bb:bb:bb:bb:bb:bb:bb:bb, wpan.dst64, 00:00:00:02:00:00:00:00, zbee_nwk.src64, 00:00:00:00:00:00:00:02, zbee_nwk.dst64, 00:00:00:02:00:00:00:00, delta_time, -2.5, count, -1, parallel, y
+
+# >>> Test procedure
+
+# 1 DUT ZC starts a PAN.
+# 1.1) DUT ZC is able to start a PAN in presence of a reference network.
+wpan.cmd, Beacon Request
+
+# 2 DUT ZED1 joins DUT ZC.
+# 2.2) DUT ZED1 is able to join DUT ZC.
+wpan.cmd, Beacon Request
+wpan.frame_type, Beacon, zbee_beacon.ext_panid, aa:aa:aa:aa:aa:aa:aa:aa, wpan.src_pan, 0x1aaa, wpan.src16, 0x00000000, wpan.assoc_permit, True
+wpan.cmd, Association Request, wpan.src64, 00:00:00:00:00:00:00:01, wpan.dst_pan, 0x1aaa
+wpan.cmd, Association Response, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst64, 00:00:00:00:00:00:00:01, wpan.dst_pan, 0x1aaa, wpan.assoc.status, 0x00000000, delta_time, -2
+zbee_aps.zdp_cluster, Device Announcement, zbee_nwk.dst, 0x0000fffd, wpan.dst_pan, 0x1aaa, zbee_zdp.ext_addr, 00:00:00:00:00:00:00:01
+
+# 3 DUT ZR1 joins DUT ZC
+# 3.3) DUT ZR1 is able to join DUT ZC.
+wpan.cmd, Beacon Request
+wpan.frame_type, Beacon, zbee_beacon.ext_panid, aa:aa:aa:aa:aa:aa:aa:aa, wpan.src_pan, 0x1aaa, wpan.src16, 0x00000000, wpan.assoc_permit, True
+wpan.cmd, Association Request, wpan.src64, 00:00:00:01:00:00:00:00, wpan.dst_pan, 0x1aaa
+wpan.cmd, Association Response, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst64, 00:00:00:01:00:00:00:00, wpan.dst_pan, 0x1aaa, wpan.assoc.status, 0x00000000, delta_time, -2
+zbee_aps.zdp_cluster, Device Announcement, zbee_nwk.dst, 0x0000fffd, wpan.dst_pan, 0x1aaa, zbee_zdp.ext_addr, 00:00:00:01:00:00:00:00
+
+# 4 DUT ZED1 sends packets using ClusterId=0x0001, at two
+# second interval, length 60 bytes, from DUT ZED1 to ZR1.
+# 4.4) DUT ZED1 is able to send packets to DUT ZR1 through DUT ZC.
+zbee_aps.t2.cluster, 0x0001, wpan.src64, 00:00:00:00:00:00:00:01, wpan.dst64, aa:aa:aa:aa:aa:aa:aa:aa, zbee_nwk.src64, 00:00:00:00:00:00:00:01, zbee_nwk.dst64, 00:00:00:01:00:00:00:00, delta_time, -2.5, count, -1, parallel, y
+zbee_aps.t2.cluster, 0x0001, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst64, 00:00:00:01:00:00:00:00, zbee_nwk.src64, 00:00:00:00:00:00:00:01, zbee_nwk.dst64, 00:00:00:01:00:00:00:00, delta_time, -2.5, count, -1, parallel, y

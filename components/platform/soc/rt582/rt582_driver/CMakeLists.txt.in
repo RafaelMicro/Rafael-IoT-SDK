@@ -1,0 +1,5 @@
+sdk_add_static_library(rt582_driver)
+sdk_add_include_directories(
+    CMSIS/Include
+    Inc
+)

@@ -1,0 +1,94 @@
+# TP-R20-BV-01 (ZigBee Document 07-5035-07)
+
+# ZC EPID = 0x0000 0000 0000 0001
+#    PAN ID = 0x1aaa
+#    Short Address = 0x0000
+#    Long Address = aa:aa:aa:aa:aa:aa:aa:aa
+# ZR1 EPID = 0x0000 0000 0000 0001
+#     PAN ID = 0x1aaa
+#     Short Address = Generated in a
+#     random manner within the range 1 to 0xFFF7
+#     Long Address = 00:00:00:01:00:00:00:00
+# gZED1 EPID = 0x0000 0000 0000 0001
+#       PAN ID = 0x1aaa
+#       Short Address = Generated in a
+#       random manner within the range 1 to 0xFFF7
+#       Long Address = 00:00:00:00:00:00:00:01
+# gZED2 EPID = 0x0000 0000 0000 0001
+#       PAN ID = 0x1aaa
+#       Short Address = Generated in a
+#       random manner within the range 1 to 0xFFF7
+#       Long Address = 00:00:00:00:00:00:00:02
+
+# >>> Test Procedure
+# (start ZC)
+wpan.cmd, Beacon Request
+
+# 1 Join device ZR1 to ZC.
+# 1.1 ZR1 shall issue an MLME Beacon Request MAC command frame, and
+# ZC shall respond with a beacon.
+wpan.cmd, Beacon Request
+wpan.frame_type, Beacon, zbee_beacon.ext_panid, 00:00:00:00:00:00:00:01, wpan.src16, 0x00000000, wpan.assoc_permit, True
+
+# 1.2 ZR1 is able to complete the MAC association sequence with ZC and
+# gets a new short address, randomly generated.
+wpan.cmd, Association Request, wpan.src64, 00:00:00:01:00:00:00:00
+wpan.cmd, Association Response, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst64, 00:00:00:01:00:00:00:00, wpan.assoc.status, 0x00000000, delta_time, -2
+
+# 1.3 ZC sends an APS encrypted Transport key to ZR1 with the
+# current value of the Network Key.
+zbee_aps.cmd.id, Transport Key, zbee_aps.cmd.src, aa:aa:aa:aa:aa:aa:aa:aa, zbee_aps.cmd.dst, 00:00:00:01:00:00:00:00, zbee_aps.cmd.key, abcdef01234567890000000000000000
+
+# 1.4 ZR1 issues a ZDO device announcement sent to the broadcast
+# address (0xFFFD).
+zbee_aps.zdp_cluster, Device Announcement, zbee_nwk.dst, 0x0000fffd, zbee_zdp.ext_addr, 00:00:00:01:00:00:00:00
+
+# 2 Join device gZED1 to ZR1.
+# 2.5 gZED1 shall issue an MLME Beacon Request MAC command
+# frame, and ZR1 shall respond with a beacon.
+wpan.cmd, Beacon Request
+wpan.frame_type, Beacon, zbee_beacon.ext_panid, 00:00:00:00:00:00:00:01, !wpan.src16, 0x00000000, wpan.assoc_permit, True
+
+# 2.6 gZED1 is able to complete the MAC association sequence with ZC and
+# gets a new short address, randomly generated.
+wpan.cmd, Association Request, wpan.src64, 00:00:00:00:00:00:00:01
+wpan.cmd, Association Response, wpan.src64, 00:00:00:01:00:00:00:00, wpan.dst64, 00:00:00:00:00:00:00:01, wpan.assoc.status, 0x00000000, delta_time, -2
+
+# 2.7 ZR1 sends an APS update device command to ZC with APS
+# encryption, with a status code of 0x01 (Standard Device unsecured
+# join).
+zbee_aps.cmd.id, Update Device, wpan.src64, 00:00:00:01:00:00:00:00, wpan.dst16, 0x00000000, zbee_aps.cmd.device, 00:00:00:00:00:00:00:01, zbee_aps.security, True, zbee_aps.cmd.update_status, 01
+
+# 2.8 ZC sends an APS Tunnel Data command to ZR1 containing an APS
+# transport key command. The APS Tunnel command shall not be APS
+# encrypted, but the contained transport key command shall be APS
+# encrypted.
+zbee_aps.cmd.id, Tunnel, zbee_aps.cmd.id, Transport Key, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst64, 00:00:00:01:00:00:00:00, zbee_aps.cmd.src, aa:aa:aa:aa:aa:aa:aa:aa, zbee_aps.cmd.dst, 00:00:00:00:00:00:00:01, zbee_aps.security, False, zbee_aps.security, True
+zbee_aps.cmd.id, Transport Key, wpan.src64, 00:00:00:01:00:00:00:00, wpan.dst64, 00:00:00:00:00:00:00:01, zbee_aps.cmd.src, aa:aa:aa:aa:aa:aa:aa:aa, zbee_aps.cmd.dst, 00:00:00:00:00:00:00:01, zbee_aps.cmd.key, abcdef01234567890000000000000000
+
+# 2.9 gZED1 issues a ZDO device announcement sent to the broadcast
+# address (0xFFFD).
+zbee_aps.zdp_cluster, Device Announcement, zbee_nwk.dst, 0x0000fffd, zbee_zdp.ext_addr, 00:00:00:00:00:00:00:01
+
+# 3 Configure ZR1 to send the APS update device without
+# APS encryption. This step shall be skipped when
+# running with ZR1 as DUT.
+# 3.10 gZED2 shall issue an MLME Beacon Request MAC command
+# frame, and ZR1 shall respond with a beacon.
+wpan.cmd, Beacon Request
+wpan.frame_type, Beacon, zbee_beacon.ext_panid, 00:00:00:00:00:00:00:01, !wpan.src16, 0x00000000, wpan.assoc_permit, True
+
+# 3.11 gZED2 is able to complete the MAC association sequence with ZC and
+# gets a new short address, randomly generated.
+wpan.cmd, Association Request, wpan.src64, 00:00:00:00:00:00:00:02
+wpan.cmd, Association Response, wpan.src64, 00:00:00:01:00:00:00:00, wpan.dst64, 00:00:00:00:00:00:00:02, wpan.assoc.status, 0x00000000, delta_time, -2
+
+# 4 Join device gZED2. This step shall be skipped when
+# running with ZR1 as DUT.
+# 4.12 ZR1 sends an APS update device command to ZC without APS
+# encryption.
+zbee_aps.cmd.id, Update Device, wpan.src64, 00:00:00:01:00:00:00:00, wpan.dst16, 0x00000000, zbee_aps.cmd.device, 00:00:00:00:00:00:00:02, zbee_aps.security, False
+
+# 4.13 ZC sends no APS command to ZR1.
+zbee_aps.type, Command, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst64, 00:00:00:01:00:00:00:00, parallel, y, exclude, y
+

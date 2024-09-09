@@ -1,0 +1,8 @@
+menu "COMPONENT SETTING"
+
+source "components/cpc/Kconfig"
+source "components/network/Kconfig"
+source "components/platform/Kconfig"
+source "components/utility/Kconfig"
+
+endmenu

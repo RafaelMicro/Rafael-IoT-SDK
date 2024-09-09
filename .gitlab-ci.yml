@@ -1,0 +1,95 @@
+ #variables:
+  # GIT_DEPTH: 1
+   #GIT_STRATEGY: clone
+
+ #stages:
+  # - check
+  # - build
+   #- test
+
+ #format-check:
+   #stage: check
+   #tags:
+    # - "server3"
+   #rules:
+     #- if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE != "merge_test_schedule"'
+     #  when: never
+     #- if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+     #- if: '$CI_COMMIT_BRANCH == "rt584_driver_examples"'
+     #- if: '$CI_COMMIT_BRANCH == "main"'
+     #- if: '$CI_COMMIT_BRANCH == "Release_v1"'
+     
+   #script:
+    # - echo "This job runs in the check stage."
+    # - CI_Tools\AStyle.exe --options=CI_Tools\astyle_opt.txt "*.c,*.h" --exclude=Third_Party --exclude=CMSIS -I -Q
+    # - git diff --name-status --exit-code --diff-filter=M --color
+
+ #auto_build:
+   #stage: build
+   #tags:
+   #  - "server3"
+   #rules:
+     #- if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE != "merge_test_schedule"'
+     #  when: never
+     #- if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # - if: '$CI_COMMIT_BRANCH == "rt584_driver_examples"'
+     #- if: '$CI_COMMIT_BRANCH == "main"'
+     #- if: '$CI_COMMIT_BRANCH == "Release_v1"'
+   #script:
+    # - echo "This job runs in the build stage."
+    # - CI_Tools\auto_build.exe Project dist -w CI_Tools\auto_build_white_list.txt
+     #- CI_Tools\MailServer.exe
+     #- CI_Tools\IssueServer.exe
+   #artifacts:
+    # when: always
+    # paths:
+      # - dist
+
+ # auto_build_all:
+   # stage: build
+   # tags:
+     # - "server3"
+   # rules:
+     # - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE == "day_schedule"'
+   # script:
+     # - echo "This job runs in the build stage."
+     # - CI_Tools\auto_build_all.exe Project dist -e CI_Tools\auto_build_exclude_list.txt  -f 1
+     # - CI_Tools\auto_package\gcc_auto_package.exe gcc Project gcc_dist --compiler-path D:\GNU_Arm_Embedded_Toolchain\10_2021.10\bin --gcc-ld-list CI_Tools\auto_package\gcc-ld-list.json --gcc-makefile-path CI_Tools\GCC\Makefile
+     # - CI_Tools\PrintCheckAte\IoT_EVALUATION_TOOL.exe
+   # artifacts:
+     # when: always
+     # paths:
+       # - dist
+       # - gcc_dist
+   # after_script:
+     # - CI_Tools\MailServer.exe
+     # - CI_Tools\IssueServer.exe  
+
+ #basic-test:
+   #stage: test
+   #tags:
+    # - "server3"
+   #rules:
+     #- if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE != "merge_test_schedule"'
+      # when: never
+     #- if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+     #- if: '$CI_COMMIT_BRANCH == "rt584_driver_examples"'
+   #script:
+     #- echo "This job runs in the test stage."
+     #- echo "hello123" >> script.log
+   #artifacts:
+     #paths:
+       #- script.log
+
+ # tag_only_job:
+   # stage: build
+   # tags:
+     # - "server3"
+   # only:
+     # refs:
+       # - tags
+     # variables:
+       # - $CI_COMMIT_TAG =~ /^Release.*/
+   # script:
+   # - echo "This job3 runs in the build stage."
+  

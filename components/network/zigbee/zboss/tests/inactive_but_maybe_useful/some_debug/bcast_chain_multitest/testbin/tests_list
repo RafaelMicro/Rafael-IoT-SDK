@@ -1,0 +1,7 @@
+ZC TP_bcast_chain_bcast_chain_zc ../TP_bcast_chain/bcast_chain_zc.c
+ED TP_bcast_chain_bcast_chain_zed1 ../TP_bcast_chain/bcast_chain_zed1.c
+ZC TP_bcast_chain_bcast_chain_zr1 ../TP_bcast_chain/bcast_chain_zr1.c
+ZC TP_bcast_chain_bcast_chain_zr2 ../TP_bcast_chain/bcast_chain_zr2.c
+ZC TP_bcast_chain_bcast_chain_zr3 ../TP_bcast_chain/bcast_chain_zr3.c
+ZC TP_bcast_chain_bcast_chain_zr4 ../TP_bcast_chain/bcast_chain_zr4.c
+ED TP_bcast_chain_bcast_chain_zed2 ../TP_bcast_chain/bcast_chain_zed2.c

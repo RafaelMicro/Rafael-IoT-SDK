@@ -1,0 +1,9 @@
+#ifndef VERSION_Z_MAC_VERIFY_H_
+
+#define VERSION_Z_MAC_VERIFY_H_
+
+#define VERSION_Z_MAC_VERIFY_STR "$WCREV$"
+
+#define VERSION_Z_MAC_VERIFY_NUM $WCREV$
+
+#endif

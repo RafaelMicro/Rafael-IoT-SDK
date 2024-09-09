@@ -1,0 +1,38 @@
+.vscode\settings.json
+.vscode
+.repo
+.cache
+.clangd
+cscope*
+compile_commands.*
+
+Makefile
+
+# IntelliJ/CLion
+.idea
+
+**/build_out
+**/build
+release
+
+# Linux
+*.swp
+*.tmp
+
+# MacOS
+.DS_Store
+__pycache__
+
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+.config
+.config.old

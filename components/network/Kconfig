@@ -1,0 +1,13 @@
+menu "NETWORK"
+
+source "components/network/bluetooth/Kconfig"
+source "components/network/css/Kconfig"
+source "components/network/lmac15p4/Kconfig"
+source "components/network/rt569-rf/Kconfig"
+source "components/network/rt569-fw/Kconfig"
+source "components/network/ruci/Kconfig"
+source "components/network/subg_ctrl/Kconfig"
+source "components/network/thread/Kconfig"
+source "components/network/zigbee/Kconfig"
+
+endmenu

@@ -1,0 +1,165 @@
+raw in: 
+de ad cb 69 
+skip bad de
+raw in: 
+de 
+skip bad ad
+raw in: 
+ad 
+skip bad cb
+raw in: 
+00 
+skip bad 69
+raw in: 
+de 
+skip bad de
+raw in: 
+00 
+skip bad ad
+raw in: 
+00 
+skip bad 00
+raw in: 
+04 
+skip bad de
+raw in: 
+06 
+skip bad 00
+raw in: 
+e3 
+skip bad 00
+raw in: 
+00 
+skip bad 04
+raw in: 
+de 
+skip bad 06
+raw in: 
+00 
+skip bad e3
+raw in: 
+de 
+skip bad 00
+raw in: 
+ad 
+skip bad de
+raw in: 
+de 
+skip bad 00
+raw in: 
+ad 
+skip bad de
+raw in: 
+0d 
+skip bad ad
+raw in: 
+de 
+skip bad de
+raw in: 
+ad 
+skip bad ad
+raw in: 
+0e 
+skip bad 0d
+raw in: 
+de 
+skip bad de
+raw in: 
+00 
+skip bad ad
+raw in: 
+de 
+skip bad 0e
+raw in: 
+ad 
+skip bad de
+raw in: 
+de 
+skip bad 00
+raw in: 
+ad 
+skip bad de
+raw in: 
+03 
+skip bad ad
+raw in: 
+de 
+skip bad de
+raw in: 
+ad 
+skip bad ad
+raw in: 
+00 
+skip bad 03
+raw in: 
+de 
+skip bad de
+raw in: 
+ad 
+skip bad ad
+raw in: 
+12 
+skip bad 00
+raw in: 
+de 
+skip bad de
+raw in: 
+ad 
+skip bad ad
+raw in: 
+de 
+skip bad 12
+raw in: 
+ad 
+skip bad de
+raw in: 
+05 
+skip bad ad
+raw in: 
+de 
+skip bad de
+raw in: 
+ad 
+skip bad ad
+raw in: 
+de 
+skip bad 05
+raw in: 
+de 
+skip bad de
+raw in: 
+ad 
+skip bad ad
+raw in: 
+03 
+skip bad de
+raw in: 
+21 
+skip bad de
+raw in: 
+de 
+skip bad ad
+raw in: 
+ad 
+skip bad 03
+raw in: 
+00 
+skip bad 21
+raw in: 
+de 
+skip bad de
+raw in: 
+ad 
+skip bad ad
+raw in: 
+17 
+skip bad 00
+raw in: 
+de 
+skip bad de
+raw in: 
+16 
+skip bad ad
+raw in: 
+de 
+skip bad 17

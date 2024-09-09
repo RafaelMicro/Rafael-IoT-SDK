@@ -1,0 +1,23 @@
+menu "PROJECT CONFIG"
+
+config  CRYPTO_AES_ENABLE
+    bool "CRYPTO_AES_ENABLE"
+    default true
+
+config CRYPTO_SECP192R1_ENABLE
+    bool "CRYPTO_SECP192R1_ENABLE"
+    default true
+
+config CRYPTO_SECP256R1_ENABLE
+    bool "CRYPTO_SECP256R1_ENABLE"
+    default true
+
+config CRYPTO_SECT163R2_ENABLE
+    bool "CRYPTO_SECT163R2_ENABLE"
+    default true
+
+config CRYPTO_C25519_ENABLE
+    bool "CRYPTO_C25519_ENABLE"
+    default true
+
+endmenu

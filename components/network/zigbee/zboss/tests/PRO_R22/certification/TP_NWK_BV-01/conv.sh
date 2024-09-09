@@ -1,0 +1,40 @@
+#/* ZBOSS Zigbee software protocol stack
+# *
+# * Copyright (c) 2012-2020 DSR Corporation, Denver CO, USA.
+# * www.dsr-zboss.com
+# * www.dsr-corporation.com
+# * All rights reserved.
+# *
+# * This is unpublished proprietary source code of DSR Corporation
+# * The copyright notice does not evidence any actual or intended
+# * publication of such source code.
+# *
+# * ZBOSS is a registered trademark of Data Storage Research LLC d/b/a DSR
+# * Corporation
+# *
+# * Commercial Usage
+# * Licensees holding valid DSR Commercial licenses may use
+# * this file in accordance with the DSR Commercial License
+# * Agreement provided with the Software or, alternatively, in accordance
+# * with the terms contained in a written agreement between you and
+# * DSR.
+#
+# PURPOSE:
+
+set - `ls *dutzc.dump`
+../../../../devtools/dump_converter/dump_converter -ns $1 dutzc.pcap
+set - `ls *dutzr1.dump`
+../../../../devtools/dump_converter/dump_converter -ns $1 dutzr1.pcap
+set - `ls *dutzed1.dump`
+../../../../devtools/dump_converter/dump_converter -ns $1 dutzed1.pcap
+
+set - `ls *gzc.dump`
+../../../../devtools/dump_converter/dump_converter -ns $1 gzc.pcap
+set - `ls *gzr1.dump`
+../../../../devtools/dump_converter/dump_converter -ns $1 gzr1.pcap
+set - `ls *gzed1.dump`
+../../../../devtools/dump_converter/dump_converter -ns $1 gzed1.pcap
+
+rm -f *.dump
+
+#sh save-res.sh

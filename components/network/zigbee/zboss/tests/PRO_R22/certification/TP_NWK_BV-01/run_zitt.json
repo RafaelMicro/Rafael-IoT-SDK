@@ -1,0 +1,39 @@
+{
+  "name" : "tp_nwk_bv_01",
+
+  "instances" : [
+    {
+      "binary"      : "./gzc",
+      "test_role"   : "th1",
+      "start_idx"   : 0
+    },
+    {
+      "binary"      : "./gzr1",
+      "test_role"   : "th2",
+      "start_idx"   : 1
+    },
+    {
+      "binary"      : "./gzed1",
+      "test_role"   : "th3",
+      "start_idx"   : 2,
+      "wait_after_start"   : 30
+    },
+    {
+      "binary"      : "./dutzc",
+      "test_role"   : "dut1",
+      "start_idx"   : 3
+    },
+    {
+      "binary"      : "./dutzed1",
+      "test_role"   : "dut2",
+      "start_idx"   : 4
+    },
+    {
+      "binary"      : "./dutzr1",
+      "test_role"   : "dut3",
+      "start_idx"   : 5
+    }
+  ],
+
+  "timeout" : 120
+}

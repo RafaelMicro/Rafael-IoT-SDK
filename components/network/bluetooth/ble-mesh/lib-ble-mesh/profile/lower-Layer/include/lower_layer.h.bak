@@ -1,0 +1,23 @@
+// ---------------------------------------------------------------------------
+// Copyright (c) 2021
+// All rights reserved.
+//
+// ---------------------------------------------------------------------------
+#ifndef __LOWER_LAYER_H__
+#define __LOWER_LAYER_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+//=============================================================================
+//                Include (Better to prevent)
+//=============================================================================
+#include "sys_task.h"
+
+uint8_t mesh_lower_handle(sys_if_tlv_t *pt_tlv, uint32_t u32_tlv_wait_tick);
+sys_if_err_t mesh_lower_init(void* pt_param);
+#ifdef __cplusplus
+};
+#endif
+#endif /* __LOWER_LAYER_H__ */

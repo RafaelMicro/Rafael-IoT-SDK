@@ -1,0 +1,74 @@
+# menu "SELECT DEVICE"
+
+# choice CHIP_TYPE
+# 	prompt "chip type"
+# 	default RT582
+
+# config RT581
+# 	bool "RT581"
+# 	help
+# 	  RT581.
+
+# config RT582
+# 	bool "RT582"
+# 	help
+# 	  RT582.
+
+# config RT583
+# 	bool "RT583"
+# 	help
+# 	  RT583.
+
+# config RT584
+# 	bool "RT584"
+# 	help
+# 	  RT584.
+
+# endchoice
+
+# choice BOARD_TYPE
+# 	prompt "board type"
+# 	default NONE
+# if RT581
+# config NONE
+# 	bool "None"
+# 	help
+# 	  None.
+# endif # RT581
+
+# if RT582
+# config DONGLE
+# 	bool "DONGLE"
+# 	help
+# 	  Dongle.
+
+# config EVB
+# 	bool "EVB"
+# 	help
+# 	  EVB.
+# endif # RT582
+
+# if RT583
+# config NONE
+# 	bool "None"
+# 	help
+# 	  None.
+# endif # RT583
+
+# if RT584
+# config NONE
+# 	bool "None"
+# 	help
+# 	  None.
+# endif # RT584
+# endchoice
+
+# if RT582 && EVB
+# source "components/platform/soc/rt582/rt582_evb/Kconfig"
+# endif # RT582 && BOARD_TYPE="EVB"
+
+# if RT582 && DONGLE
+# source "components/platform/soc/rt582/rt582_dongle/Kconfig"
+# endif # CHIP_TYPE="RT582" && BOARD_TYPE="DONGLE"
+
+# endmenu

@@ -1,0 +1,28 @@
+menu "RT582 EVB"
+
+config HOSAL_SOC_MAIN_ENTRY_TASK_SIZE
+    int "main entry task size"
+	def_int 256
+
+config HOSAL_SOC_MAIN_ENTRY_TASK_PRIORITY
+    int "main entry task priority"
+	def_int 5
+
+config HOSAL_SOC_IDLE_SLEEP
+    bool "platform enable sleep"
+	def_bool false
+    help
+        platform enable sleep
+config HOSAL_SOC_SLEEP_TIMER_ID
+    depends on HOSAL_SOC_IDLE_SLEEP
+    int "sleep timer id"
+    def_int 3
+    range 3 4
+
+config HOSAL_SOC_TARGET_CUSTOMER
+    string "target customer"
+	def_string ""
+    help
+        target customer
+
+endmenu

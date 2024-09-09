@@ -1,0 +1,56 @@
+# TP-PRO-BV-04 (ZigBee Document 07-5035-07)
+
+# PANid=0x1AAA
+# gZC address (wpan.src64): aa:aa:aa:aa:aa:aa:aa:aa
+# gZC short address (): 0x0000
+# DUT ZR1 address (wpan.src64): 00:00:00:01:00:00:00:00
+# DUT ZR2 address (wpan.src64): 00:00:00:03:00:00:00:00
+# gZED1 address (wpan.src64): 00:00:00:02:00:00:00:00
+
+
+# >>> Initial Conditions
+# 1 Reset all nodes; SYMLINK=TRUE
+# 2 Set gZC under target stack profile. gZC as coordinator
+# starts a PAN = 0x1AAA network and is the Trust Centre for
+# the PAN.
+wpan.cmd, Beacon Request
+
+# 3 DUT ZR2 shall join PAN at gZC
+wpan.cmd, Beacon Request
+wpan, Beacon, zbee_beacon.ext_panid, aa:aa:aa:aa:aa:aa:aa:aa, wpan.src16, 0x00000000, wpan.assoc_permit, True
+wpan.cmd, Association Request, wpan.src64, 00:00:00:03:00:00:00:00
+wpan.cmd, Association Response, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst64, 00:00:00:03:00:00:00:00, wpan.assoc.status, 0x00000000, delta_time, -2
+zbee_aps.zdp_cluster, Device Announcement, zbee_zdp.ext_addr, 00:00:00:03:00:00:00:00
+
+# DUT ZR1 shall join PAN at gZC
+wpan.cmd, Beacon Request
+wpan, Beacon, zbee_beacon.ext_panid, aa:aa:aa:aa:aa:aa:aa:aa, wpan.src16, 0x00000000, wpan.assoc_permit, True
+wpan.cmd, Association Request, wpan.src64, 00:00:00:01:00:00:00:00
+wpan.cmd, Association Response, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.dst64, 00:00:00:01:00:00:00:00, wpan.assoc.status, 0x00000000, delta_time, -2
+zbee_aps.zdp_cluster, Device Announcement, zbee_zdp.ext_addr, 00:00:00:01:00:00:00:00
+
+# gZED1 joins PAN at DUT ZR2.
+wpan.cmd, Beacon Request
+wpan, Beacon, zbee_beacon.ext_panid, aa:aa:aa:aa:aa:aa:aa:aa, !wpan.src16, 0x00000000, wpan.assoc_permit, True
+wpan.cmd, Association Request, wpan.src64, 00:00:00:02:00:00:00:00
+wpan.cmd, Association Response, wpan.src64, 00:00:00:03:00:00:00:00, wpan.dst64, 00:00:00:02:00:00:00:00, wpan.assoc.status, 0x00000000, delta_time, -2
+zbee_aps.zdp_cluster, Device Announcement, zbee_zdp.ext_addr, 00:00:00:02:00:00:00:00
+
+# >>> Test Procedure
+
+# 1 Via test driver gZC shall unicast Buffer Test Request to gZED1.
+# 1.1) gZC sends Buffer test request for gZED1.
+# 2) gZC shall broadcast a route request for gZED1
+zbee_nwk.cmd.id, Route Request, zbee_nwk.src64, aa:aa:aa:aa:aa:aa:aa:aa, zbee_nwk.dst, 0x0000fffc
+
+# 3) Both DUT ZR1 and DUT ZR2 reply to the route request.
+zbee_nwk.cmd.id, Route Reply, zbee_nwk.src64, 00:00:00:03:00:00:00:00, wpan.dst16, 0x00000000
+zbee_nwk.cmd.id, Route Reply, zbee_nwk.src64, 00:00:00:01:00:00:00:00, wpan.dst16, 0x00000000
+
+# 4) gZED1 sends Buffer test response along the path gZED1 -> DUT ZR2 -> DUT ZR1 -> gZC.
+zbee_aps.t2.cluster, Buffer Test Request, zbee_nwk.src64, aa:aa:aa:aa:aa:aa:aa:aa, zbee_nwk.dst64, 00:00:00_02:00:00:00:00, wpan.src64, aa:aa:aa:aa:aa:aa:aa:aa
+zbee_aps.t2.cluster, Buffer Test Request, zbee_nwk.src64, aa:aa:aa:aa:aa:aa:aa:aa, zbee_nwk.dst64, 00:00:00_02:00:00:00:00, wpan.src64, 00:00:00_01:00:00:00:00
+zbee_aps.t2.cluster, Buffer Test Request, zbee_nwk.src64, aa:aa:aa:aa:aa:aa:aa:aa, zbee_nwk.dst64, 00:00:00_02:00:00:00:00, wpan.src64, 00:00:00_03:00:00:00:00
+zbee_aps.t2.cluster, Buffer Test Response, zbee_nwk.src64, 00:00:00_02:00:00:00:00, zbee_nwk.dst64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.src64, 00:00:00_02:00:00:00:00
+zbee_aps.t2.cluster, Buffer Test Response, zbee_nwk.src64, 00:00:00_02:00:00:00:00, zbee_nwk.dst64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.src64, 00:00:00_03:00:00:00:00
+zbee_aps.t2.cluster, Buffer Test Response, zbee_nwk.src64, 00:00:00_02:00:00:00:00, zbee_nwk.dst64, aa:aa:aa:aa:aa:aa:aa:aa, wpan.src64, 00:00:00_01:00:00:00:00

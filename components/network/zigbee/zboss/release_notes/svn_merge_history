@@ -1,0 +1,34 @@
+History of merges with svn.
+
+Merges to be done by:
+1) cd svn_working_copy && svn diff -x -w -r{start_rev} | filterdiff  --clean --annotate >d.diff
+2) Update diff file using script
+sed -e  's/application\/bootloader\/nrf52_dfu_spi_bootloader/platform\/application\/bootloader\/nrf52_dfu_spi_bootloader/' \
+-e 's/ osif\// platform\/osif\//' \
+-e 's/mac\/nrf/platform\/mac\/nrf/' \
+-e 's/ build\// platform\/build\//' \
+-e 's/ include\/vendor_cfgs\/Nordic\/juna\// platform_nrf52-bm\/include\//' \
+-e 's/ include\/vendor_cfgs\/Nordic\/macsplit_device\// platform_nrf52-bm\/include\//' \
+-e 's/ include\/vendor_cfgs\/Telink\/macsplit_device\// platform_tlsr8646-bm\/include\//' \
+-e 's/ include\/vendor_cfgs\/EFR32\/macsplit_device\// platform_efr32-bm\/include\//' \
+-e 's/ include\/mac_nrf52/ platform_nrf52-bm\/include\/mac_nrf52/' \
+-e 's/ build-configurations\// platform\/build-configurations\//' d.diff > ddd.diff
+3) apply patch by running
+patch -p0 <ddd.diff
+Manually skip files to be ignored, change path when appropriate.
+4) resolve conflicts by analyzing .rej files
+
+05/15/2020 - merge with r22active/devel -r59569:59568
+
+05/08/2020 - merge with r22active/devel -r59514:59523
+
+03/26/2020 - merge with r22active/devel -r58800:58806
+
+01/30/2020 - merge with r22active/devel -r56495:57757
+
+12/20/2019 - merge with r22active/devel -r55499:56495 to stack code and Nordic platform for nrf52840.
+Skipped:
+- all include/vendor_cfgs
+- all Keil and IAR project files
+- all non-Nordic MAC files
+- all non-Nordic osif files

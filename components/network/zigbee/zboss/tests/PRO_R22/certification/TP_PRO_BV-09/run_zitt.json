@@ -1,0 +1,33 @@
+{
+  "name" : "tp_pro_bv_09",
+
+  "instances" : [
+    {
+      "binary"      : "./zc",
+      "test_role"   : "th1",
+      "start_idx"   : 0
+    },
+    {
+      "binary"      : "./zr1",
+      "test_role"   : "th1",
+      "start_idx"   : 1
+    },
+    {
+      "binary"      : "./zr2",
+      "test_role"   : "th2",
+      "start_idx"   : 2
+    },
+    {
+      "binary"      : "./zr3",
+      "test_role"   : "dut3",
+      "start_idx"   : 3
+    },
+    {
+      "binary"      : "./zr4",
+      "test_role"   : "th4",
+      "start_idx"   : 4
+    }
+  ],
+
+  "timeout" : 40
+}

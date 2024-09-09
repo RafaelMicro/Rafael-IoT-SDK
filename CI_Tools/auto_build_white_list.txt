@@ -1,0 +1,10 @@
+Zigbee_Demo\Switch\Keil\Switch.uvprojx
+Zigbee_Demo\Gateway_Module\Keil\Gateway_Module.uvprojx
+RF_Evaluation\RF_UB\Keil\RF_UB.uvprojx
+RF_Evaluation\RFET\Keil\RFET.uvprojx
+Examples\FreeRTOS\Keil\FreeRTOS.uvprojx
+Examples\Sleep\Keil\Sleep.uvprojx
+BLE_Demo\Central\Data_Rate_Central\Keil_Source\Data_Rate_Central_source.uvprojx
+BLE_Demo\Internal\AT_Cmd\Keil_Source\AT_Cmd_source.uvprojx
+BLE_Demo\Multilink\TRSP_1C1P\Keil_Source\TRSP_1C1P_source.uvprojx
+BLE_Demo\Peripheral\HOGP_Periph\Keil_Source\HOGP_Periph_source.uvprojx

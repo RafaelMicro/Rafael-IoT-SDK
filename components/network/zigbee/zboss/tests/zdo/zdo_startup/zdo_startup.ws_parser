@@ -1,0 +1,11 @@
+# ZDO startup test
+# ZC address: 0d:f0:ad:de:0d:f0:ad:de
+# ZED address: 00:00:00:01:00:00:00:01
+# PAN id: 0x1aaa
+
+wpan.cmd, Beacon Request
+wpan, Beacon, wpan.assoc_permit, True
+wpan.cmd, Association Request, wpan.src64, 00:00:00:01:00:00:00:01, wpan.dst_pan, 0x1aaa
+wpan.cmd, Association Response, wpan.src64, 0d:f0:ad:de:0d:f0:ad:de, wpan.dst64, 00:00:00:01:00:00:00:01, wpan.dst_pan, 0x1aaa, delta_time, -0.3
+zbee_aps.zdp_cluster, Device Announcement, zbee_zdp.ext_addr, 00:00:00:01:00:00:00:01
+zbee_aps.cluster, 0x0000f00d, count, -1, parallel, y

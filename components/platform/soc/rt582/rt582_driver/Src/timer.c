@@ -1,0 +1,252 @@
+/**
+ * \file            timer.c
+ * \brief           Timer driver file
+ */
+/*
+ * Copyright (c) year FirstName LASTNAME
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge,
+ * publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+ * AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ *
+ * Author:          Kc.tseng
+ */
+
+#include "mcu.h"
+
+/* timer0/1/2, slow timer0/1, total 5 timer */
+#define MAX_NUMBER_OF_TIMER         5
+
+#define TIMER_STATE_OPEN            1
+#define TIMER_STATE_CLOSED          0
+
+/**
+ * \brief           The structure save timer info
+ */
+typedef struct{
+    timer_cb_fn             timer_cb;           /*!< user callback function. */
+    timer_config_mode_t     cfg;                /*!< Point X coordinate */
+    uint8_t                 state : 2;          /*!< device state */
+} timer_config_t;
+
+static timer_config_t   timer_cfg[MAX_NUMBER_OF_TIMER];
+
+void timer_callback_register(uint32_t timer_id, timer_cb_fn timer_cb) {
+    timer_cfg[timer_id].timer_cb = timer_cb;
+    return;
+}
+
+uint32_t timer_open(uint32_t timer_id, timer_config_mode_t cfg, 
+                    timer_cb_fn timer_cb) {
+    if (timer_id > MAX_NUMBER_OF_TIMER) {
+        return STATUS_INVALID_PARAM;
+    }
+
+    if (timer_cfg[timer_id].state != TIMER_STATE_CLOSED) {
+        return STATUS_INVALID_REQUEST;          /*device already opened*/
+    }
+
+    timer_callback_register(timer_id, timer_cb);
+    timer_cfg[timer_id].cfg = cfg;
+
+    timer_cfg[timer_id].state = TIMER_STATE_OPEN;
+
+    if (timer_cb != NULL) {
+        if (timer_id < 2) {
+            NVIC_EnableIRQ((IRQn_Type)(Timer0_IRQn + timer_id));
+        } else if (timer_id == 2) {
+            NVIC_EnableIRQ(Timer2_IRQn);
+        } else if (timer_id == 3) {
+            NVIC_EnableIRQ(Timer3_IRQn);
+        } else if (timer_id == 4) {
+            NVIC_EnableIRQ(Timer4_IRQn);
+        } else {
+            return STATUS_INVALID_PARAM;
+        }
+    }
+
+    return STATUS_SUCCESS;
+}
+
+uint32_t timer_load(uint32_t timer_id, uint32_t timeout_ticks) {
+    timern_t* timer;
+    timern_t* base[MAX_NUMBER_OF_TIMER] = {TIMER0, TIMER1, TIMER2, TIMER3, TIMER4};
+
+    if (timer_id > MAX_NUMBER_OF_TIMER) {
+        return STATUS_INVALID_PARAM;
+    }
+
+    timer = base[timer_id];
+
+    timer->load = (timeout_ticks - 1);
+
+    return STATUS_SUCCESS;
+}
+
+uint32_t timer_start(uint32_t timer_id, uint32_t timeout_ticks) {
+    timern_t* timer;
+    timern_t* base[MAX_NUMBER_OF_TIMER] = {TIMER0, TIMER1, TIMER2, TIMER3, TIMER4};
+
+    if (timer_id > MAX_NUMBER_OF_TIMER) {
+        return STATUS_INVALID_PARAM;
+    }
+
+    if (timer_cfg[timer_id].state != TIMER_STATE_OPEN) {
+        return STATUS_NO_INIT;                  /*DEVIC SHOULD BE OPEN FIRST.*/
+    }
+
+    timer = base[timer_id];
+    timer_load(timer_id, timeout_ticks);
+    timer->control.bit.int_enable = timer_cfg[timer_id].cfg.int_en;
+
+    if (timer_cfg[timer_id].cfg.mode == TIMER_FREERUN_MODE) {
+        timer->control.bit.mode = 0;
+    } else {
+        timer->control.bit.mode = 1;
+    }
+
+    if (timer_id == 3 || timer_id == 4) {
+        timer->repeat_delay.bit.int_repeat_delay = timer_cfg[timer_id].cfg.repeat_delay;
+    }
+    
+    timer->control.bit.prescale = timer_cfg[timer_id].cfg.prescale;
+    Delay_ms(1);                                /* For register synchronization in 32KHz clock domain */
+    timer->control.bit.en = 1;
+
+    return STATUS_SUCCESS;
+}
+
+uint32_t timer_stop(uint32_t timer_id) {
+    timern_t* timer;
+    timern_t* base[MAX_NUMBER_OF_TIMER] = {TIMER0, TIMER1, TIMER2, TIMER3, TIMER4};
+
+    if (timer_id > MAX_NUMBER_OF_TIMER) {
+        return STATUS_INVALID_PARAM;
+    }
+
+    if (timer_cfg[timer_id].state != TIMER_STATE_OPEN) {
+        return STATUS_NO_INIT;                  /*DEVIC SHOULD BE OPEN FIRST.*/
+    }
+
+    timer = base[timer_id];
+    timer->control.reg = 0;                     /*Disable timer*/
+
+    return STATUS_SUCCESS;
+}
+
+uint32_t timer_close(uint32_t timer_id) {
+    timern_t* timer;
+    timern_t* base[MAX_NUMBER_OF_TIMER] = {TIMER0, TIMER1, TIMER2, TIMER3, TIMER4};
+
+    if (timer_id > MAX_NUMBER_OF_TIMER) {
+        return STATUS_INVALID_PARAM;
+    }
+
+    timer = base[timer_id];
+    timer->control.reg = 0;                     /*Disable timer*/
+
+    if (timer_id < 2) {
+        NVIC_DisableIRQ((IRQn_Type)(Timer0_IRQn + timer_id));
+    } else if (timer_id == 2) {
+        NVIC_DisableIRQ(Timer2_IRQn);
+    } else if (timer_id == 3) {
+        NVIC_DisableIRQ(Timer3_IRQn);
+    } else if (timer_id == 4) {
+        NVIC_DisableIRQ(Timer4_IRQn);
+    }
+
+    timer_cfg[timer_id].timer_cb = NULL;
+    timer_cfg[timer_id].state = TIMER_STATE_CLOSED;
+
+    return STATUS_SUCCESS;
+}
+
+uint32_t timer_current_get(uint32_t timer_id) {
+    timern_t* timer;
+    timern_t* base[MAX_NUMBER_OF_TIMER] = {TIMER0, TIMER1, TIMER2, TIMER3, TIMER4};
+    
+    timer = base[timer_id];
+    return (timer->value);
+}
+
+/**
+ * \brief           Timer0 Interrupt Handler
+ */
+void timer0_handler(void) {
+    TIMER0->clear = 1;                          /*clear interrupt*/
+
+    if (timer_cfg[0].timer_cb != NULL) {
+        timer_cfg[0].timer_cb(0);
+    }
+    return;
+}
+
+/**
+ * \brief           Timer1 Interrupt Handler
+ */
+void timer1_handler(void) {
+    TIMER1->clear = 1;                          /*clear interrupt*/
+
+    if (timer_cfg[1].timer_cb != NULL) {
+        timer_cfg[1].timer_cb(1);
+    }
+    return;
+}
+
+/**
+ * \brief           Timer2 Interrupt Handler
+ */
+void timer2_handler(void) {
+    TIMER2->clear = 1;                          /*clear interrupt*/
+
+    if (timer_cfg[2].timer_cb != NULL) {
+        timer_cfg[2].timer_cb(2);
+    }
+    return;
+}
+
+#if ((CHIP_VERSION == RT58X_MPA) || (CHIP_VERSION == RT58X_MPB))
+
+/**
+ * \brief           Slow Timer0 Interrupt Handler
+ */
+void timer3_handler(void) {
+    TIMER3->clear = 1;                          /*clear interrupt*/
+
+    if (timer_cfg[3].timer_cb != NULL) {
+        timer_cfg[3].timer_cb(3);
+    }
+    return;
+}
+
+/**
+ * \brief           Slow Timer1 Interrupt Handler
+ */
+void timer4_handler(void) {
+    TIMER4->clear = 1;                          /*clear interrupt*/
+
+    if (timer_cfg[4].timer_cb != NULL) {
+        timer_cfg[4].timer_cb(4);
+    }
+    return;
+}
+
+#endif
+
