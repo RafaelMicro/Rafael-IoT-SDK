@@ -381,13 +381,9 @@ function(app_git_version git_version)
         OUTPUT_VARIABLE GIT_REV OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
     )
-    if(GIT_REV STREQUAL "")
-      set(${git_version} "auto-build")
-    else()
-      message("${CONFIG_BUILD_PORJECT}-" "${GIT_REV}")
-      string(REPLACE "${CONFIG_BUILD_PORJECT}-" "" var ${GIT_REV}) 
-      set(${git_version} ${var} PARENT_SCOPE)
-    endif()
+    message("${CONFIG_BUILD_PORJECT}-" "${GIT_REV}")
+    string(REPLACE "${CONFIG_BUILD_PORJECT}-" "" var ${GIT_REV}) 
+    set(${git_version} ${var} PARENT_SCOPE)
 endfunction()
 
 function(show_banner) 
