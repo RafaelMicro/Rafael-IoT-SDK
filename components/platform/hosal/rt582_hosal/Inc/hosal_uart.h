@@ -111,6 +111,15 @@ typedef enum {
     HOSAL_UART_MODE_INT,    /**< @brief UART TX and RX int mode */
 } hosal_uart_mode_t;
 
+typedef enum {
+    HOSAL_UART_LSR_FIFO_ERR = 0x80,
+    HOSAL_UART_LSR_TRANSMIT_EMPTY = 0x40,
+    HOSAL_UART_LSR_BREAK_INT = 0x10,
+    HOSAL_UART_LSR_FRAMING_ERROR = 0x08,
+    HOSAL_UART_LSR_PARITY_ERROR = 0x04,
+    HOSAL_UART_LSR_OVERRUN_ERROR = 0x02,
+} hosal_uart_rx_line_status_t;
+
 //=============================================================================
 //                  Macro Definition
 //=============================================================================
@@ -127,7 +136,8 @@ typedef enum {
     3 /**< @brief UART tx DMA trans complete callback */
 #define HOSAL_UART_RX_DMA_CALLBACK                                             \
     4 /**< @brief UART rx DMA trans complete callback */
-#define HOSAL_UART_BREAK_CALLBACK 5 /**< @brief UART break callback */
+#define HOSAL_UART_RECEIVE_LINE_STATUS_CALLBACK                                \
+    5 /**< @brief UART break callback */
 
 #define UART_EVENT_TX_DONE                                                     \
     (1UL << 0) ///< Send completed; however UART may still transmit data
@@ -147,28 +157,29 @@ typedef enum {
 #define UART_POWER_OFF (0) ///< Power off the uart device
 #define UART_POWER_ON  (1) ///< Power on the uart device
 
-#define HOSAL_UART_BAUD_SET          1  /**< @brief UART baud set */
-#define HOSAL_UART_BAUD_GET          2  /**< @brief UART baud get */
-#define HOSAL_UART_DATA_WIDTH_SET    3  /**< @brief UART data width set */
-#define HOSAL_UART_DATA_WIDTH_GET    4  /**< @brief UART data width get */
-#define HOSAL_UART_STOP_BITS_SET     5  /**< @brief UART stop bits set */
-#define HOSAL_UART_STOP_BITS_GET     6  /**< @brief UART stop bits get */
-#define HOSAL_UART_FLOWMODE_SET      7  /**< @brief UART flow mode set */
-#define HOSAL_UART_FLOWSTAT_GET      8  /**< @brief UART flow state get */
-#define HOSAL_UART_PARITY_SET        9  /**< @brief UART flow mode set */
-#define HOSAL_UART_PARITY_GET        10 /**< @brief UART flow state get */
-#define HOSAL_UART_MODE_SET          11 /**< @brief UART mode set */
-#define HOSAL_UART_MODE_GET          12 /**< @brief UART mode get */
-#define HOSAL_UART_FREE_TXFIFO_GET   13 /**< @brief UART free tx fifo get */
-#define HOSAL_UART_FREE_RXFIFO_GET   14 /**< @brief UART free rx fifo get */
-#define HOSAL_UART_FLUSH             15 /**< @brief Wait for the send to complete */
-#define HOSAL_UART_TX_TRIGGER_ON     16 /**< @brief UART TX trigger on */
-#define HOSAL_UART_TX_TRIGGER_OFF    17 /**< @brief UART TX trigger off */
-#define HOSAL_UART_DMA_TX_START      18 /**< @brief UART DMA TX start trans */
-#define HOSAL_UART_DMA_RX_START      19 /**< @brief UART DMA RX start trans */
-#define HOSAL_UART_ENABLE_INTERRUPT  20
-#define HOSAL_UART_DISABLE_INTERRUPT 21
-#define HOSAL_UART_CLEAR_FIFO        22
+#define HOSAL_UART_BAUD_SET                   1 /**< @brief UART baud set */
+#define HOSAL_UART_BAUD_GET                   2 /**< @brief UART baud get */
+#define HOSAL_UART_DATA_WIDTH_SET             3 /**< @brief UART data width set */
+#define HOSAL_UART_DATA_WIDTH_GET             4 /**< @brief UART data width get */
+#define HOSAL_UART_STOP_BITS_SET              5 /**< @brief UART stop bits set */
+#define HOSAL_UART_STOP_BITS_GET              6 /**< @brief UART stop bits get */
+#define HOSAL_UART_FLOWMODE_SET               7 /**< @brief UART flow mode set */
+#define HOSAL_UART_FLOWSTAT_GET               8 /**< @brief UART flow state get */
+#define HOSAL_UART_PARITY_SET                 9 /**< @brief UART flow mode set */
+#define HOSAL_UART_PARITY_GET                 10 /**< @brief UART flow state get */
+#define HOSAL_UART_MODE_SET                   11 /**< @brief UART mode set */
+#define HOSAL_UART_MODE_GET                   12 /**< @brief UART mode get */
+#define HOSAL_UART_FREE_TXFIFO_GET            13 /**< @brief UART free tx fifo get */
+#define HOSAL_UART_FREE_RXFIFO_GET            14 /**< @brief UART free rx fifo get */
+#define HOSAL_UART_FLUSH                      15 /**< @brief Wait for the send to complete */
+#define HOSAL_UART_TX_TRIGGER_ON              16 /**< @brief UART TX trigger on */
+#define HOSAL_UART_TX_TRIGGER_OFF             17 /**< @brief UART TX trigger off */
+#define HOSAL_UART_DMA_TX_START               18 /**< @brief UART DMA TX start trans */
+#define HOSAL_UART_DMA_RX_START               19 /**< @brief UART DMA RX start trans */
+#define HOSAL_UART_ENABLE_INTERRUPT           20
+#define HOSAL_UART_DISABLE_INTERRUPT          21
+#define HOSAL_UART_CLEAR_FIFO                 22
+#define HOSAL_UART_RECEIVE_LINE_STATUS_ENABLE 23
 
 //=============================================================================
 //                  Structure Definition
@@ -198,8 +209,8 @@ typedef struct {
     void* p_txdma_arg;
     hosal_uart_callback_t rxdma_cb;
     void* p_rxdma_arg;
-    hosal_uart_callback_t break_cb;
-    void* p_break_arg;
+    hosal_uart_callback_t rx_line_status_cb;
+    void* p_rx_line_status_arg;
     void* priv;
 } hosal_uart_dev_t;
 
@@ -246,6 +257,9 @@ int hosal_uart_callback_set(hosal_uart_dev_t* uart_dev, int callback_type,
                             hosal_uart_callback_t pfn_callback, void* arg);
 
 int hosal_uart_finalize(hosal_uart_dev_t* uart_dev);
+void hosal_uart_send_complete(hosal_uart_dev_t* uart_dev);
+uint32_t hosal_uart_get_lsr(hosal_uart_dev_t* uart_dev);
+
 #ifdef __cplusplus
 }
 #endif

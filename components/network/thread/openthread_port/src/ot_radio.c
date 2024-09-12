@@ -32,7 +32,7 @@
 #include "soft_source_match_table.h"
 #include "util_list.h"
 #include "util_string.h"
-#if OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+#if CONFIG_BUILD_COMPONENT_OPENTHREAD_SUBG
 #include "subg_ctrl.h"
 #endif
 #include "cli.h"
@@ -43,7 +43,7 @@
 #define CCA_THRESHOLD_UNINIT (127)
 #if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
 #define CCA_THRESHOLD_DEFAULT (55) // dBm  - default for 2.4GHz 802.15.4
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+#elif CONFIG_BUILD_COMPONENT_OPENTHREAD_SUBG
 #define CCA_THRESHOLD_DEFAULT (75) // 87
 #endif
 #define RAFAEL_RECEIVE_SENSITIVITY (98)
@@ -70,7 +70,7 @@
 #define MAC_PIB_MAC_MAX_FRAME_RETRIES         4
 #define MAC_PIB_MAC_MAX_CSMACA_BACKOFFS       10
 #define MAC_PIB_MAC_MIN_BE                    5
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+#elif CONFIG_BUILD_COMPONENT_OPENTHREAD_SUBG
 #define PHY_PIB_TURNAROUND_TIMER  1000
 #define PHY_PIB_CCA_DETECTED_TIME 640 // 8 symbols for 50 kbps-data rate
 #define PHY_PIB_CCA_DETECT_MODE   0
@@ -88,10 +88,11 @@
 #define MAC_RX_BUFFERS 100
 #if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
 #define FREQ (2405)
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+#elif CONFIG_BUILD_COMPONENT_OPENTHREAD_SUBG
 #define FREQ                                                                   \
-    (920000) // 915 MHZ range is (902~928), but Taiwan range is (920~925)
-#define CHANNEL_SPACING 500
+    (OPENTHREAD_CONFIG_CHANNEL_FREQUENCY) // 915 MHZ range is (902~928), but Taiwan range is (920~925)
+#define CHANNEL_SPACING (OPENTHREAD_CONFIG_CHANNEL_SPACING)
+
 #endif
 
 extern uint8_t rfb_port_ack_packet_read(uint8_t* rx_data_address);
@@ -104,10 +105,10 @@ enum {
     kMinChannel = 11,
     kMaxChannel = 26,
 };
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+#elif CONFIG_BUILD_COMPONENT_OPENTHREAD_SUBG
 enum {
-    kMinChannel = 1,
-    kMaxChannel = 10,
+    kMinChannel = OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MIN,
+    kMaxChannel = OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MAX,
 };
 #endif
 
@@ -172,7 +173,7 @@ static uint16_t sTurnaroundTime = PHY_PIB_TURNAROUND_TIMER;
 static uint8_t sCCAMode = PHY_PIB_CCA_DETECT_MODE;
 static uint8_t sCCAThreshold = PHY_PIB_CCA_THRESHOLD;
 static uint16_t sCCADuration = PHY_PIB_CCA_DETECTED_TIME;
-#if OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+#if CONFIG_BUILD_COMPONENT_OPENTHREAD_SUBG
 static uint16_t CCADuration_choices[8] = {
     0, 0, 0, 160, 320, 640, 128, 213}; // use 2.4g parameter for 300k
 static uint32_t FrameTotalWaitTime_choices[8] = {
@@ -631,7 +632,7 @@ void otPlatRadioEnableSrcMatch(otInstance *aInstance, bool aEnable)
     // set Frame Pending bit for all outgoing ACKs if aEnable is false
     sIsSrcMatchEnabled = aEnable;
 
-    // lmac15p4_src_match_ctrl(0, aEnable);
+    lmac15p4_src_match_ctrl(0, aEnable);
 }
 
 /**
@@ -753,7 +754,7 @@ otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel)
             sCurrentChannel = aChannel;
 #if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
             lmac15p4_channel_set((lmac154_channel_t)(sCurrentChannel - kMinChannel));
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+#elif CONFIG_BUILD_COMPONENT_OPENTHREAD_SUBG
             subg_ctrl_frequency_set(FREQ + (CHANNEL_SPACING * (sCurrentChannel - kMinChannel)));
 #endif    
         }
@@ -897,7 +898,7 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
             sCurrentChannel = aFrame->mChannel;
 #if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
             lmac15p4_channel_set((lmac154_channel_t)(sCurrentChannel - kMinChannel));
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+#elif CONFIG_BUILD_COMPONENT_OPENTHREAD_SUBG
              subg_ctrl_frequency_set(FREQ + (CHANNEL_SPACING * (sCurrentChannel - kMinChannel)));
 #endif    
         }
@@ -1215,6 +1216,7 @@ void ot_radioTask(ot_system_event_t trxEvent)
             if (trxEvent & OT_SYSTEM_EVENT_RADIO_TX_ACKED) 
             {
                 otPlatRadioTxDone(otRadio_var.aInstance, txframe, otRadio_var.pAckFrame, OT_ERROR_NONE);
+                // log_info_hexdump("ack", otRadio_var.pAckFrame->mPsdu, otRadio_var.pAckFrame->mLength);
             }
             if (trxEvent & OT_SYSTEM_EVENT_RADIO_TX_NO_ACK) 
             {
@@ -1305,7 +1307,11 @@ static void _TxDoneEvent(uint32_t tx_status)
         else if (0x40 == tx_status || 0x80 == tx_status ) 
         {
             //ack_now32Time = otPlatAlarmMicroGetNow();
-            otRadio_var.pAckFrame->mLength = lmac15p4_read_ack((uint8_t *)otRadio_var.pAckFrame->mPsdu, (uint8_t *)&ack_now32Time);
+#if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
+            otRadio_var.pAckFrame->mLength = lmac15p4_read_ack((uint8_t *)otRadio_var.pAckFrame->mPsdu, (uint8_t *)&ack_now32Time, 0);
+#elif CONFIG_BUILD_COMPONENT_OPENTHREAD_SUBG
+            otRadio_var.pAckFrame->mLength = lmac15p4_read_ack((uint8_t *)otRadio_var.pAckFrame->mPsdu, (uint8_t *)&ack_now32Time, 1); 
+#endif
             otRadio_var.pAckFrame->mInfo.mRxInfo.mTimestamp = longtime_to_longlong_time(&ack_prev32Time, ack_now32Time, &ack_timerWraps);;
             OT_NOTIFY(OT_SYSTEM_EVENT_RADIO_TX_ACKED);
 
@@ -1362,7 +1368,7 @@ static void _RxDoneEvent(uint16_t packet_length, uint8_t *rx_data_address,
 #if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
             memcpy(p->frame.mPsdu, (rx_data_address + 8), (packet_length-13));
             p->frame.mLength = (packet_length-13);
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+#elif CONFIG_BUILD_COMPONENT_OPENTHREAD_SUBG
             memcpy(p->frame.mPsdu, (rx_data_address + 9), (packet_length-14));
             p->frame.mLength = (packet_length-14);
 #endif            
@@ -1484,18 +1490,10 @@ void ot_radioInit()
     mac_cb.tx_cb = _TxDoneEvent;
     lmac15p4_cb_set(0, &mac_cb);
 
-#if OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-    subg_ctrl_sleep_set(false);
-    subg_ctrl_idle_set();
-    subg_ctrl_modem_config_set(SUBG_CTRL_MODU_FSK, sPhyDataRate, SUBG_CTRL_FSK_MOD_1);
-    subg_ctrl_mac_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_CRC_TYPE_16, SUBG_CTRL_WHITEN_DISABLE);
-    subg_ctrl_preamble_set(SUBG_CTRL_MODU_FSK, 8);
-    subg_ctrl_sfd_set(SUBG_CTRL_MODU_FSK, 0x00007209);
-    subg_ctrl_filter_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_FILTER_TYPE_GFSK);
-#endif
+
 #if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
     lmac15p4_channel_set((lmac154_channel_t)(sCurrentChannel - kMinChannel));
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+#elif CONFIG_BUILD_COMPONENT_OPENTHREAD_SUBG
     subg_ctrl_frequency_set(FREQ + (CHANNEL_SPACING * (sCurrentChannel - kMinChannel)));
 #endif    
     /* Auto ACK */

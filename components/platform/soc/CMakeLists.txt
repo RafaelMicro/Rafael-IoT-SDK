@@ -1,6 +1,7 @@
 if(CONFIG_BOOTLOADER)
-    sdk_add_subdirectory_ifdef(CONFIG_DRIVER ${CMAKE_CURRENT_LIST_DIR}/rt582/rt582_driver) 
     sdk_add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/rt582/rt582_bootloader)
+    sdk_add_subdirectory_ifdef(CONFIG_DRIVER ${CMAKE_CURRENT_LIST_DIR}/rt582/rt582_driver) 
+    sdk_add_subdirectory_ifdef(CONFIG_CRYPTO ${CMAKE_CURRENT_LIST_DIR}/rt582/rt582_crypto)
 else()
 if((${CONFIG_CHIP} STREQUAL "RT582"))
     sdk_add_subdirectory_ifdef(CONFIG_DRIVER ${CMAKE_CURRENT_LIST_DIR}/rt582/rt582_driver)    

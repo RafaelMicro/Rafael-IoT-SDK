@@ -1,5 +1,5 @@
 /**
- * \file            i2cm_reg.h
+ * \file            i2c_master_reg.h
  * \brief           i2c master register header file
  */
 /*
@@ -29,8 +29,8 @@
  * Author:          Kc.tseng
  */
 
-#ifndef I2CM_REG_H
-#define I2CM_REG_H
+#ifndef I2C_MASTER_REG_H
+#define I2C_MASTER_REG_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,11 +50,8 @@ typedef struct {
     __IO uint32_t prescale_h;                   /*!< 0x18 i2c divider upper 8 bits */
 } i2cm_t;
 
-
-
-
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* End of I2CM_REG_H */
+#endif /* End of I2C_MASTER_REG_H */

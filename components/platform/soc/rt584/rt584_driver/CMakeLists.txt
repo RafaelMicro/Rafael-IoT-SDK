@@ -9,7 +9,8 @@ sdk_library_add_sources(
     Src/dma.c
     Src/flashctl.c
     Src/gpio.c
-    #Src/i2c_master.c
+    Src/i2c_master.c
+    Src/i2c_slave.c
     #Src/i2s.c
     #Src/lpm.c
     #Src/mp_sector.c

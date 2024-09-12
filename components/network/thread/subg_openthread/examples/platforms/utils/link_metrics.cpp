@@ -34,7 +34,6 @@
 #include "common/linked_list.hpp"
 #include "common/pool.hpp"
 #include "thread/link_quality.hpp"
-ss
 #if OPENTHREAD_CONFIG_MLE_LINK_METRICS_INITIATOR_ENABLE || OPENTHREAD_CONFIG_MLE_LINK_METRICS_SUBJECT_ENABLE
 
 using namespace ot;

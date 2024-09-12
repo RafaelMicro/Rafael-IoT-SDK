@@ -191,17 +191,15 @@ __STATIC_FORCEINLINE void handle_event_status(void) {
 
 __STATIC_FORCEINLINE void handle_rx_data_status(void) {
     RF_MCU_RXQ_ERROR rx_queue_error = RF_MCU_RXQ_ERR_INIT;
-    uint32_t event_len = 0;
-    event_len = RfMcu_RxQueueRead(g_rx_data, &rx_queue_error);
-    if (event_len <= 0)
-        return;
 
-    if (g_rx_data[0] == RUCI_PCI_DATA_HEADER) {
-        if (g_pci_rx_done_cb)
-            g_pci_rx_done_cb(g_rx_data);
-    } else if (g_rx_data[0] == 0x02) {
-        if (g_hci_data_cb)
-            g_hci_data_cb(g_rx_data);
+    while (RfMcu_RxQueueRead(g_rx_data, &rx_queue_error) != 0) {
+        if (g_rx_data[0] == RUCI_PCI_DATA_HEADER) {
+            if (g_pci_rx_done_cb)
+                g_pci_rx_done_cb(g_rx_data);
+        } else if (g_rx_data[0] == 0x02) {
+            if (g_hci_data_cb)
+                g_hci_data_cb(g_rx_data);
+        }
     }
 }
 
@@ -307,8 +305,10 @@ __rf_15p4_ack_packet_get(hosal_rf_15p4_ack_packet_t* ack) {
     uint8_t page;
     uint8_t i;
     uint8_t tmp_rtc_time;
-    bool is2bytephr = false;
+    bool is2bytephr = ack->is2bytephr;
     bool skip = false;
+
+    skip = is2bytephr;
 
     /* get address of local data q */
     RfMcu_MemoryGet(0x4038, (uint8_t*)&temp_data, 4);

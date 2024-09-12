@@ -287,9 +287,9 @@ typedef enum IRQn_Type
 #endif
 
 #if (WDT_SECURE_EN == 1)
-#define WDT                   ((WDT_T *) (WDT_BASE | PERIPH_SECURE_OFFSET))
+#define WDT                   ((wdt_t *) (WDT_BASE | PERIPH_SECURE_OFFSET))
 #else
-#define WDT                   ((WDT_T *) WDT_BASE)
+#define WDT ((wdt_t*)WDT_BASE)
 #endif
 
 #if (UART0_SECURE_EN == 1)
@@ -325,21 +325,21 @@ typedef enum IRQn_Type
 #endif
 
 #if (I2C_MASTER0_SECURE_EN == 1)
-#define I2C_MASTER0           ((I2C_MASTER_T *) (I2C_MASTER0_BASE | PERIPH_SECURE_OFFSET))
+#define I2C_MASTER0           ((i2c_master_t *) (I2C_MASTER0_BASE | PERIPH_SECURE_OFFSET))
 #else
-#define I2C_MASTER0           ((I2C_MASTER_T *) I2C_MASTER0_BASE)
+#define I2C_MASTER0           ((i2c_master_t *) I2C_MASTER0_BASE)
 #endif
 
 #if (I2C_MASTER1_SECURE_EN == 1)
-#define I2C_MASTER1           ((I2C_MASTER_T *) (I2C_MASTER1_BASE | PERIPH_SECURE_OFFSET))
+#define I2C_MASTER1           ((i2c_master_t *) (I2C_MASTER1_BASE | PERIPH_SECURE_OFFSET))
 #else
-#define I2C_MASTER1           ((I2C_MASTER_T *) I2C_MASTER1_BASE)
+#define I2C_MASTER1           ((i2c_master_t *) I2C_MASTER1_BASE)
 #endif
 
 #if (I2C_SLAVE_SECURE_EN == 1)
-#define I2C_SLAVE             ((I2C_SLAVE_T *) (I2C_SLAVE_BASE | PERIPH_SECURE_OFFSET))
+#define I2C_SLAVE             ((i2c_slave_t *) (I2C_SLAVE_BASE | PERIPH_SECURE_OFFSET))
 #else
-#define I2C_SLAVE             ((I2C_SLAVE_T *) I2C_SLAVE_BASE)
+#define I2C_SLAVE             ((i2c_slave_t *) I2C_SLAVE_BASE)
 #endif
 
 #if (COMM_SUBSYSTEM_AHB_SECURE_EN == 1)

@@ -1,18 +1,33 @@
 menu "THREAD"
 
 config RADIO_2P4GHZ_OQPSK_SUPPORT
-    # depends on BUILD_COMPONENT_OPENTHREAD
-    # bool "2.4G"
+    depends on BUILD_COMPONENT_OPENTHREAD
+    bool "2.4G"
 	def_bool false
     help
         2.4G
 
 config RADIO_SUBGHZ_OQPSK_SUPPORT
-    # depends on BUILD_COMPONENT_OPENTHREAD_SUBG
-    # bool "Sub-G"
+    depends on BUILD_COMPONENT_OPENTHREAD_SUBG
+    bool "Sub-G"
 	def_bool false
     help
         Sub-G
+choice RADIO_BAND_SELECTION
+prompt "RADIO BAND SELECTION"
+default SUBG_FREQUENCY_BAND_915
+config SUBG_FREQUENCY_BAND_915
+    bool "915MHz"
+config SUBG_FREQUENCY_BAND_868
+    bool "868MHz"
+config SUBG_FREQUENCY_BAND_470
+    bool "470MHz"
+config SUBG_FREQUENCY_BAND_433
+    bool "433MHz"
+    
+endchoice
+
+
 config OPENTHREAD_TASK_SIZE
     int "OPENTHREAD TASK SIZE"
     default 4096

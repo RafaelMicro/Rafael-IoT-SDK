@@ -65,9 +65,9 @@ void UART2_Handler                   (void) __attribute__ ((weak, alias("Default
 
 void IRM_Handler                     (void) __attribute__ ((weak, alias("Default_Handler")));
 
-void I2C_Master0_Handler             (void) __attribute__ ((weak, alias("Default_Handler")));
-void I2C_Master1_Handler             (void) __attribute__ ((weak, alias("Default_Handler")));
-void I2C_Slave_Handler               (void) __attribute__ ((weak, alias("Default_Handler")));
+void i2c_master0_handler             (void) __attribute__ ((weak, alias("Default_Handler")));
+void i2c_master1_handler             (void) __attribute__ ((weak, alias("Default_Handler")));
+void i2c_slave_handler               (void) __attribute__ ((weak, alias("Default_Handler")));
 
 void QSPI0_Handler                   (void) __attribute__ ((weak, alias("Default_Handler")));
 void QSPI1_Handler                   (void) __attribute__ ((weak, alias("Default_Handler")));
@@ -146,9 +146,9 @@ const VECTOR_TABLE_Type __VECTOR_TABLE[64] __VECTOR_TABLE_ATTRIBUTE =
     UART2_Handler,                            /*   18 UART2 Handler */
     0,                                        /*   19 Reserved */
     IRM_Handler,                              /*   20 IRM Handler */
-    I2C_Master0_Handler,                      /*   21 I2C Master0 Handler */
-    I2C_Master1_Handler,                      /*   22 I2C Master1 Handler */
-    I2C_Slave_Handler,                        /*   23 I2C Slave Handler*/
+    i2c_master0_handler,                      /*   21 I2C Master0 Handler */
+    i2c_master1_handler,                      /*   22 I2C Master1 Handler */
+    i2c_slave_handler,                        /*   23 I2C Slave Handler*/
     0,                                        /*   24 Reserved */
     QSPI0_Handler,                            /*   25 QSPI0 Handler */
     QSPI1_Handler,                            /*   26 QSPI1 Handler */

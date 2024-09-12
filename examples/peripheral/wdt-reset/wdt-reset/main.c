@@ -32,6 +32,7 @@ int32_t main(void) {
     
     puts("/*****Start WDT Reset******/\r\n");
     
+
 #if defined (CONFIG_RT584)
     printf("reset cause: %8x\r\n", hosal_get_all_reset_cause());
     if (hosal_reset_by_wdt()) {

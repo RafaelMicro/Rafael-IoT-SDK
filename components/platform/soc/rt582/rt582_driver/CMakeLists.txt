@@ -11,7 +11,8 @@ sdk_library_add_sources(
     Src/flashctl.c
     Src/sysctrl.c
     Src/timer.c
-    # Src/sysfun.c 
+    Src/wdt.c
+    Src/sysfun.c 
 )
 else()
 sdk_library_add_sources(

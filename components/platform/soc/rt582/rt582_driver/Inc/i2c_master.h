@@ -130,15 +130,13 @@ typedef struct {
     uint8_t bFlag_16bits;                       /*!< 1 for register address is 16bits, 
                                                      0 for register address is 8bits.  */
     uint16_t reg_addr;                          /*!< I2C register address value   */
-} i2c_slave_data_t;
+} i2c_master_mode_t;
 
 /**
  * \brief           I2C master pre-initial function
- * \param[in]       scl_pin: Specifies the SCL pin number
- * \param[in]       sda_pin: Specifies the SDA pin number
- * \return          Function status, STATUS_SUCCESS, STATUS_INVALID_PARAM
+ * \return          Function status, STATUS_SUCCESS
  */
-uint32_t i2c_preinit(uint32_t scl_pin, uint32_t sda_pin);
+uint32_t i2c_preinit(void);
 
 /**
  * \brief           Set I2C master initialize
@@ -156,8 +154,8 @@ uint32_t i2c_init(uint32_t i2c_speed);
  *                               when I2C request completed or aborted
  * \return          Function status, STATUS_SUCCESS, STATUS_INVALID_PARAM
  */
-uint32_t i2c_write(const i2c_slave_data_t* slave, uint8_t* data, uint32_t len,
-                   i2cm_cb_fn i2c_usr_isr);
+uint32_t i2c_write(const i2c_master_mode_t* slave, uint8_t* data,
+                   uint32_t len, i2cm_cb_fn i2c_usr_isr);
 
 /**
  * \brief           I2C read data to slave
@@ -169,8 +167,8 @@ uint32_t i2c_write(const i2c_slave_data_t* slave, uint8_t* data, uint32_t len,
  * \return          Function status, STATUS_SUCCESS, STATUS_INVALID_PARAM, 
  *                  STATUS_NO_INIT, STATUS_EBUSY
  */
-uint32_t i2c_read(const i2c_slave_data_t* slave, uint8_t* data, uint32_t len,
-                  i2cm_cb_fn i2c_usr_isr);
+uint32_t i2c_read(const i2c_master_mode_t* slave, uint8_t* data,
+                  uint32_t len, i2cm_cb_fn i2c_usr_isr);
 
 #ifdef __cplusplus
 }

@@ -343,31 +343,22 @@ void pin_set_pullopt(uint32_t pin_number, uint32_t mode);
  *
  */
 extern void pin_set_drvopt(uint32_t pin_number, uint32_t mode);
+
 /**
- * @brief Set pin to opendrain option
- *
- * @param[in] pin_number  Specifies the pin number.
- *                                              GPIO0~GPIO31
- * @return
- *         NONE
- *
- * @details
- *        Set the pin to opendrain mode.
+ * \brief           Set pin to opendrain option
+ * \param[in]       pin_number: Specifies the pin number
  */
-extern void enable_pin_opendrain(uint32_t pin_number);
+void enable_pin_opendrain(uint32_t pin_number);
+
 /**
- * @brief Disable pin to opendrain option
- *
- * @param[in] pin_number   Specifies the pin number
- *                                               GPIO0~GPIO31
- * @return
- *         NONE
- *
- * @details
- *        Reset the pin to non-opendrain mode.
+ * \brief           Disable pin to opendrain option
+ * \param[in]       pin_number: Specifies the pin number
  */
-extern void disable_pin_opendrain(uint32_t pin_number);
+void disable_pin_opendrain(uint32_t pin_number);
+
+
 /**
+ * 
  * @brief check pll unlock
  *
  * @param[in] NONE

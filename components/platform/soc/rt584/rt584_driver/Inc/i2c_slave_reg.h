@@ -1,42 +1,59 @@
-/**************************************************************************//**
- * @file     i2c_slave_reg.h
- * @version  V1.00
- * @brief    i2c slave register definition header file
+/**
+ * \file            i2c_slave_reg.h
+ * \brief           i2c slave register header file
+ */
+/*
+ * Copyright (c) year FirstName LASTNAME
  *
- * @copyright
- *****************************************************************************/
-/** @defgroup I2C_Slave_Register I2C_Slave
- *  @ingroup  peripheral_group
- *  @{
- *  @brief  I2C_Slave_Register header information
-*/
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge,
+ * publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+ * AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ *
+ * Author:          Kc.tseng
+ */
+
 #ifndef I2C_SLAVE_REG_H
 #define I2C_SLAVE_REG_H
 
-#if defined ( __CC_ARM   )
-#pragma anon_unions
-#endif
-
-typedef struct
-{
-    __IO  uint32_t  rx_data;             /*0x00*/
-    __IO  uint32_t  i2c_slave_addr;      /*0x04*/
-    __IO  uint32_t  i2c_int_enable;      /*0x08*/
-    __IO  uint32_t  i2c_int_status;      /*0x0c*/
-    __IO  uint32_t  i2c_timeout;         /*0x10*/
-    __IO  uint32_t  i2c_slave_enable;    /*0x14*/
-    __I   uint32_t  i2c_slave_status;    /*0x18*/
-} I2C_SLAVE_T;
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 /**
- *  @Brief I2C Slave interrupt register definitions
+ * \brief           i2c slave total register 
  */
-#define  WR_DATA     RX_DATA
+typedef struct {
+    __IO uint32_t i2c_slave_data;           /*!< 0x00 i2c slave T/Rx data */
+    __IO uint32_t i2c_slave_addr;           /*!< 0x04 i2c slave address */
+    __IO uint32_t i2c_slave_int_enable;     /*!< 0x08 i2c slave interrupt enable 
+                                                register */
+    __IO uint32_t i2c_slave_int_status;     /*!< 0x0C i2c slave interrupt status 
+                                                register */
+    __IO uint32_t i2c_slave_timeout;        /*!< 0x10 i2c slave timeout register */
+    __IO uint32_t i2c_slave_enable;         /*!< 0x14 i2c slave enable register */
+    __I  uint32_t i2c_slave_status;         /*!< 0x18 i2c slave status register */
+} i2c_slave_t;
 
-/*@}*/ /* end of peripheral_group I2C_Slave_Register */
 
-#if defined ( __CC_ARM   )
-#pragma no_anon_unions
+#ifdef __cplusplus
+}
 #endif
 
-#endif      /* end of __RT584_I2C_SLAVE_REG_H__ */
+#endif /* End of I2C_SLAVE_REG_H */

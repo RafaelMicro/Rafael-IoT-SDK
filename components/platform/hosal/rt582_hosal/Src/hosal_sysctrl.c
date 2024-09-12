@@ -67,3 +67,11 @@ uint32_t hosal_pin_set_mode(uint32_t pin_number, uint32_t mode) {
 void hosal_pin_set_pullopt(uint32_t pin_number, uint32_t mode) {
     pin_set_pullopt(pin_number, mode);
 }
+
+void hosal_enable_pin_opendrain(uint32_t pin_number) {
+    enable_pin_opendrain(pin_number);
+}
+
+void hosal_disable_pin_opendrain(uint32_t pin_number) {
+    disable_pin_opendrain(pin_number);
+}

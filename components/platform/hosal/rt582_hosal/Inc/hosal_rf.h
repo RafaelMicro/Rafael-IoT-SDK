@@ -154,6 +154,7 @@ typedef struct {
 typedef struct {
     uint8_t* pdata;
     uint8_t* ptime;
+    uint8_t is2bytephr;
     uint32_t ack_len;
 } hosal_rf_15p4_ack_packet_t;
 

@@ -60,6 +60,10 @@ uint32_t hosal_pin_set_mode(uint32_t pin_number, uint32_t mode) {
         pin_set_mode(pin_number, MODE_I2S0);
     } else if (mode == HOSAL_MODE_I2S_MCLK && pin_number == 14) {
         pin_set_mode(pin_number, MODE_I2S0);
+    } else if (mode == HOSAL_MODE_I2C_SLAVE_SCL && pin_number == 28) {
+        pin_set_mode(pin_number, MODE_I2C_SLAVE);
+    } else if (mode == HOSAL_MODE_I2C_SLAVE_SDA && pin_number == 29) {
+        pin_set_mode(pin_number, MODE_I2C_SLAVE);
     } else {
         return STATUS_INVALID_PARAM;
     }
@@ -70,4 +74,26 @@ void hosal_pin_set_pullopt(uint32_t pin_number, uint32_t mode) {
     pin_set_pullopt(pin_number, mode);
 }
 
+void hosal_enable_pin_opendrain(uint32_t pin_number) {
+    enable_pin_opendrain(pin_number);
+}
 
+void hosal_disable_pin_opendrain(uint32_t pin_number) {
+    disable_pin_opendrain(pin_number);
+}
+
+void hosal_pin_enable_schmitt(uint32_t pin_number) {
+    pin_enable_schmitt(pin_number);
+}
+
+void hosal_pin_disable_schmitt(uint32_t pin_number) {
+    pin_disable_schmitt(pin_number);
+}
+
+void hosal_pin_enable_filter(uint32_t pin_number) {
+    pin_enable_filter(pin_number);
+}
+
+void hosal_pin_disable_filter(uint32_t pin_number) {
+    pin_disable_filter(pin_number);
+}

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "mcu.h"
-#if CONFIG_BUILD_COMPONENT_UART_STDIO
+#if defined(CONFIG_BOOTLOADER_DEBUG)
 #include "uart_stdio.h"
 #endif
 static void pin_mux_init(void) {
@@ -15,10 +15,10 @@ static void pin_mux_init(void) {
 
 int rt582_main(void) {
     pin_mux_init();
-#if CONFIG_BUILD_COMPONENT_UART_STDIO
+#if defined(CONFIG_BOOTLOADER_DEBUG)
     uart_stdio_init();
 #endif
-    puts("Main hello world\r\n");
+    // puts("Main hello world\r\n");
 
     extern int main();
     main();

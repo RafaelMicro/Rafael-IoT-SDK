@@ -206,8 +206,8 @@ uint64_t otPlatTimeGet(void) {
 #if (OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE == 1)
     now32Time = otPlatAlarmMicroGetNow();
 #else
-    now32Time = lmac15p4_rtc_time_read();
-    // now32Time = otPlatAlarmMilliGetNow();
+    // now32Time = lmac15p4_rtc_time_read();
+    now32Time = otPlatAlarmMilliGetNow();
 #endif
     if (now32Time < prev32Time) {
         timerWraps += 1U;

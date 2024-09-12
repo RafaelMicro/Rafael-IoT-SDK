@@ -38,60 +38,50 @@ extern "C" {
 
 typedef enum IRQn_Type {
     /******  Cortex-M3 Processor Exceptions Numbers ***************************************************/
-    NonMaskableInt_IRQn =
-        -14, /*!<  2 Cortex-M3 Non Maskable Interrupt                 */
-    HardFault_IRQn =
-        -13, /*!<  3 Cortex-M3 Hard Fault Interrupt                   */
-    MemoryManagement_IRQn =
-        -12, /*!<  4 Cortex-M3 Memory Management Interrupt            */
-    BusFault_IRQn =
-        -11, /*!<  5 Cortex-M3 Bus Fault Interrupt                    */
-    UsageFault_IRQn =
-        -10, /*!<  6 Cortex-M3 Usage Fault Interrupt                  */
-    SVCall_IRQn =
-        -5, /*!< 11 Cortex-M3 SV Call Interrupt                      */
-    DebugMonitor_IRQn =
-        -4, /*!< 12 Cortex-M3 Debug Monitor Interrupt                */
-    PendSV_IRQn =
-        -2, /*!< 14 Cortex-M3 Pend SV Interrupt                      */
-    SysTick_IRQn =
-        -1, /*!< 15 Cortex-M3 System Tick Interrupt                  */
+    NonMaskableInt_IRQn = -14,                  /*!<  2 Cortex-M3 Non Maskable Interrupt      */
+    HardFault_IRQn = -13,                       /*!<  3 Cortex-M3 Hard Fault Interrupt        */
+    MemoryManagement_IRQn = -12,                /*!<  4 Cortex-M3 Memory Management Interrupt */
+    BusFault_IRQn = -11,                        /*!<  5 Cortex-M3 Bus Fault Interrupt         */
+    UsageFault_IRQn = -10,                      /*!<  6 Cortex-M3 Usage Fault Interrupt       */
+    SVCall_IRQn = -5,                           /*!< 11 Cortex-M3 SV Call Interrupt           */
+    DebugMonitor_IRQn = -4,                     /*!< 12 Cortex-M3 Debug Monitor Interrupt     */
+    PendSV_IRQn = -2,                           /*!< 14 Cortex-M3 Pend SV Interrupt           */
+    SysTick_IRQn = -1,                          /*!< 15 Cortex-M3 System Tick Interrupt       */
 
     /******  CM3MCU Specific Interrupt Numbers *******************************************************/
-    Gpio_IRQn = 0,     /*!< GPIO combined Interrupt                          */
-    Timer0_IRQn = 1,   /*!< TIMER 0 Interrupt                                */
-    Timer1_IRQn = 2,   /*!< TIMER 1 Interrupt                                */
-    Wdt_IRQn = 3,      /*!< WatchDog Interrupt                               */
-    Uart0_IRQn = 4,    /*!< UART 0 Interrupt                                 */
-    I2cm_IRQn = 5,     /*!< I2C Master Interrupt                             */
-    FlashCtl_IRQn = 6, /*!< FlashCtl Interrupt                               */
-    Uart1_IRQn = 7,    /*!< UART 1 Interrupt                                 */
-    Rtc_IRQn = 8,      /*!< RTC Interrupt                                    */
-    Dma0_C0_IRQn = 9,  /*!< DMA0 Channel 0 Interrupt                         */
-    Dma0_C1_IRQn = 10, /*!< DMA0 Channel 1 Interrupt                         */
-    Dma0_C2_IRQn = 11, /*!< DMA0 Channel 2 Interrupt                         */
-    Dma0_C3_IRQn = 12, /*!< DMA0 Channel 3 Interrupt                         */
-    Qspi0_IRQn = 13,   /*!< QSPI0 Interrupt                                  */
-    I2s0_IRQn = 14,    /*!< I2S0  Interrupt                                  */
-    Timer3_IRQn = 15,  /*!< TIMER 3 Interrupt                                */
-    Timer4_IRQn = 16,  /*!< TIMER 4 Interrupt                                */
-    Dma1_C2_IRQn = 17, /*!< DMA1 Channel 2 Interrupt                         */
-    Bod_IRQn = 18,     /*!< BOD Interrupt                                    */
-    Uart2_IRQn = 19,   /*!< UART2 Interrupt                                  */
-    CommSubsystem_IRQn =
-        20,           /*!< COMM_SUBSYSTEM_COMM Interrupt                    */
-    Pwm0_IRQn = 21,   /*!< PWM0 Interrupt                                   */
-    Pwm1_IRQn = 22,   /*!< PWM1 Interrupt                                   */
-    Pwm2_IRQn = 23,   /*!< PWM2 Interrupt                                   */
-    Pwm3_IRQn = 24,   /*!< PWM3 Interrupt                                   */
-    Pwm4_IRQn = 25,   /*!< PWM4 Interrupt                                   */
-    Sadc_IRQn = 26,   /*!< SADC Interrupt                                   */
-    Crypto_IRQn = 27, /*!< Crypto  Interrupt                                */
-    Timer2_IRQn = 28, /*!< TIMER 2 Interrupt                                */
-    Qspi1_IRQn = 29,  /*!< QSPI1   Interrupt                                */
-    Soft_IRQn = 30,   /*!< SOFTWARE  Interrupt                              */
-    Trng_IRQn = 31,   /*!< TRNG    Interrupt                                */
-    Comp_IRQn = 32,   /*!< COMPARATOR Interrupt                             */
+    Gpio_IRQn = 0,                              /*!< GPIO combined Interrupt       */
+    Timer0_IRQn = 1,                            /*!< TIMER 0 Interrupt             */
+    Timer1_IRQn = 2,                            /*!< TIMER 1 Interrupt             */
+    Wdt_IRQn = 3,                               /*!< WatchDog Interrupt            */
+    Uart0_IRQn = 4,                             /*!< UART 0 Interrupt              */
+    I2C_Master0_IRQn = 5,                       /*!< I2C Master Interrupt          */
+    FlashCtl_IRQn = 6,                          /*!< FlashCtl Interrupt            */
+    Uart1_IRQn = 7,                             /*!< UART 1 Interrupt              */
+    Rtc_IRQn = 8,                               /*!< RTC Interrupt                 */
+    Dma0_C0_IRQn = 9,                           /*!< DMA0 Channel 0 Interrupt      */
+    Dma0_C1_IRQn = 10,                          /*!< DMA0 Channel 1 Interrupt      */
+    Dma0_C2_IRQn = 11,                          /*!< DMA0 Channel 2 Interrupt      */
+    Dma0_C3_IRQn = 12,                          /*!< DMA0 Channel 3 Interrupt      */
+    Qspi0_IRQn = 13,                            /*!< QSPI0 Interrupt               */
+    I2s0_IRQn = 14,                             /*!< I2S0  Interrupt               */
+    Timer3_IRQn = 15,                           /*!< TIMER 3 Interrupt             */
+    Timer4_IRQn = 16,                           /*!< TIMER 4 Interrupt             */
+    Dma1_C2_IRQn = 17,                          /*!< DMA1 Channel 2 Interrupt      */
+    Bod_IRQn = 18,                              /*!< BOD Interrupt                 */
+    Uart2_IRQn = 19,                            /*!< UART2 Interrupt               */
+    CommSubsystem_IRQn = 20,                    /*!< COMM_SUBSYSTEM_COMM Interrupt */
+    Pwm0_IRQn = 21,                             /*!< PWM0 Interrupt                */
+    Pwm1_IRQn = 22,                             /*!< PWM1 Interrupt                */
+    Pwm2_IRQn = 23,                             /*!< PWM2 Interrupt                */
+    Pwm3_IRQn = 24,                             /*!< PWM3 Interrupt                */
+    Pwm4_IRQn = 25,                             /*!< PWM4 Interrupt                */
+    Sadc_IRQn = 26,                             /*!< SADC Interrupt                */
+    Crypto_IRQn = 27,                           /*!< Crypto  Interrupt             */
+    Timer2_IRQn = 28,                           /*!< TIMER 2 Interrupt             */
+    Qspi1_IRQn = 29,                            /*!< QSPI1   Interrupt             */
+    Soft_IRQn = 30,                             /*!< SOFTWARE  Interrupt           */
+    Trng_IRQn = 31,                             /*!< TRNG    Interrupt             */
+    Comp_IRQn = 32,                             /*!< COMPARATOR Interrupt          */
 } IRQn_Type;
 
 /*

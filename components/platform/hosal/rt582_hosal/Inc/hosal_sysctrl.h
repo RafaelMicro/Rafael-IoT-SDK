@@ -123,6 +123,18 @@ uint32_t hosal_pin_set_mode(uint32_t pin_number, uint32_t mode);
  */
 void hosal_pin_set_pullopt(uint32_t pin_number, uint32_t mode);
 
+/**
+ * \brief           Set pin to opendrain option
+ * \param[in]       pin_number: Specifies the pin number
+ */
+void hosal_enable_pin_opendrain(uint32_t pin_number);
+
+/**
+ * \brief           Disable pin to opendrain option
+ * \param[in]       pin_number: Specifies the pin number
+ */
+void hosal_disable_pin_opendrain(uint32_t pin_number);
+
 #ifdef __cplusplus
 }
 #endif

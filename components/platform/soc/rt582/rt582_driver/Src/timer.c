@@ -68,20 +68,6 @@ uint32_t timer_open(uint32_t timer_id, timer_config_mode_t cfg,
 
     timer_cfg[timer_id].state = TIMER_STATE_OPEN;
 
-    if (timer_cb != NULL) {
-        if (timer_id < 2) {
-            NVIC_EnableIRQ((IRQn_Type)(Timer0_IRQn + timer_id));
-        } else if (timer_id == 2) {
-            NVIC_EnableIRQ(Timer2_IRQn);
-        } else if (timer_id == 3) {
-            NVIC_EnableIRQ(Timer3_IRQn);
-        } else if (timer_id == 4) {
-            NVIC_EnableIRQ(Timer4_IRQn);
-        } else {
-            return STATUS_INVALID_PARAM;
-        }
-    }
-
     return STATUS_SUCCESS;
 }
 
@@ -161,16 +147,6 @@ uint32_t timer_close(uint32_t timer_id) {
 
     timer = base[timer_id];
     timer->control.reg = 0;                     /*Disable timer*/
-
-    if (timer_id < 2) {
-        NVIC_DisableIRQ((IRQn_Type)(Timer0_IRQn + timer_id));
-    } else if (timer_id == 2) {
-        NVIC_DisableIRQ(Timer2_IRQn);
-    } else if (timer_id == 3) {
-        NVIC_DisableIRQ(Timer3_IRQn);
-    } else if (timer_id == 4) {
-        NVIC_DisableIRQ(Timer4_IRQn);
-    }
 
     timer_cfg[timer_id].timer_cb = NULL;
     timer_cfg[timer_id].state = TIMER_STATE_CLOSED;

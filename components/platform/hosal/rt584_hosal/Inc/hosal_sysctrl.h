@@ -84,6 +84,8 @@ extern "C"
 #define HOSAL_MODE_I2S_SDO          0x25
 #define HOSAL_MODE_I2S_SDI          0x26
 #define HOSAL_MODE_I2S_MCLK         0x27
+#define HOSAL_MODE_I2C_SLAVE_SCL    0x28
+#define HOSAL_MODE_I2C_SLAVE_SDA    0x29
 
 /**
  * \brief           Gpio pull up define
@@ -125,6 +127,26 @@ uint32_t hosal_pin_set_mode(uint32_t pin_number, uint32_t mode);
  *                        PULL_UP_1M       7
  */
 void hosal_pin_set_pullopt(uint32_t pin_number, uint32_t mode);
+
+/**
+ * \brief           Set pin to opendrain option
+ * \param[in]       pin_number: Specifies the pin number
+ */
+void hosal_enable_pin_opendrain(uint32_t pin_number);
+
+/**
+ * \brief           Disable pin to opendrain option
+ * \param[in]       pin_number: Specifies the pin number
+ */
+void hosal_disable_pin_opendrain(uint32_t pin_number);
+
+void hosal_pin_enable_schmitt(uint32_t pin_number);
+
+void hosal_pin_disable_schmitt(uint32_t pin_number);
+
+void hosal_pin_enable_filter(uint32_t pin_number);
+
+void hosal_pin_disable_filter(uint32_t pin_number);
 
 #ifdef __cplusplus
 }

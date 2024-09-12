@@ -37,8 +37,8 @@
 
 #include "hosal_i2c_master.h"
 
-uint32_t hosal_i2c_preinit(uint32_t scl_pin, uint32_t sda_pin) {
-    return i2c_preinit(scl_pin, sda_pin);
+uint32_t hosal_i2c_preinit(uint32_t master_id) {
+    return i2c_preinit();
 }
 
 uint32_t hosal_i2c_init(uint32_t i2c_master_port, uint32_t i2c_speed) {
@@ -47,8 +47,8 @@ uint32_t hosal_i2c_init(uint32_t i2c_master_port, uint32_t i2c_speed) {
 
 uint32_t hosal_i2c_write(uint32_t i2c_master_port, void* slave, uint8_t* data,
                          uint32_t len) {
-    hosal_i2c_slave_data_t* hosal_cfg = (hosal_i2c_slave_data_t*)slave;
-    i2c_slave_data_t drv_cfg = {
+    hosal_i2c_master_mode_t* hosal_cfg = (hosal_i2c_master_mode_t*)slave;
+    i2c_master_mode_t drv_cfg = {
         .bFlag_16bits = hosal_cfg->bFlag_16bits,
         .dev_addr = hosal_cfg->dev_addr,
         .reg_addr = hosal_cfg->reg_addr,
@@ -56,9 +56,10 @@ uint32_t hosal_i2c_write(uint32_t i2c_master_port, void* slave, uint8_t* data,
     return i2c_write(&drv_cfg, data, len, hosal_cfg->i2c_usr_isr);
 }
 
-uint32_t hosal_i2c_read(uint32_t i2c_master_port, hosal_i2c_slave_data_t* slave,
-                        uint8_t* data, uint32_t len) {
-    i2c_slave_data_t drv_cfg = {
+uint32_t hosal_i2c_read(uint32_t i2c_master_port,
+                        hosal_i2c_master_mode_t* slave, uint8_t* data,
+                        uint32_t len) {
+    i2c_master_mode_t drv_cfg = {
         .bFlag_16bits = slave->bFlag_16bits,
         .dev_addr = slave->dev_addr,
         .reg_addr = slave->reg_addr,

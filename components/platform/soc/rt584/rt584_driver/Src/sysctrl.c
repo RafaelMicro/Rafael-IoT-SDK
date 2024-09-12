@@ -196,6 +196,26 @@ uint32_t pin_get_mode(uint32_t pin_number)
     return reg;
 }
 
+void pin_enable_schmitt(uint32_t pin_number) {
+
+    SYSCTRL->gpio_en_schmitt |= 0x1 << pin_number;
+}
+
+void pin_disable_schmitt(uint32_t pin_number) {
+
+    SYSCTRL->gpio_en_schmitt &= ~(0x1 << pin_number);
+}
+
+void pin_enable_filter(uint32_t pin_number) {
+
+    SYSCTRL->gpio_en_filter |= 0x1 << pin_number;
+}
+
+void pin_disable_filter(uint32_t pin_number) {
+
+    SYSCTRL->gpio_en_filter &= ~(0x1 << pin_number);
+}
+
 /*
  * For multithread OS, and dynamic enable/disable peripheral environment,
  * Set this register has race condition issue.

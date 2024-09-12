@@ -20,6 +20,7 @@
 #include "ble_host_cmd.h"
 #include "ble_profile.h"
 #include "hosal_rf.h"
+#include "hosal_gpio.h"
 
 /**************************************************************************************************
  *    MACROS
@@ -51,6 +52,8 @@ static const ble_gap_addr_t  DEVICE_ADDR = {.addr_type = RANDOM_STATIC_ADDR,
                                             .addr = {0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xC6 }
                                            };
 
+#define GPIO_WAKE_UP_PIN                0
+
 /**************************************************************************************************
  *    LOCAL VARIABLES
  *************************************************************************************************/
@@ -75,6 +78,11 @@ static bool app_request_set(uint8_t host_id, app_request_t request, bool from_is
  *  Handler
  * ------------------------------
  */
+static void app_gpio_handler(uint32_t pin, void *isr_param)
+{
+    lpm_low_power_mask(LOW_POWER_MASK_BIT_TASK_BLE_APP);
+}
+
 static void app_peripheral_handler(app_req_param_t *p_param)
 {
     ble_err_t status;
@@ -595,6 +603,7 @@ static ble_err_t ble_init(void)
 static void app_init(void)
 {
     ble_task_priority_t ble_task_level;
+    hosal_gpio_input_config_t input_cfg;
 
     // banner
     printf("------------------------------------------\n");
@@ -616,6 +625,14 @@ static void app_init(void)
     else {
         printf("BLE stack initial fail...\n");
     }
+
+    // wake up pin
+    input_cfg.pin_int_mode = HOSAL_GPIO_PIN_INT_EDGE_FALLING;
+    input_cfg.usr_cb = app_gpio_handler;
+    input_cfg.param = NULL;
+    hosal_gpio_cfg_input(GPIO_WAKE_UP_PIN, input_cfg);
+    hosal_gpio_debounce_enable(GPIO_WAKE_UP_PIN);
+    hosal_gpio_int_enable(GPIO_WAKE_UP_PIN);
 }
 
 /**************************************************************************************************

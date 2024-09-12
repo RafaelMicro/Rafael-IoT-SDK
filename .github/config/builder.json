@@ -5,8 +5,73 @@
         "config_file": "default"
     },
     {
-        "name": "bluetooth-le-central",
+        "name": "Bootloader",
+        "example_name": "bootloader-app",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-central-data-rate",
         "example_name": "bluetooth-le/central/central-data-rate",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-central-trsp",
+        "example_name": "bluetooth-le/central/central-trsp",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-multi-1c1p",
+        "example_name": "bluetooth-le/multi-link/multi-1c1p",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-power-management",
+        "example_name": "bluetooth-le/multi-link/power-management",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-at-command",
+        "example_name": "bluetooth-le/others/at-command",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-ibeacon",
+        "example_name": "bluetooth-le/others/ibeacon",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-script-test",
+        "example_name": "bluetooth-le/others/script-test",
+        "config_file": "default_1link"
+    },
+    {
+        "name": "bluetooth-le-periph-data-rate",
+        "example_name": "bluetooth-le/peripheral/periph-data-rate",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-periph-hogp",
+        "example_name": "bluetooth-le/peripheral/periph-hogp",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-periph-hrs",
+        "example_name": "bluetooth-le/peripheral/periph-hrs",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-periph-iot-test",
+        "example_name": "bluetooth-le/peripheral/periph-iot-test",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-periph-trsp",
+        "example_name": "bluetooth-le/peripheral/periph-trsp",
+        "config_file": "default"
+    },
+    {
+        "name": "bluetooth-le-periph-trsp-fota",
+        "example_name": "bluetooth-le/peripheral/periph-trsp-fota",
         "config_file": "default"
     },
     {

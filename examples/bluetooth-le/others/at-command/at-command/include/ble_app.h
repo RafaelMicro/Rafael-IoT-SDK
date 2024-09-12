@@ -72,22 +72,6 @@ extern uint16_t tx_index[2];
  *    PUBLIC FUNCTIONS
  *************************************************************************************************/
 
-/** @brief BLE initialization.
- * @details Initial BLE stack and application task.
- *
- * @return none.
- */
-void app_init(void);
-
-
-/** @brief Application Resuet Set command.
- *
- * @param[in] data : uart data pointer.
- * @param[in] length : data length.
- */
-void uart_rx_data_handle(uint8_t *data, uint8_t length);
-
-
 /** @brief Application Resuet Set command.
  *
  * @param[in] host_id : the link's id.

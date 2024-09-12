@@ -7,7 +7,7 @@
 #include "ble_gap.h"
 #include "ble_advertising.h"
 #include "ble_scan.h"
-#include "project_config.h"
+
 
 typedef struct atcmd_ble_param_t
 {

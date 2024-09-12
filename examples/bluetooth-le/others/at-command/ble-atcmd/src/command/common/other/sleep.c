@@ -1,4 +1,5 @@
 #include "atcmd_command_list.h"
+#include "lpm.h"
 
 // PRIVATE FUNCTION DECLARE
 static void sleep_init(cmd_info_t *this);
@@ -23,7 +24,7 @@ static void sleep_init(cmd_info_t *this)
 
 static ble_err_t set_cmd(atcmd_item_t *item)
 {
-    Lpm_Low_Power_Unmask(LOW_POWER_MASK_BIT_TASK_BLE_APP);
+    lpm_low_power_unmask(LOW_POWER_MASK_BIT_TASK_BLE_APP);
     item->status = AT_CMD_STATUS_OK;
     return BLE_ERR_OK;
 }

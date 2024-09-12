@@ -37,6 +37,8 @@
 extern "C" {
 #endif /* __cplusplus */
 
+#include "i2c_master.h"
+
 /**
  * \brief           I2C CLOCK Constant Definitions
  */
@@ -54,45 +56,44 @@ typedef struct {
                                                      0 for register address is 8bits. */
     uint16_t   reg_addr;                        /*!< I2C register address value */
     i2cm_cb_fn i2c_usr_isr;                     /*!< I2C usr callback */
-} hosal_i2c_slave_data_t;
+} hosal_i2c_master_mode_t;
 
 /**
  * \brief           hosal I2C master pre-initial function
- * \param[in]       scl_pin: Specifies the SCL pin number
- * \param[in]       sda_pin: Specifies the SDA pin number
+ * \param[in]       master_id: Specifies the i2c id number
  * \return          Function status, STATUS_SUCCESS, STATUS_INVALID_PARAM
  */
-uint32_t hosal_i2c_preinit(uint32_t scl_pin, uint32_t sda_pin);
+uint32_t hosal_i2c_preinit(uint32_t master_id);
 
 /**
  * \brief           Set hosal I2C master initialize
- * \param[in]       i2c_master_port: Set the I2C master port number
+ * \param[in]       master_id: Set the I2C master port number
  * \param[in]       i2c_speed: Set the I2C master bus clock frequency
  * \return          Function status, STATUS_SUCCESS, STATUS_INVALID_REQUEST
  */
-uint32_t hosal_i2c_init(uint32_t i2c_master_port, uint32_t i2c_speed);
+uint32_t hosal_i2c_init(uint32_t master_id, uint32_t i2c_speed);
 
 /**
  * \brief           I2C write data to slave
- * \param[in]       i2c_master_port: Set the I2C master port number
+ * \param[in]       master_id: Set the I2C master port number
  * \param[in]       slave: Specifies the I2C slave address and register address
  * \param[in]       data: Pointer to buffer with data to write to I2C slave
  * \param[in]       len:Number of data bytes to transmit, maxmum size is 1024 bytes
  * \return          Function status, STATUS_SUCCESS, STATUS_INVALID_PARAM
  */
-uint32_t hosal_i2c_write(uint32_t i2c_master_port, void* slave, uint8_t* data,
-                         uint32_t len);
+uint32_t hosal_i2c_write(uint32_t master_id, hosal_i2c_master_mode_t* slave,
+                         uint8_t* data, uint32_t len);
 
 /**
  * \brief           I2C read data to slave
- * \param[in]       i2c_master_port: Set the I2C master port number
+ * \param[in]       master_id: Set the I2C master port number
  * \param[in]       slave: Specifies the I2C slave address and register address
  * \param[in]       data: Pointer to buffer with data to receive from I2C slave
  * \param[in]       len: Number of data bytes to receive, maxmum size is 1024 bytes
  * \return          Function status, STATUS_SUCCESS, STATUS_INVALID_PARAM, 
  *                  STATUS_NO_INIT, STATUS_EBUSY
  */
-uint32_t hosal_i2c_read(uint32_t i2c_master_port, hosal_i2c_slave_data_t* slave,
+uint32_t hosal_i2c_read(uint32_t master_id, hosal_i2c_master_mode_t* slave,
                         uint8_t* data, uint32_t len);
 
 #ifdef __cplusplus
