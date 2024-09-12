@@ -4,7 +4,8 @@ sdk_library_add_sources(
     Src/hosal_dma.c
     Src/hosal_flash.c 
     Src/hosal_gpio.c
-    #Src/hosal_i2c_master.c
+    Src/hosal_i2c_master.c
+    Src/hosal_i2c_slave.c
     #Src/hosal_i2s.c
     #Src/hosal_pwm.c
     #Src/hosal_qspi.c 

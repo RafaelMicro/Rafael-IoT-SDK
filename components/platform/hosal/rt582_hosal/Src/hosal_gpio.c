@@ -50,27 +50,41 @@ void hosal_gpio_cfg_input(uint32_t pin_number,
         gpio_callback_register(pin_number, input_cfg.usr_cb, input_cfg.param);
 }
 
-void hosal_gpio_pin_set(uint32_t pin_number) { gpio_pin_set(pin_number); }
+void hosal_gpio_pin_set(uint32_t pin_number) { 
+    gpio_pin_set(pin_number); 
+}
 
-void hosal_gpio_pin_clear(uint32_t pin_number) { gpio_pin_clear(pin_number); }
+void hosal_gpio_pin_clear(uint32_t pin_number) { 
+    gpio_pin_clear(pin_number); 
+}
 
 void hosal_gpio_pin_write(uint32_t pin_number, uint32_t value) {
     gpio_pin_write(pin_number, value);
 }
 
-void hosal_gpio_pin_toggle(uint32_t pin_number) { gpio_pin_toggle(pin_number); }
+void hosal_gpio_pin_toggle(uint32_t pin_number) { 
+    gpio_pin_toggle(pin_number); 
+}
 
 uint32_t hosal_gpio_pin_get(uint32_t pin_number) {
     return gpio_pin_get(pin_number);
 }
 
-void hosal_gpio_int_enable(uint32_t pin) { gpio_int_enable(pin); }
+void hosal_gpio_int_enable(uint32_t pin) { 
+    gpio_int_enable(pin);
+}
 
-void hosal_gpio_int_disable(uint32_t pin) { gpio_int_disable(pin); }
+void hosal_gpio_int_disable(uint32_t pin) { 
+    gpio_int_disable(pin);
+}
 
-void hosal_gpio_debounce_enable(uint32_t pin) { gpio_debounce_enable(pin); }
+void hosal_gpio_debounce_enable(uint32_t pin) { 
+    gpio_debounce_enable(pin);
+}
 
-void hosal_gpio_debounce_disable(uint32_t pin) { gpio_debounce_disable(pin); }
+void hosal_gpio_debounce_disable(uint32_t pin) { 
+    gpio_debounce_disable(pin);
+}
 
 void hosal_gpio_set_debounce_time(uint32_t mode) {
     gpio_set_debounce_time(mode);

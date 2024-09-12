@@ -21,12 +21,10 @@
 //=============================================================================
 //                Public Global Variables Declaration
 //=============================================================================
-extern void set_duty_cycle(pwm_seq_para_head_t *pwm_para_config, uint16_t current_lv);
 
 //=============================================================================
 //                Public Global Variables
 //=============================================================================
-extern pwm_seq_para_head_t pwm_para_config[3];
 extern ble_mesh_element_param_t g_element_info[];
 extern light_lightness_state_t  el0_light_lightness_state;
 
@@ -249,7 +247,6 @@ void app_process_model_msg(mesh_app_mdl_evt_msg_idc_t *pt_msg_idc, ble_mesh_elem
     default:
         printf("unsupport opcode 0x%08x \n", opcode);
         break;
-
     }
 }
 void app_process_element_lightness_model_state(uint16_t element_address, uint16_t state)
@@ -259,18 +256,7 @@ void app_process_element_lightness_model_state(uint16_t element_address, uint16_
     element_idx = element_address - pib_primary_address_get();
     printf("Set element[%d] act level %d\n", element_idx, state);
 
-    if (state > 0)
-    {
-        //set_duty_cycle(&pwm_para_config[0], state);
-        //set_duty_cycle(&pwm_para_config[1], state);
-        //set_duty_cycle(&pwm_para_config[2], state);
-    }
-    else
-    {
-        //set_duty_cycle(&pwm_para_config[0], 0);
-        //set_duty_cycle(&pwm_para_config[1], 0);
-        //set_duty_cycle(&pwm_para_config[2], 0);
-    }
+    hosal_pwm_fmt0_duty_ex(0, 100-((state+1)/655));
 }
 
 void app_process_element_scene_model_state(uint16_t element_address, uint8_t action, uint32_t *p_scene_state, void **p_extend_model_state_set)
@@ -291,18 +277,8 @@ void app_process_element_scene_model_state(uint16_t element_address, uint8_t act
         //change current state by scene state
         printf("scene recall, element addr 0x%04x state %d\n", element_address, *p_scene_state);
 
-        if (*p_scene_state > 0)
-        {
-            //set_duty_cycle(&pwm_para_config[0], *p_scene_state);
-            //set_duty_cycle(&pwm_para_config[1], *p_scene_state);
-            //set_duty_cycle(&pwm_para_config[2], *p_scene_state);
-        }
-        else
-        {
-            //set_duty_cycle(&pwm_para_config[0], 0);
-            //set_duty_cycle(&pwm_para_config[1], 0);
-            //set_duty_cycle(&pwm_para_config[2], 0);
-        }
+        hosal_pwm_fmt0_duty_ex(0, 100-((*p_scene_state+1)/655));
+
 
         if (el0_light_lightness_state.lightness_actual != *p_scene_state)
         {
@@ -320,7 +296,6 @@ void app_process_element_scene_model_state(uint16_t element_address, uint8_t act
         printf("invalid scene action %d\n", action);
     }
 }
-
 
 void app_process_element_raf_trsp_sr_model_state(raf_trsp_cb_params_t *p_raf_trsp_cb_params)
 {

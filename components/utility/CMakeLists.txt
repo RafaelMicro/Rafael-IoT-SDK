@@ -7,3 +7,5 @@ sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_CLI ${CMAKE_CURRENT_LIST_DIR}/
 sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_ENHANCED_FLASH_DATASET ${CMAKE_CURRENT_LIST_DIR}/EnhancedFlashDataset)
 sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_SYSLOG ${CMAKE_CURRENT_LIST_DIR}/syslog)
 sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_SW_TIMER ${CMAKE_CURRENT_LIST_DIR}/sw_timer)
+sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_LZMADEC ${CMAKE_CURRENT_LIST_DIR}/LzmaDec)
+sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_VERSION_INFO ${CMAKE_CURRENT_LIST_DIR}/Version_Information)

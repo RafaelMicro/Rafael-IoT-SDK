@@ -376,32 +376,28 @@ void delay_us(unsigned int us);
  */
 void delay_ms(unsigned int ms);
 
+
 /**
- * @brief get pin function mode
- *
- * @param[in] pin_number    Specifies the pin number.
- *                                                  GPIO0~GPIO30
- * @return
- *         get the pin function mode UART/I2S/PWM/SADC/I2C/SPI....
- * @details
- *         each pin has different function pin setting, please read RT58x datasheet to know each pin
- *   function usage setting.
+ * \brief           Get pin function mode
+ * \param[in]       pin_number:  Specifies the pin number
+ * \return          get the pin function mode
  */
 uint32_t pin_get_mode(uint32_t pin_number);
+
 /**
- * @brief set pin function mode
- *
- * @param[in] pin_number    Specifies the pin number.
- *                                                  GPIO0~GPIO30
- * @param[in] mode          The specail function mode for the pin_number
- *                                              Config GPIO To --> UART/I2S/PWM/SADC/I2C/SPI...
- * @return
- *         NONE
- * @details
- *         each pin has different function pin setting, please read RT58x datasheet to know each pin
- *   function usage setting.
+ * \brief           Set pin function mode
+ * \param[in]       pin_number: Specifies the pin number
+ * \param[in]       mode: The specail function mode for the pin_number
  */
 void pin_set_mode(uint32_t pin_number, uint32_t mode);
+
+void pin_enable_schmitt(uint32_t pin_number);
+
+void pin_disable_schmitt(uint32_t pin_number);
+
+void pin_enable_filter(uint32_t pin_number);
+
+void pin_disable_filter(uint32_t pin_number);
 
 /**
  * @brief set pin function mode extend for RT584
@@ -503,28 +499,16 @@ void pin_set_pullopt(uint32_t pin_number, uint32_t mode);
  *
  */
 void pin_set_drvopt(uint32_t pin_number, uint32_t mode);
+
 /**
- * @brief Set pin to opendrain option
- *
- * @param[in] pin_number  Specifies the pin number.
- *                                              GPIO0~GPIO31
- * @return
- *         NONE
- *
- * @details
- *        Set the pin to opendrain mode.
+ * \brief           Set pin to opendrain option
+ * \param[in]       pin_number: Specifies the pin number
  */
 void enable_pin_opendrain(uint32_t pin_number);
+
 /**
- * @brief Disable pin to opendrain option
- *
- * @param[in] pin_number   Specifies the pin number
- *                                               GPIO0~GPIO31
- * @return
- *         NONE
- *
- * @details
- *        Reset the pin to non-opendrain mode.
+ * \brief           Disable pin to opendrain option
+ * \param[in]       pin_number: Specifies the pin number
  */
 void disable_pin_opendrain(uint32_t pin_number);
 

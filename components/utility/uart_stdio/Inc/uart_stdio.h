@@ -19,6 +19,7 @@ extern "C" {
 int uart_stdio_init(void);
 int uart_stdio_write(uint8_t* p_data, uint32_t length);
 int uart_stdio_read(uint8_t* p_data, uint32_t length);
+int uart_stdio_deinit(void);
 
 /** @} */
 #endif

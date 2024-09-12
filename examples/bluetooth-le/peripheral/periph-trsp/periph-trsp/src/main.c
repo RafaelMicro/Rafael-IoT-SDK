@@ -23,6 +23,8 @@
 #include "ble_api.h"
 #include "ble_host_cmd.h"
 #include "hosal_uart.h"
+#include "uart_stdio.h"
+#include "hosal_gpio.h"
 
 /**************************************************************************************************
  *    MACROS
@@ -61,6 +63,8 @@ static const ble_gap_addr_t  DEVICE_ADDR = {.addr_type = RANDOM_STATIC_ADDR,
 #define UART0_OPERATION_PORT            0
 HOSAL_UART_DEV_DECL(uart0_dev, UART0_OPERATION_PORT, 16, 17, UART_BAUDRATE_115200)
 
+#define GPIO_WAKE_UP_PIN                0
+
 /**************************************************************************************************
  *    LOCAL VARIABLES
  *************************************************************************************************/
@@ -97,6 +101,11 @@ static void trsp_data_send_from_isr(uint8_t *p_data, uint8_t length);
  *  Handler
  * ------------------------------
  */
+static void app_gpio_handler(uint32_t pin, void *isr_param)
+{
+    lpm_low_power_mask(LOW_POWER_MASK_BIT_TASK_BLE_APP);
+}
+
 static bool uart_data_handler(char ch)
 {
     bool status = false;
@@ -125,6 +134,17 @@ static bool uart_data_handler(char ch)
         status = true;
     }
     return status;
+}
+
+static int uart0_receive_line_callback(void *p_arg)
+{
+    if (hosal_uart_get_lsr(&uart0_dev) & UART_LSR_BI)
+    {
+        char ch;
+
+        hosal_uart_receive(&uart0_dev, &ch, 1);
+        lpm_low_power_mask(LOW_POWER_MASK_BIT_TASK_BLE_APP);
+    }
 }
 
 static int uart0_rx_callback(void *p_arg)
@@ -779,9 +799,14 @@ static void app_uart_init(void)
     /* Configure UART Rx interrupt callback function */
     hosal_uart_callback_set(&uart0_dev, HOSAL_UART_RX_CALLBACK, uart0_rx_callback, &uart0_dev);
     hosal_uart_callback_set(&uart0_dev, HOSAL_UART_TX_DMA_CALLBACK, NULL, &uart0_dev);
+    hosal_uart_callback_set(&uart0_dev, HOSAL_UART_RECEIVE_LINE_STATUS_CALLBACK, uart0_receive_line_callback, &uart0_dev);
 
     /* Configure UART to interrupt mode */
     hosal_uart_ioctl(&uart0_dev, HOSAL_UART_MODE_SET, (void *)HOSAL_UART_MODE_INT_RX);
+    /* Configure UART to interrupt mode */
+    hosal_uart_ioctl(&uart0_dev, HOSAL_UART_RECEIVE_LINE_STATUS_ENABLE, (void *)NULL);
+
+    lpm_enable_low_power_wakeup(LOW_POWER_WAKEUP_UART_RX);
 
     __NVIC_SetPriority(Uart0_IRQn, 6);
 }
@@ -929,6 +954,7 @@ static ble_err_t ble_init(void)
 static void app_init(void)
 {
     ble_task_priority_t ble_task_level;
+    hosal_gpio_input_config_t input_cfg;
 
     // banner
     printf("------------------------------------------\n");
@@ -951,7 +977,16 @@ static void app_init(void)
         printf("BLE stack initial fail...\n");
     }
 
+    uart_stdio_deinit();
     app_uart_init();
+
+    // wake up pin
+    input_cfg.pin_int_mode = HOSAL_GPIO_PIN_INT_EDGE_FALLING;
+    input_cfg.usr_cb = app_gpio_handler;
+    input_cfg.param = NULL;
+    hosal_gpio_cfg_input(GPIO_WAKE_UP_PIN, input_cfg);
+    hosal_gpio_debounce_enable(GPIO_WAKE_UP_PIN);
+    hosal_gpio_int_enable(GPIO_WAKE_UP_PIN);
 }
 
 /**************************************************************************************************

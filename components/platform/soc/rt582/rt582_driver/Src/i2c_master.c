@@ -53,7 +53,7 @@
 #define I2C_STATE_HOST_INIT     32
 
 /**
- * \brief           I2C clock speed definitions
+ * \brief           I2C clock speed devide definitions
  */
 #define HIGH_SPEED_DIV       (20 - 1)
 #define MEDIUM_SPEED_DIV     (40 - 1)
@@ -85,20 +85,10 @@ static uint16_t i2c_substate;
 static uint16_t  remain_data_length;
 static uint8_t   *pdata;
 static i2cm_cb_fn notify_cb;
-static i2c_slave_data_t read_slave;
+static i2c_master_mode_t read_slave;
 
-
-uint32_t i2c_preinit(uint32_t scl_pin, uint32_t sda_pin) {
+uint32_t i2c_preinit(void) {
     uint32_t times = 0;
-
-    /* check SCL and SDA pin setting */
-    if ((scl_pin != 22) && (scl_pin != 20) && (scl_pin != 18)) {
-        return STATUS_INVALID_PARAM;
-    }
-
-    if ((sda_pin != 23) && (sda_pin != 21) && (sda_pin != 19)) {
-        return STATUS_INVALID_PARAM;
-    }
 
     /* clear I2C FIFO */
     I2CM->status = I2CM_STATUS_FIFO_CLR;
@@ -106,48 +96,8 @@ uint32_t i2c_preinit(uint32_t scl_pin, uint32_t sda_pin) {
     while (I2CM->status  & I2CM_STATUS_FIFO_CLR) {}
 
     /* I2C disable first */
-    I2CM->control = 0;      
+    I2CM->control = 0;
 
-    /* clear pending interrupt */
-    NVIC_ClearPendingIRQ(I2cm_IRQn);
-
-    pin_set_mode(scl_pin, MODE_GPIO);
-    pin_set_mode(sda_pin, MODE_GPIO);
-
-    gpio_pin_set(scl_pin);
-    gpio_pin_set(sda_pin);
-
-    gpio_cfg_output(scl_pin);
-    gpio_cfg_output(sda_pin);
-
-    __NOP();
-    __NOP();
-    __NOP();
-    __NOP();
-
-    for (times = 0; times < 9; ++times) {
-        gpio_pin_clear(scl_pin);
-
-        __NOP();
-        __NOP();
-        __NOP();
-        __NOP();
-
-        gpio_pin_set(scl_pin);
-
-        __NOP();
-        __NOP();
-        __NOP();
-        __NOP();
-    }
-
-    /* set SCL, SDA I2C mode */
-    pin_set_mode(scl_pin, MODE_I2C);
-    pin_set_mode(sda_pin, MODE_I2C);
-
-    /* set SCL, SDA as open drain mode */
-    enable_pin_opendrain(scl_pin);
-    enable_pin_opendrain(sda_pin);
     i2c_state = I2C_STATE_UNINIT;
 
     return STATUS_SUCCESS;
@@ -195,9 +145,6 @@ uint32_t i2c_init(uint32_t i2c_speed) {
     /* clear I2C interrupt status register */
     I2CM->int_status = 0xF;
 
-    /* enable NVIC I2C interrrupt */
-    NVIC_EnableIRQ(I2cm_IRQn);
-
     enter_critical_section();
     i2c_state = I2C_STATE_IDLE;
     leave_critical_section();
@@ -224,7 +171,8 @@ static uint32_t i2c_check_state(uint16_t next_state) {
     return STATUS_SUCCESS;
 }
 
-static void i2c_write_addr_reg(const i2c_slave_data_t *slave, uint32_t bReadFlag) {
+static void i2c_write_addr_reg(const i2c_master_mode_t* slave,
+                               uint32_t bReadFlag) {
     I2CM->command = I2CM_CMD_STRT;      /*send Start condition*/
     I2CM->command = I2CM_CMD_WDAT8;
 
@@ -259,8 +207,8 @@ static void i2c_write_addr_reg(const i2c_slave_data_t *slave, uint32_t bReadFlag
     return;
 }
 
-uint32_t i2c_write(const i2c_slave_data_t* slave, uint8_t* data, uint32_t len,
-                   i2cm_cb_fn i2c_usr_isr) {
+uint32_t i2c_write(const i2c_master_mode_t* slave, uint8_t* data,
+                   uint32_t len, i2cm_cb_fn i2c_usr_isr) {
     uint32_t status;
 
     /* slave data should not be NULL */
@@ -300,8 +248,8 @@ uint32_t i2c_write(const i2c_slave_data_t* slave, uint8_t* data, uint32_t len,
     return STATUS_SUCCESS;
 }
 
-uint32_t i2c_read(const i2c_slave_data_t* slave, uint8_t* data, uint32_t len,
-                  i2cm_cb_fn i2c_usr_isr) {
+uint32_t i2c_read(const i2c_master_mode_t* slave, uint8_t* data,
+                  uint32_t len, i2cm_cb_fn i2c_usr_isr) {
     uint32_t status;
 
     /* slave data should not be NULL */
@@ -363,9 +311,11 @@ static void i2c_idle(void) {
      */
 }
 
-/*I2C Master Interrupt*/
-void i2cm_handler(void)
-{
+
+/**
+ * \brief           I2C Master Interrupt
+ */
+void i2cm_handler(void) {
     uint32_t status;
 
     status = I2CM->int_status;

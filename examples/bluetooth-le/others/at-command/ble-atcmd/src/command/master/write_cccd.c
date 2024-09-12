@@ -1,5 +1,4 @@
 #include "atcmd_command_list.h"
-#include "project_config.h"
 
 // PRIVATE FUNCTION DECLARE
 static void write_cccd_cmd_init(cmd_info_t *this);

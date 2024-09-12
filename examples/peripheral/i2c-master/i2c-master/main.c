@@ -9,6 +9,12 @@
 #include "log.h"
 #include "task.h"
 
+#define I2C_MASTER  0
+
+/* 
+ * RT582 i2c scl must be gpio 22,
+ * i2c sda must be gpio 23.
+ */
 #define I2CM0_SCL  22
 #define I2CM0_SDA  23
 
@@ -25,7 +31,7 @@ void i2c_finish(uint32_t status) {
 }
 
 void do_i2c_master_test(void) {
-    hosal_i2c_slave_data_t dev_cfg2;
+    hosal_i2c_master_mode_t dev_cfg2;
     hosal_timer_tick_config_t tick_cfg0;
 
     uint32_t status;
@@ -39,7 +45,9 @@ void do_i2c_master_test(void) {
                                       0xC9, 0x33, 0x18, 0xFF, 0x38};
     uint8_t rdata[64];
 
-    hosal_i2c_init(0, I2C_CLOCK_400K);
+    hosal_i2c_init(I2C_MASTER, I2C_CLOCK_400K);
+    /* enable NVIC I2C interrrupt */
+    NVIC_EnableIRQ(I2C_Master0_IRQn);
 
     /* generate some test pattern to write.. this is simple loop to generate random number */
     for (i = 11; i < 64; i++) {
@@ -58,7 +66,7 @@ void do_i2c_master_test(void) {
     dev_cfg2.i2c_usr_isr = i2c_finish;
     g_transfer_done = 0;
 
-    status = hosal_i2c_write(0, &dev_cfg2, data, 64);
+    status = hosal_i2c_write(I2C_MASTER, &dev_cfg2, data, 64);
 
     while (g_transfer_done == 0) {}
 
@@ -85,10 +93,10 @@ void do_i2c_master_test(void) {
     for (i = 1; i < 64; i++) {
         memset(rdata, 0, 64);
         read_bytes = i;
-
+        puts(".");
         g_transfer_done = FALSE;
         /* read/write bytes can NOT be zero!! */
-        status = hosal_i2c_read(0, &dev_cfg2, rdata, read_bytes);
+        status = hosal_i2c_read(I2C_MASTER, &dev_cfg2, rdata, read_bytes);
         if (status != STATUS_SUCCESS) {
             printf("i2c_read error why \n");
         }
@@ -108,12 +116,25 @@ void do_i2c_master_test(void) {
             }
         }
     }
-    puts("I2C read write verify End \r\n");
+    puts("\r\nI2C read write verify End \r\n");
 }
 
 void init_default_pin_mux(void) {
-    /* set I2C GPIO22 SCL, GPIO23 SDA */
-    hosal_i2c_preinit(I2CM0_SCL, I2CM0_SDA);
+    
+#if defined(CONFIG_RT584)
+    hosal_pin_set_pullopt(I2CM0_SCL, HOSAL_PULL_DOWN_10K);
+    hosal_pin_set_pullopt(I2CM0_SDA, HOSAL_PULL_DOWN_10K);
+#endif /* !defined(CONFIG_RT584) */
+
+    /* set SCL, SDA as open drain mode */
+    hosal_enable_pin_opendrain(I2CM0_SCL);
+    hosal_enable_pin_opendrain(I2CM0_SDA);
+
+    /* set SCL, SDA I2C mode */
+    hosal_pin_set_mode(I2CM0_SCL, HOSAL_MODE_I2CM0_SCL);
+    hosal_pin_set_mode(I2CM0_SDA, HOSAL_MODE_I2CM0_SDA);
+
+    hosal_i2c_preinit(I2C_MASTER);
     return;
 }
 
@@ -127,9 +148,9 @@ void init_timer(void) {
     hosal_timer_tick_config_t tick_cfg0;
 
     cfg0.counting_mode = HOSAL_TIMER_DOWN_COUNTING;
-    cfg0.int_enable = HOSAL_TIMER_INT_ENABLE;
+    cfg0.int_en = HOSAL_TIMER_INT_ENABLE;
     cfg0.mode = HOSAL_TIMER_FREERUN_MODE;
-    cfg0.one_shot_mode = HOSAL_TIMER_ONE_SHOT_ENABLE;
+    cfg0.oneshot_mode = HOSAL_TIMER_ONE_SHOT_ENABLE;
     cfg0.prescale = HOSAL_TIMER_PRESCALE_32;
     cfg0.user_prescale = 0;
 
@@ -139,6 +160,8 @@ void init_timer(void) {
     timeout = 0;
 
     hosal_timer_init(TIMER0_ID, cfg0, timer0_cb);
+    NVIC_EnableIRQ((IRQn_Type)(Timer0_IRQn));
+
     hosal_timer_start(TIMER0_ID, tick_cfg0);
 }
 

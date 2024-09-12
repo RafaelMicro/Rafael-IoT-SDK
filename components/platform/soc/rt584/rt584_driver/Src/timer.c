@@ -157,7 +157,6 @@ uint32_t timer_start(uint32_t timer_id, uint32_t timeload_ticks, uint32_t timeou
 
     timer_load(timer_id, timeload_ticks, timeout_ticks);
     timer->control.bit.en = 1;
-    puts("timer_start\r\n");
     return STATUS_SUCCESS;
 }
 

@@ -25,6 +25,8 @@ typedef struct {
     void* rxdma_cb_arg;
     hosal_uart_callback_t txdma_cb;
     void* txdma_cb_arg;
+    hosal_uart_callback_t rx_line_status_cb;
+    void* rx_line_status_cb_arg;
 } uart_handle_t;
 
 static uart_handle_t g_uart_handle[MAX_NUMBER_OF_UART] = {
@@ -131,6 +133,14 @@ int hosal_uart_send(hosal_uart_dev_t* uart_dev, const void* data,
     return i;
 }
 
+void hosal_uart_send_complete(hosal_uart_dev_t* uart_dev) {
+    hosal_uart_config_t* cfg = &uart_dev->config;
+    UART_T* uart;
+    uart = g_uart_handle[cfg->uart_id].uart;
+
+    while ((UART_ReadLineStatus(uart) & UART_LSR_TEMT) == 0) {}
+}
+
 inline int hosal_uart_receive(hosal_uart_dev_t* uart_dev, void* data,
                               uint32_t expect_size) {
     uint32_t counter = 0;
@@ -157,6 +167,14 @@ static inline void set_config_value(void* config_field, void* p_arg) {
 static inline void get_config_value(void* config_field, void* p_arg) {
     if (p_arg)
         *(uint32_t*)p_arg = *(uint32_t*)config_field;
+}
+
+inline uint32_t hosal_uart_get_lsr(hosal_uart_dev_t* uart_dev) {
+    uint32_t status = 0;
+    UART_T* uart = g_uart_handle[uart_dev->config.uart_id].uart;
+
+    status = uart->LSR;
+    return status;
 }
 
 int hosal_uart_ioctl(hosal_uart_dev_t* uart_dev, int ctl, void* p_arg) {
@@ -195,10 +213,17 @@ int hosal_uart_ioctl(hosal_uart_dev_t* uart_dev, int ctl, void* p_arg) {
         case HOSAL_UART_PARITY_GET:
             get_config_value(&uart_dev->config.parity, p_arg);
             break;
-        case HOSAL_UART_MODE_SET:
+        case HOSAL_UART_RECEIVE_LINE_STATUS_ENABLE:
+            NVIC_DisableIRQ(g_uart_handle[uart_dev->config.uart_id].irq_num);
             NVIC_ClearPendingIRQ(
                 g_uart_handle[uart_dev->config.uart_id].irq_num);
+            uart->IER |= UART_IER_RLSI;
+            NVIC_EnableIRQ(g_uart_handle[uart_dev->config.uart_id].irq_num);
+            break;
+        case HOSAL_UART_MODE_SET:
             uart->IER = 0;
+            NVIC_ClearPendingIRQ(
+                g_uart_handle[uart_dev->config.uart_id].irq_num);
             uart_dev->config.mode = (hosal_uart_mode_t)p_arg;
 
             switch (uart_dev->config.mode) {
@@ -214,7 +239,7 @@ int hosal_uart_ioctl(hosal_uart_dev_t* uart_dev, int ctl, void* p_arg) {
                         g_uart_handle[uart_dev->config.uart_id].irq_num);
                     break;
                 case HOSAL_UART_MODE_INT:
-                    uart->IER = 3;
+                    uart->IER |= (UART_IER_RDI | UART_IER_THRI);
                     NVIC_EnableIRQ(
                         g_uart_handle[uart_dev->config.uart_id].irq_num);
                     break;
@@ -288,6 +313,12 @@ int hosal_uart_callback_set(hosal_uart_dev_t* uart_dev, int callback_type,
                          &g_uart_handle[cfg->uart_id].rxdma_cb,
                          &g_uart_handle[cfg->uart_id].rxdma_cb_arg);
             break;
+        case HOSAL_UART_RECEIVE_LINE_STATUS_CALLBACK:
+            set_callback(&uart_dev->rx_line_status_cb,
+                         &uart_dev->p_rx_line_status_arg, pfn_callback, arg,
+                         &g_uart_handle[cfg->uart_id].rx_line_status_cb,
+                         &g_uart_handle[cfg->uart_id].rx_line_status_cb_arg);
+            break;
         default: return -1;
     }
     return 0;
@@ -303,6 +334,11 @@ static inline void handle_callback(hosal_uart_callback_t cb, void* cb_arg) {
 static inline void __uart_generic_notify_handler(uint8_t id) {
     UART_T* uart = g_uart_handle[id].uart;
     uint32_t iir = uart->IIR & IIR_INTID_MSK;
+
+    if (iir == IIR_INTID_RLS) {
+        handle_callback(g_uart_handle[id].rx_line_status_cb,
+                        g_uart_handle[id].rx_line_status_cb_arg);
+    }
 
     if ((iir == IIR_INTID_RDA || iir == IIR_INTID_CTI)
         && (uart->LSR & UART_LSR_DR))

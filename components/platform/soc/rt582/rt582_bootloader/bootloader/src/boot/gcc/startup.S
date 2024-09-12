@@ -73,21 +73,11 @@ __isr_vector:
     .long   0                           /* Reserved                      */
     .long   0                           /* Reserved                      */
     .long   0                           /* Reserved                      */
-#ifdef USE_FREERTOS    
-    .long   vPortSVCHandler            /* SVCall Handler                */    
-#else
     .long   SVC_Handler                 /* SVCall Handler                */
-#endif
     .long   DebugMon_Handler            /* Debug Monitor Handler         */
     .long   0                           /* Reserved                      */
-    
-#ifdef USE_FREERTOS  
-    .long   xPortPendSVHandler          /* PendSV Handler                */    
-    .long   xPortSysTickHandler         /* SysTick Handler               */
-#else    
     .long   PendSV_Handler              /* PendSV Handler                */    
     .long   SysTick_Handler             /* SysTick Handler               */
-#endif    
 
     /* External Interrupts */
     .long   gpio_handler                /* 16: GPIO    Handler         */
@@ -206,11 +196,11 @@ Reset_Handler:
     def_default_handler    MemManage_Handler
     def_default_handler    BusFault_Handler
     def_default_handler    UsageFault_Handler
-    @ def_default_handler    SVC_Handler
+    def_default_handler    SVC_Handler
     def_default_handler    vPortSVCHandler
     def_default_handler    DebugMon_Handler
-    @ def_default_handler    PendSV_Handler
-    @ def_default_handler    SysTick_Handler
+    def_default_handler    PendSV_Handler
+    def_default_handler    SysTick_Handler
     def_default_handler    xPortPendSVHandler          /* PendSV Handler                */    
     def_default_handler    xPortSysTickHandler 
 

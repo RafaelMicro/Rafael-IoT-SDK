@@ -1,5 +1,4 @@
 #include "atcmd_command_list.h"
-#include "project_config.h"
 #include "ble_service_gaps.h"
 
 // PRIVATE FUNCTION DECLARE

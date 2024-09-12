@@ -23,6 +23,7 @@
 #include "timer.h"
 #include "ctrl_cmd.h"
 #include "hosal_uart.h"
+#include "uart_stdio.h"
 
 /**************************************************************************************************
  *    MACROS
@@ -1225,6 +1226,7 @@ static void app_init(void)
         printf("BLE stack initial fail...\n");
     }
 
+    uart_stdio_deinit();
     app_uart_init();
 }
 

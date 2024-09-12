@@ -3,6 +3,7 @@ sdk_add_include_directories(Inc)
 if(CONFIG_BOOTLOADER)
 sdk_library_add_sources(
     Src/hosal_uart.c
+    Src/hosal_wdt.c
 ) 
 else()
 sdk_library_add_sources(

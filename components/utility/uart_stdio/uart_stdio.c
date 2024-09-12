@@ -1,9 +1,11 @@
+#ifndef CONFIG_BOOTLOADER
 #include <FreeRTOS.h>
+#include <task.h>
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <task.h>
 
 #include "hosal_uart.h"
 #include "mcu.h"
@@ -91,8 +93,9 @@ static int __uartstdio_rx_callback(void* p_arg) {
     return 0;
 }
 
-static int __uartstdio_break_callback(void* p_arg) {
-    printf("uart stdio break \r\n");
+static int __uartstdio_line_status_callback(void* p_arg) {
+
+    hosal_uart_get_lsr((hosal_uart_dev_t*)p_arg);
 }
 
 int uart_stdio_write(uint8_t* p_data, uint32_t length) {
@@ -134,6 +137,12 @@ void uart_stdio_en_int_mode(void) {
                      (void*)HOSAL_UART_MODE_INT_RX);
 }
 
+int uart_stdio_deinit(void) {
+    hosal_uart_send_complete(&uartstdio);
+    hosal_uart_finalize(&uartstdio);
+    return 0;
+}
+
 int uart_stdio_init(void) {
     /*Init UART In the first place*/
     hosal_uart_init(&uartstdio);
@@ -143,8 +152,8 @@ int uart_stdio_init(void) {
                             __uartstdio_rx_callback, &uartstdio);
 
     /* Configure UART break interrupt callback function */
-    hosal_uart_callback_set(&uartstdio, HOSAL_UART_BREAK_CALLBACK,
-                            __uartstdio_break_callback, &uartstdio);
+    hosal_uart_callback_set(&uartstdio, HOSAL_UART_RECEIVE_LINE_STATUS_CALLBACK,
+                            __uartstdio_line_status_callback, &uartstdio);
 
     /* Configure UART to interrupt mode */
     hosal_uart_ioctl(&uartstdio, HOSAL_UART_MODE_SET,

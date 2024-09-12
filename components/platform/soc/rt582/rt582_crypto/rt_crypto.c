@@ -7,10 +7,12 @@
 *****************************************************************************/
 #include <stdio.h>
 #include <string.h>
+#ifndef CONFIG_BOOTLOADER
 #include "FreeRTOS.h"
 #include "task.h"
 #include "timers.h"
 #include "queue.h"
+#endif
 #include "mcu.h"
 #include "rt_crypto.h"
 

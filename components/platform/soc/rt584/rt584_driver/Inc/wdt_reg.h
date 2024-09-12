@@ -83,7 +83,7 @@ typedef struct
                                                     trigger wdt*/
     __IO uint32_t          prescale;            /*!< 0x20 wdt prescale value */
 
-} WDT_T;
+} wdt_t;
 
 #ifdef __cplusplus
 }

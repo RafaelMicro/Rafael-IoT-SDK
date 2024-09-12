@@ -31,13 +31,15 @@
  */
 #include "assert_help.h"
 #include "mcu.h"
-
+#if defined(CONFIG_FREERTOS)
 #include "FreeRTOS.h"
 #include "task.h"
-
+#endif
 static int critical_counter = 0;
 
 void enter_critical_section(void) {
+
+#if defined(CONFIG_FREERTOS)
     if (portNVIC_INT_CTRL_REG & 0xFF) {
         return;
     }
@@ -47,11 +49,15 @@ void enter_critical_section(void) {
     } else {
         vPortEnterCritical();
     }
-
+#else
+    __disable_irq();
+#endif
     critical_counter++;
 }
 
 void leave_critical_section(void) {
+
+#if defined(CONFIG_FREERTOS)
     if (portNVIC_INT_CTRL_REG & 0xFF) {
         return;
     }
@@ -68,6 +74,13 @@ void leave_critical_section(void) {
             __enable_irq();
         }
     }
+#else
+    critical_counter--;
+    assert_param(critical_counter >= 0);
+    if (critical_counter == 0) {
+        __enable_irq();
+    }
+#endif
 }
 
 /*

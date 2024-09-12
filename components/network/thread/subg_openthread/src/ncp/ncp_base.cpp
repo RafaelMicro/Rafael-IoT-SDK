@@ -378,7 +378,6 @@ void NcpBase::HandleReceive(const uint8_t *aBuf, uint16_t aBufLength)
 
     tid = SPINEL_HEADER_GET_TID(header);
 
-    log_info("rx tid %d", tid);
 
     if ((mNextExpectedTid != 0) && (tid != mNextExpectedTid))
     {
@@ -761,7 +760,6 @@ otError NcpBase::EnqueueResponse(uint8_t aHeader, ResponseType aType, unsigned i
 
     mResponseQueueTail++;
 
-    log_info("etx tid", tid);
 
 exit:
     return error;

@@ -30,57 +30,56 @@
  * Author:          Kc.tseng
  */
 
-#include "stdio.h"
-#include <stdint.h>
-#include "mcu.h"
 #include "hosal_i2c_master.h"
 
-uint32_t hosal_i2c_preinit(uint32_t scl_pin, uint32_t sda_pin) {
+uint32_t hosal_i2c_preinit(uint32_t master_id) {
     uint32_t rval;
 
-    rval = i2c_preinit(scl_pin, sda_pin);
+    rval = i2c_preinit(master_id);
 
     return rval;
 }
 
-uint32_t hosal_i2c_init(uint32_t i2c_master_port, uint32_t i2c_speed) {
+uint32_t hosal_i2c_init(uint32_t master_id, uint32_t i2c_speed) {
     uint32_t rval;
 
-    rval = i2c_init(i2c_speed);
+    rval = i2c_master_init(master_id, i2c_speed);
 
     return rval;
 }
 
-uint32_t hosal_i2c_write(uint32_t i2c_master_port, void* slave, uint8_t* data,
-                         uint32_t len) {
-    hosal_i2c_slave_data_t* hosal_cfg;
-    i2c_slave_data_t drv_cfg;
-    
+uint32_t hosal_i2c_write(uint32_t master_id, hosal_i2c_master_mode_t* slave,
+                         uint8_t* data, uint32_t len) {
+    hosal_i2c_master_mode_t* hosal_cfg;
+    i2c_master_mode_t drv_cfg;
+
     uint32_t rval;
 
-    hosal_cfg = (hosal_i2c_slave_data_t*)slave;
+    hosal_cfg = (hosal_i2c_master_mode_t*)slave;
 
     drv_cfg.bFlag_16bits = hosal_cfg->bFlag_16bits;
     drv_cfg.dev_addr = hosal_cfg->dev_addr;
     drv_cfg.reg_addr = hosal_cfg->reg_addr;
+    drv_cfg.endproc_cb = slave->i2c_usr_isr;
 
-    rval = i2c_write(&drv_cfg, data, len, hosal_cfg->i2c_usr_isr);
+    rval = i2c_master_write(master_id, &drv_cfg, data, len);
 
     return rval;
 }
 
-uint32_t hosal_i2c_read(uint32_t i2c_master_port, hosal_i2c_slave_data_t* slave,
+uint32_t hosal_i2c_read(uint32_t master_id, hosal_i2c_master_mode_t* slave,
                         uint8_t* data, uint32_t len) {
     i2cm_cb_fn usr_cb;
-    i2c_slave_data_t drv_cfg;
+    i2c_master_mode_t drv_cfg;
 
     uint32_t rval;
 
     drv_cfg.bFlag_16bits = slave->bFlag_16bits;
     drv_cfg.dev_addr = slave->dev_addr;
     drv_cfg.reg_addr = slave->reg_addr;
+    drv_cfg.endproc_cb = slave->i2c_usr_isr;
 
-    rval = i2c_read(&drv_cfg, data, len, slave->i2c_usr_isr);
+    rval = i2c_master_read(master_id, &drv_cfg, data, len);
 
     return rval;
 }

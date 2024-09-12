@@ -22,6 +22,7 @@
 #include "hosal_rf.h"
 #include "ble_api.h"
 #include "ble_host_cmd.h"
+#include "hosal_gpio.h"
 
 /**************************************************************************************************
  *    MACROS
@@ -58,6 +59,7 @@ static const ble_gap_addr_t  DEVICE_ADDR = {.addr_type = RANDOM_STATIC_ADDR,
                                             .addr = {0x11, 0x12, 0x13, 0x14, 0x15, 0xC6 }
                                            };
 
+#define GPIO_WAKE_UP_PIN                0
 /**************************************************************************************************
  *    LOCAL VARIABLES
  *************************************************************************************************/
@@ -86,6 +88,11 @@ static bool hrs_sw_timer_stop(void);
 /**************************************************************************************************
  *    LOCAL FUNCTIONS
  *************************************************************************************************/
+static void app_gpio_handler(uint32_t pin, void *isr_param)
+{
+    lpm_low_power_mask(LOW_POWER_MASK_BIT_TASK_BLE_APP);
+}
+
 static void hrs_timer_handler( TimerHandle_t timer)
 {
     /* Optionally do something if the pxTimer parameter is NULL. */
@@ -101,7 +108,6 @@ static void hrs_timer_handler( TimerHandle_t timer)
         }
     }
 }
-
 
 static void ble_svcs_hrs_evt_handler(ble_evt_att_param_t *p_param)
 {
@@ -873,6 +879,7 @@ static ble_err_t ble_init(void)
 static void app_init(void)
 {
     ble_task_priority_t ble_task_level;
+    hosal_gpio_input_config_t input_cfg;
 
     // banner
     printf("------------------------------------------\n");
@@ -897,6 +904,14 @@ static void app_init(void)
 
     // application SW timer, tick = 1s
     g_hrs_timer = xTimerCreate("HRS_Timer", pdMS_TO_TICKS(1000), pdTRUE, ( void * ) 0, hrs_timer_handler);
+
+    // wake up pin
+    input_cfg.pin_int_mode = HOSAL_GPIO_PIN_INT_EDGE_FALLING;
+    input_cfg.usr_cb = app_gpio_handler;
+    input_cfg.param = NULL;
+    hosal_gpio_cfg_input(GPIO_WAKE_UP_PIN, input_cfg);
+    hosal_gpio_debounce_enable(GPIO_WAKE_UP_PIN);
+    hosal_gpio_int_enable(GPIO_WAKE_UP_PIN);
 }
 
 /**************************************************************************************************
