@@ -1,2 +1,2 @@
-test sync
+Alpha test, not offical release.
 
