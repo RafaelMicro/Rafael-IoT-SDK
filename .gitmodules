@@ -1,6 +1,0 @@
-[submodule "components/network/thread"]
-	path = components/network/thread
-	url = git@github.com:RafaelMicro/openthread.git
-[submodule "components"]
-	path = components
-	url = https://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@github.com/RafaelMicro/components_dev.git

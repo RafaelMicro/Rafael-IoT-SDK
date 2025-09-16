@@ -1,3 +1,0 @@
-
-sdk_add_static_library(css)
-sdk_add_include_directories(include)

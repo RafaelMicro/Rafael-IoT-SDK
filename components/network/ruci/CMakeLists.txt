@@ -1,2 +1,0 @@
-sdk_add_static_library(src/ruci)
-sdk_add_include_directories(include)
