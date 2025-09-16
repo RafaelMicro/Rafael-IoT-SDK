@@ -1,0 +1,8 @@
+cmake
+ninja
+kconfiglib
+requests
+urllib3
+chardet
+pyelftools
+windows-curses

@@ -39,6 +39,11 @@ constants etc.
 #include "zb_config_common.h"
 //#include "zb_mem_config_max.h"
 
+/* Support custom cluster */
+#ifndef ZB_ZCL_SUPPORT_CLUSTER_CUSTOM_CLUSTER
+#define ZB_ZCL_SUPPORT_CLUSTER_CUSTOM_CLUSTER 1
+#endif
+
 /* Rafeal modify code for networking improvement */
 #ifndef ZB_RAF_NETWORKING_IMPROVEMENT
 #define ZB_RAF_NETWORKING_IMPROVEMENT
@@ -798,7 +803,7 @@ ZB_ED_RX_OFF_WHEN_IDLE
 #ifndef ZB_NEIGHBOR_TABLE_SIZE
 
 #if defined ZB_COORDINATOR_ROLE
-#define ZB_NEIGHBOR_TABLE_SIZE 32U
+#define ZB_NEIGHBOR_TABLE_SIZE 100U
 
 #elif defined ZB_ROUTER_ROLE
 #define ZB_NEIGHBOR_TABLE_SIZE 32U
@@ -982,7 +987,7 @@ ZB_ED_RX_OFF_WHEN_IDLE
 #else
 /* [EE] 05/25/2016 CR:MINOR Set it to some big value - say, 128. This is total #
  * of devices in the network, not neighbor table size */
-#define ZB_N_APS_KEY_PAIR_ARR_MAX_SIZE            ZB_NEIGHBOR_TABLE_SIZE
+#define ZB_N_APS_KEY_PAIR_ARR_MAX_SIZE            200 //ZB_NEIGHBOR_TABLE_SIZE
 #endif
 #endif
 
@@ -1060,15 +1065,17 @@ ZB_ED_RX_OFF_WHEN_IDLE
 /** @endcond */ /* DOXYGEN_INTERNAL_DOC */
 /* Some defaults for ZDO startup */
 
-#ifdef ZB_RAF_FAST_JOIN_CONFIGURATION
-extern unsigned char  ZB_RAF_SCAN_DURATION;
-#endif
 
 #ifndef ZB_TRACE_LEVEL
 /**
    NWK: default energy/active scan duration
 */
+#ifdef ZB_RAF_FAST_JOIN_CONFIGURATION
+extern unsigned char ZB_RAF_SCAN_DURATION;
+#define ZB_DEFAULT_SCAN_DURATION ZB_RAF_SCAN_DURATION
+#else
 #define ZB_DEFAULT_SCAN_DURATION 3U
+#endif /* ZB_RAF_FAST_JOIN_CONFIGURATION */
 
 #ifdef ZB_SUBGHZ_BAND_ENABLED
 /** @cond DOXYGEN_SUBGHZ_FEATURE */
@@ -1086,7 +1093,12 @@ extern unsigned char  ZB_RAF_SCAN_DURATION;
 #ifdef SNCP_MODE
 #define ZB_DEFAULT_SCAN_DURATION 3U
 #else
-#define ZB_DEFAULT_SCAN_DURATION 5U
+#ifdef ZB_RAF_FAST_JOIN_CONFIGURATION
+extern unsigned char ZB_RAF_SCAN_DURATION;
+#define ZB_DEFAULT_SCAN_DURATION ZB_RAF_SCAN_DURATION
+#else
+#define ZB_DEFAULT_SCAN_DURATION 3U
+#endif /* ZB_RAF_FAST_JOIN_CONFIGURATION */
 #endif /* SNCP_MODE */
 #else
 /* Increase scan duration for NSNG: usually it runs with high trace level, so we can miss beacons if scan too fast */

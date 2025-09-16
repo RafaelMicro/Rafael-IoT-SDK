@@ -221,7 +221,6 @@ typedef struct __attribute__((packed)) ble_evt_adv_set_adv_data_s
 
 } ble_evt_adv_set_adv_data_t;
 
-
 /**
  * @brief Scan Response Data Event Parameters.
  * @ingroup ble_advertising
@@ -232,7 +231,6 @@ typedef struct __attribute__((packed)) ble_evt_adv_set_scan_rsp_s
     uint8_t     status;
 
 } ble_evt_adv_set_scan_rsp_t;
-
 
 /**
  * @brief Advertising Enable Event Parameters.
@@ -247,6 +245,7 @@ typedef struct __attribute__((packed)) ble_evt_adv_set_adv_enable_s
     bool        adv_enabled;
 
 } ble_evt_adv_set_adv_enable_t;
+
 
 
 /**
@@ -268,7 +267,6 @@ typedef struct
 
         /** Set advertising enable event parameters. */
         ble_evt_adv_set_adv_enable_t  evt_set_adv_enable;
-
     } param;/** Event parameters. */
 
 } ble_evt_adv_t;

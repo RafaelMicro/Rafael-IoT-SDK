@@ -1,0 +1,94 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "zigbee_platform.h"
+#include "zigbee_zcl_msg_handler.h"
+#include "zigbee_api.h"
+#include "device_api.h"
+
+#include "hosal_rf.h"
+#include "hosal_uart.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
+
+#include "EnhancedFlashDataset.h"
+#include "log.h"
+#include "app_hooks.h"
+#include "uart_stdio.h"
+
+static uint8_t g_joined_network = 0;
+static uint16_t g_panid = 0xFFFF;
+static uint16_t g_short_addr = 0xFFFF;
+static uint8_t g_joined_channel = 0xFF;
+
+int main(void) {
+    uart_stdio_init();
+    vHeapRegionsInt();
+    log_info("%s version : %s", CONFIG_BUILD_PORJECT, CONFIG_PROJECT_VERSION);
+
+    enhanced_flash_dataset_init();
+    hosal_rf_init(HOSAL_RF_MODE_RUCI_CMD);
+    zigbee_app_init();
+    zbStart();
+    vTaskStartScheduler();
+    while(1) {;}
+}
+
+void app_main_loop(void* parameters_ptr) {
+    zb_app_event_t sevent = ZB_APP_EVENT_NONE;
+
+    ZB_THREAD_SAFE(
+        ZB_AF_REGISTER_DEVICE_CTX(&simple_desc_door_lock_ctx);
+        for (int i = 0; i < simple_desc_door_lock_ctx.ep_count; i++) {
+            ZB_AF_SET_ENDPOINT_HANDLER(
+                simple_desc_door_lock_ctx.ep_desc_list[i]->ep_id,
+                zigbee_zcl_msg_handler);
+        }
+    );
+    ZIGBEE_APP_NOTIFY(ZB_APP_EVENT_INIT);
+
+    for (;;) {
+        if (ulTaskNotifyTake(pdFALSE, portMAX_DELAY) != 0) {
+            ZIGBEE_APP_GET_NOTIFY(sevent);
+
+            switch (sevent) {
+                case ZB_APP_EVENT_INIT: {
+                    zigbee_app_nwk_start(ZIGBEE_CHANNEL_ALL_MASK(), 32, 0);
+                    log_info("ZigBee APP init");
+                    set_led_onoff(LED_BLUE,1);
+                } break;
+
+                case ZB_APP_EVENT_NOT_JOINED: {
+
+                    ZB_THREAD_SAFE(bdb_start_top_level_commissioning(
+                        ZB_BDB_NETWORK_STEERING));
+                    log_info("ZigBee APP not joined");
+                } break;
+
+                case ZB_APP_EVENT_JOINED: {
+                    log_info("ZigBee APP joined");
+                    g_joined_network = 1;
+                    set_led_onoff(LED_BLUE,0);
+
+                    ZB_THREAD_SAFE(g_panid = zb_get_pan_id();
+                                   g_short_addr = zb_get_short_address();
+                                   g_joined_channel = zb_get_current_channel();)
+
+                    log_info("PAN ID: %04X, Short Addr: %04X, Channel: %d",
+                             g_panid, g_short_addr, g_joined_channel);
+
+                } break;
+
+                case ZB_APP_EVENT_FACTORY_RESET: {
+                    zigbee_do_factory_reset();
+                } break;
+                case ZB_APP_EVENT_TOGGLE: {
+                    zigbee_app_toggle_lock_state();
+                } break;
+                default: break;
+            }
+        }
+    }
+}

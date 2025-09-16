@@ -1,5 +1,0 @@
-
-sdk_add_include_directories(${CMAKE_CURRENT_LIST_DIR}/qspi_access_flash/Include)
-
-sdk_set_main_file(${CMAKE_CURRENT_LIST_DIR}/qspi_access_flash/main.c)
-setup_project(qspi_access_flash)

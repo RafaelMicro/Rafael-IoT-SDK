@@ -20,7 +20,6 @@
  *    INCLUDES
  *************************************************************************************************/
 #include <stdint.h>
-#include <stdbool.h>
 #include "ble_hci.h"
 
 #ifdef __cplusplus
@@ -38,9 +37,10 @@ extern "C" {
  * @param p_param : a pointer to the encrypt parameter.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_encrypt_cmd(ble_hci_le_encrypt_param_t *p_param);
+ble_err_t hci_le_encrypt_cmd(ble_hci_le_encrypt_param_t *p_param);
 
 
 /** LE Rand command.
@@ -48,9 +48,10 @@ int8_t hci_le_encrypt_cmd(ble_hci_le_encrypt_param_t *p_param);
  * @ingroup hci_cmd_sec
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_random_cmd(void);
+ble_err_t hci_le_random_cmd(void);
 
 
 /** LE Enable Encryption command.
@@ -60,9 +61,10 @@ int8_t hci_le_random_cmd(void);
  * @param p_param : a pointer to the encryption enable parameter.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_enable_encryption_cmd(ble_hci_le_enable_encrypt_param_t *p_param);
+ble_err_t hci_le_enable_encryption_cmd(ble_hci_le_enable_encrypt_param_t *p_param);
 
 
 /** LE Long Term Key Request Reply command.
@@ -72,9 +74,10 @@ int8_t hci_le_enable_encryption_cmd(ble_hci_le_enable_encrypt_param_t *p_param);
  * @param p_param : a pointer to the long term key request reply parameter.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_long_term_key_req_reply_cmd(ble_hci_le_long_term_key_req_reply_param_t *p_param);
+ble_err_t hci_le_long_term_key_req_reply_cmd(ble_hci_le_long_term_key_req_reply_param_t *p_param);
 
 
 /** LE Long Term Key Request Negative Reply command.
@@ -84,9 +87,10 @@ int8_t hci_le_long_term_key_req_reply_cmd(ble_hci_le_long_term_key_req_reply_par
  * @param p_param : a pointer to the long term key negative reply parameter.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_long_term_key_req_neg_reply_cmd(ble_hci_le_long_term_key_neg_reply_param_t *p_param);
+ble_err_t hci_le_long_term_key_req_neg_reply_cmd(ble_hci_le_long_term_key_neg_reply_param_t *p_param);
 
 #ifdef __cplusplus
 }

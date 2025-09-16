@@ -1,9 +1,0 @@
-#ifndef VERSION_Z_MAC_VERIFY_H_
-
-#define VERSION_Z_MAC_VERIFY_H_
-
-#define VERSION_Z_MAC_VERIFY_STR "3118"
-
-#define VERSION_Z_MAC_VERIFY_NUM 3118
-
-#endif

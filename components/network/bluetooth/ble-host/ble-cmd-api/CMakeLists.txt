@@ -1,0 +1,17 @@
+sdk_generate_library(ble_cmd_api)
+sdk_add_include_directories(
+    ${CMAKE_CURRENT_LIST_DIR}/include
+)
+sdk_library_add_sources(
+    ${CMAKE_CURRENT_LIST_DIR}/src/ble_cmd_advertising.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/ble_cmd_extended_advertising.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/ble_cmd_att_gatt.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/ble_cmd_common.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/ble_cmd_connect_cte.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/ble_cmd_gap.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/ble_cmd_l2cap.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/ble_cmd_privacy.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/ble_cmd_scan.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/ble_cmd_security_manager.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/ble_host_ref.c
+)

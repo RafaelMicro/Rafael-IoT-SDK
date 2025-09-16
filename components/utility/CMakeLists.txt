@@ -1,9 +1,0 @@
-sdk_generate_component_tag()
-
-sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_UTILITY ${CMAKE_CURRENT_LIST_DIR}/utility)
-sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_LOG ${CMAKE_CURRENT_LIST_DIR}/log)
-sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_UART_STDIO ${CMAKE_CURRENT_LIST_DIR}/uart_stdio)
-sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_CLI ${CMAKE_CURRENT_LIST_DIR}/cli)
-sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_ENHANCED_FLASH_DATASET ${CMAKE_CURRENT_LIST_DIR}/EnhancedFlashDataset)
-sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_SYSLOG ${CMAKE_CURRENT_LIST_DIR}/syslog)
-sdk_add_subdirectory_ifdef(CONFIG_BUILD_COMPONENT_SW_TIMER ${CMAKE_CURRENT_LIST_DIR}/sw_timer)

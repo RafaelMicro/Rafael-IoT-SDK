@@ -87,6 +87,8 @@ extern "C"
 /* ICE Enable */
 #define RF_MCU_ICE_SUPPORTED                (0x00)
 
+#define RF_MCU_FW_PRELOAD_SUPPORTED         (0x00)
+
 #ifdef __cplusplus
 }
 #endif

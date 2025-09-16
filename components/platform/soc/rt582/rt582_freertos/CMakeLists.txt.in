@@ -1,6 +1,0 @@
-sdk_add_static_library(rt582_freertos)
-sdk_add_include_directories(
-    portable/GCC/ARM_CM3/
-    Inc
-    config
-)

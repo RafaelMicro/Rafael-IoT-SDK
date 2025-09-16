@@ -18,9 +18,16 @@
 #include "ble_api.h"
 #include "ble_event.h"
 #include "ble_host_cmd.h"
+#include "ble_l2cap.h"
 #include "ble_profile.h"
 #include "hosal_rf.h"
 #include "hosal_uart.h"
+#include "uart_stdio.h"
+#include "hosal_gpio.h"
+#include "hosal_lpm.h"
+#include "hosal_sysctrl.h"
+#include "app_hooks.h"
+#include "dump_boot_info.h"
 
 /**************************************************************************************************
  *    MACROS
@@ -68,7 +75,10 @@ static const ble_gap_addr_t  DEVICE_ADDR = {.addr_type = RANDOM_STATIC_ADDR,
                                            };
 
 #define UART0_OPERATION_PORT            0
-HOSAL_UART_DEV_DECL(uart0_dev, UART0_OPERATION_PORT, 16, 17, UART_BAUDRATE_115200)
+HOSAL_UART_DEV_DECL(uart0_dev, UART0_OPERATION_PORT, CONFIG_UART_STDIO_TX_PIN, CONFIG_UART_STDIO_RX_PIN, UART_BAUDRATE_115200)
+
+#define GPIO_WAKE_UP_PIN                0
+
 /**************************************************************************************************
  *    LOCAL VARIABLES
  *************************************************************************************************/
@@ -102,6 +112,11 @@ static void trsp_data_send_from_isr(uint8_t *p_data, uint8_t length);
  *  Handler
  * ------------------------------
  */
+static void app_gpio_handler(uint32_t pin, void *isr_param)
+{
+    hosal_lpm_ioctrl(HOSAL_LPM_MASK, HOSAL_LOW_POWER_MASK_BIT_TASK_BLE_APP);
+}
+
 static bool uart_data_handler(char ch)
 {
     bool status = false;
@@ -133,6 +148,17 @@ static bool uart_data_handler(char ch)
     return status;
 }
 
+static int uart0_receive_line_callback(void *p_arg)
+{
+    if (hosal_uart_get_lsr(&uart0_dev) & UART_LSR_BI)
+    {
+        char ch;
+
+        hosal_uart_receive(&uart0_dev, &ch, 1);
+        hosal_lpm_ioctrl(HOSAL_LPM_MASK, HOSAL_LOW_POWER_MASK_BIT_TASK_BLE_APP);
+    }
+}
+
 static int uart0_rx_callback(void *p_arg)
 {
     char ch;
@@ -141,7 +167,7 @@ static int uart0_rx_callback(void *p_arg)
     if (uart_data_handler(ch) == true)
     {
         // recieved '\n' or '\r' --> enable sleep mode
-        lpm_low_power_unmask(LOW_POWER_MASK_BIT_TASK_BLE_APP);
+        hosal_lpm_ioctrl(HOSAL_LPM_UNMASK, HOSAL_LOW_POWER_MASK_BIT_TASK_BLE_APP);
     }
 
     return 0;
@@ -745,21 +771,15 @@ static ble_err_t ble_app_event_cb(void *p_param)
     ble_tlv_t *p_tlv;
 
     status = BLE_ERR_OK;
-    do {
-        if (xSemaphoreTake(semaphore_cb, 0) == pdTRUE)
+    if (xSemaphoreTake(semaphore_cb, 0) == pdTRUE)
+    {
+        p_tlv = pvPortMalloc(sizeof(ble_tlv_t) + sizeof(ble_evt_param_t) + ((ble_evt_param_t *)p_param)->extended_length);
+        if (p_tlv != NULL)
         {
-            p_tlv = pvPortMalloc(sizeof(ble_tlv_t) + sizeof(ble_evt_param_t));
-            if (p_tlv == NULL)
-            {
-                status = BLE_ERR_DATA_MALLOC_FAIL;
-                xSemaphoreGive(semaphore_cb);
-                break;
-            }
-
             p_app_q.param_type = QUEUE_TYPE_OTHERS;
             p_app_q.param.pt_tlv = p_tlv;
             p_app_q.param.pt_tlv->type = APP_GENERAL_EVENT;
-            memcpy(p_tlv->value, p_param, sizeof(ble_evt_param_t));
+            memcpy(p_tlv->value, p_param, sizeof(ble_evt_param_t) + ((ble_evt_param_t *)p_param)->extended_length);
 
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
@@ -769,9 +789,14 @@ static ble_err_t ble_app_event_cb(void *p_param)
         }
         else
         {
-            status = BLE_BUSY;
+            status = BLE_ERR_DATA_MALLOC_FAIL;
+            xSemaphoreGive(semaphore_cb);
         }
-    } while (0);
+    }
+    else
+    {
+        status = BLE_BUSY;
+    }
 
     return status;
 }
@@ -800,6 +825,46 @@ static ble_err_t ble_service_data_cb(void *p_param)
             p_app_q.param.pt_tlv = p_tlv;
             p_app_q.param.pt_tlv->type = APP_SERVICE_EVENT;
             memcpy(p_tlv->value, p_param, sizeof(ble_evt_att_param_t) + p_evt_att->length);
+
+            if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
+            {
+                status = BLE_BUSY;
+                xSemaphoreGive(semaphore_cb);
+            }
+        }
+        else
+        {
+            status = BLE_BUSY;
+        }
+    } while (0);
+
+    return status;
+}
+
+static ble_err_t ble_l2cap_data_cb(void *p_param)
+{
+    ble_err_t status;
+    app_queue_t p_app_q;
+    ble_tlv_t *p_tlv;
+    ble_l2cap_evt_param_t *p_evt_l2cap;
+
+    status = BLE_ERR_OK;
+    do {
+        if (xSemaphoreTake(semaphore_cb, 0) == pdTRUE)
+        {
+            p_evt_l2cap = p_param;
+            p_tlv = pvPortMalloc(sizeof(ble_tlv_t) + sizeof(ble_l2cap_evt_param_t) + p_evt_l2cap->length);
+            if (p_tlv == NULL)
+            {
+                status = BLE_ERR_DATA_MALLOC_FAIL;
+                xSemaphoreGive(semaphore_cb);
+                break;
+            }
+
+            p_app_q.param_type = QUEUE_TYPE_OTHERS;
+            p_app_q.param.pt_tlv = p_tlv;
+            p_app_q.param.pt_tlv->type = APP_L2CAP_DATA_EVENT;
+            memcpy(p_tlv->value, p_param, sizeof(ble_l2cap_evt_param_t) + p_evt_l2cap->length);
 
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
@@ -891,6 +956,9 @@ static void app_main_task(void)
                     }
                     break;
 
+                    case APP_L2CAP_DATA_EVENT:
+                        break;
+
                     default:
                         break;
                     }
@@ -927,9 +995,14 @@ static void app_uart_init(void)
     /* Configure UART Rx interrupt callback function */
     hosal_uart_callback_set(&uart0_dev, HOSAL_UART_RX_CALLBACK, uart0_rx_callback, &uart0_dev);
     hosal_uart_callback_set(&uart0_dev, HOSAL_UART_TX_DMA_CALLBACK, NULL, &uart0_dev);
+    hosal_uart_callback_set(&uart0_dev, HOSAL_UART_RECEIVE_LINE_STATUS_CALLBACK, uart0_receive_line_callback, &uart0_dev);
 
     /* Configure UART to interrupt mode */
     hosal_uart_ioctl(&uart0_dev, HOSAL_UART_MODE_SET, (void *)HOSAL_UART_MODE_INT_RX);
+    /* Configure UART to interrupt mode */
+    hosal_uart_ioctl(&uart0_dev, HOSAL_UART_RECEIVE_LINE_STATUS_ENABLE, (void *)NULL);
+
+    hosal_lpm_ioctrl(HOSAL_LPM_ENABLE_WAKE_UP_SOURCE, HOSAL_LOW_POWER_WAKEUP_UART_RX);
 
     __NVIC_SetPriority(Uart0_IRQn, 6);
 }
@@ -1011,6 +1084,12 @@ static ble_err_t ble_init(void)
             break;
         }
 
+        status = ble_host_callback_set(APP_L2CAP_DATA_EVENT, ble_l2cap_data_cb);
+        if (status != BLE_ERR_OK)
+        {
+            break;
+        }
+
         status = ble_cmd_phy_controller_init();
         if (status != BLE_ERR_OK)
         {
@@ -1075,6 +1154,7 @@ static ble_err_t ble_init(void)
 static void app_init(void)
 {
     ble_task_priority_t ble_task_level;
+    hosal_gpio_input_config_t input_cfg;
 
     // banner
     printf("------------------------------------------\n");
@@ -1097,20 +1177,87 @@ static void app_init(void)
         printf("BLE stack initial fail...\n");
     }
 
+    uart_stdio_deinit();
     app_uart_init();
+
+    // wake up pin
+    input_cfg.pin_int_mode = HOSAL_GPIO_PIN_INT_EDGE_FALLING;
+    input_cfg.usr_cb = app_gpio_handler;
+    input_cfg.param = NULL;
+    hosal_gpio_cfg_input(GPIO_WAKE_UP_PIN, input_cfg);
+    hosal_gpio_debounce_enable(GPIO_WAKE_UP_PIN);
+    hosal_gpio_int_enable(GPIO_WAKE_UP_PIN);
 }
 
-/**************************************************************************************************
- *    GLOBAL FUNCTIONS
- *************************************************************************************************/
-int main(void)
+/**
+ * @brief Initializes the pin multiplexing.
+ *
+ * This function sets all GPIO pins to GPIO mode, except for GPIO16 and GPIO17,
+ * which are reserved for specific functions.
+ *
+ * @return void This function does not return a value.
+ */
+static void pin_mux_init(void) 
 {
-    hosal_rf_init(HOSAL_RF_MODE_BLE_CONTROLLER);
+    /*set all pin to gpio, except GPIO16, GPIO17 */
+    for (int i = 0; i < 32; i++) {
+        if (i == 16 || i == 17) {
+            continue; // Skip GPIO16 and GPIO17
+        }
+        hosal_pin_set_mode(i, HOSAL_MODE_GPIO);
+    }
+}
 
+/**
+ * @brief Main entry point for the application.
+ *
+ * This function initializes the RF module, starts the application initialization,
+ * and enters an infinite loop to keep the application running.
+ *
+ * @param pvParameters Pointer to parameters passed to the task (not used).
+ * @return void This function does not return a value.
+ */
+static void app_main_entry(void* pvParameters)
+{
+    hosal_lpm_init();
+    hosal_rf_init(HOSAL_RF_MODE_BLE_CONTROLLER);
+    
     /* application init */
     app_init();
     app_main_task();
 
     while (1) {
     }
+}
+
+/**************************************************************************************************
+ *    GLOBAL FUNCTIONS
+ *************************************************************************************************/
+/**
+ * @brief Application entry point.
+ *
+ * Initializes hardware, configures peripherals, and starts the main application task.
+ *
+ * @return int Not used.
+ */
+ int main(void)
+{
+    pin_mux_init();
+    uart_stdio_init();
+    vHeapRegionsInt();
+    _dump_boot_info();
+
+    if (xTaskCreate(app_main_entry, (char*)"main",
+                    CONFIG_HOSAL_SOC_MAIN_ENTRY_TASK_SIZE, NULL,
+                    E_TASK_PRIORITY_APP, NULL)
+        != pdPASS) {
+        puts("Task create fail....\r\n");
+    }
+    puts("[OS] Starting OS Scheduler...\r\n");
+    puts("\r\n");
+    vTaskStartScheduler();
+    while (1) {
+    }
+
+    return 0;
 }

@@ -49,6 +49,14 @@ RF_MCU_INIT_STATUS RfMcu_SysInit(
     RF_MCU_INIT_STATUS rf_mcu_init_state
 );
 
+RF_MCU_INIT_STATUS RfMcu_SysInitFw(
+    bool load_image,
+    const uint8_t *p_sys_image,
+    uint32_t image_size,
+    COMM_SUBSYSTEM_ISR_CONFIG rf_mcu_isr_cfg,
+    RF_MCU_INIT_STATUS rf_mcu_init_state
+);
+
 RF_MCU_INIT_STATUS RfMcu_SysInitWithPatch(
     bool load_image,
     const uint8_t *p_sys_image,

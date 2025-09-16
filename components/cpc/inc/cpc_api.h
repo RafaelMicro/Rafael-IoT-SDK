@@ -132,12 +132,12 @@ SENUM(cpc_service_endpoint_id_t){
 #define CPC_BUFFER_HANDLE_MAX_COUNT                                            \
     (CPC_TX_QUEUE_ITEM_MAX_COUNT + CPC_RX_BUFFER_MAX_COUNT                     \
      + CPC_TX_QUEUE_ITEM_SFRAME_MAX_COUNT)
-#define CPC_RE_TRANSMIT                                  (4)
-#define CPC_MAX_RE_TRANSMIT_TIMEOUT_MS                   (50)
-#define CPC_INIT_RE_TRANSMIT_TIMEOUT_MS                  (20)
-#define CPC_MIN_RE_TRANSMIT_TIMEOUT_MS                   (20)
+#define CPC_RE_TRANSMIT                                  (8)
+#define CPC_MAX_RE_TRANSMIT_TIMEOUT_MS                   (1000)
+#define CPC_INIT_RE_TRANSMIT_TIMEOUT_MS                  (50)
+#define CPC_MIN_RE_TRANSMIT_TIMEOUT_MS                   (50)
 #define CPC_DISCONNECTION_NOTIFICATION_TIMEOUT_MS        (1000)
-#define CPC_MIN_RE_TRANSMIT_TIMEOUT_MINIMUM_VARIATION_MS (3)
+#define CPC_MIN_RE_TRANSMIT_TIMEOUT_MINIMUM_VARIATION_MS (8)
 
 #if (CONFIG_CPC_RX_PAYLOAD_MAX_LENGTH > 4087)
 #error Invalid CONFIG_CPC_RX_PAYLOAD_MAX_LENGTH; Must be less or equal to 4087
@@ -646,6 +646,7 @@ status_t cpc_send_disconnection_notification(uint8_t endpoint_id);
 void cpc_on_frame_retransmit(cpc_transmit_queue_item_t* item);
 void cpc_set_state(cpc_endpoint_handle_t* endpoint_handle,
                    cpc_endpoint_state_t state);
+uint32_t cpc_get_event_signal(void);
 /** @} (end addtogroup cpc) */
 
 #ifdef __cplusplus

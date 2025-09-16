@@ -19,7 +19,6 @@
  *    INCLUDES
  *************************************************************************************************/
 #include <stdint.h>
-#include <stdbool.h>
 #include "ble_hci.h"
 
 #ifdef __cplusplus
@@ -40,7 +39,7 @@ extern "C" {
  * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
  * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_set_adv_param_cmd(ble_hci_cmd_set_adv_param_param_t *p_param);
+ble_err_t hci_le_set_adv_param_cmd(ble_hci_cmd_set_adv_param_param_t *p_param);
 
 
 /** LE Set Advertising Data command.
@@ -50,9 +49,10 @@ int8_t hci_le_set_adv_param_cmd(ble_hci_cmd_set_adv_param_param_t *p_param);
  * @param p_param : a pointer to the advertising data.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_set_adv_data_cmd(ble_hci_cmd_set_adv_data_param_t *p_param);
+ble_err_t hci_le_set_adv_data_cmd(ble_hci_cmd_set_adv_data_param_t *p_param);
 
 
 /** LE Set Scan Response Data command.
@@ -62,9 +62,10 @@ int8_t hci_le_set_adv_data_cmd(ble_hci_cmd_set_adv_data_param_t *p_param);
  * @param p_param : a pointer to the scan response data.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_set_scan_rsp_data_cmd(ble_hci_cmd_set_scan_rsp_param_t *p_param);
+ble_err_t hci_le_set_scan_rsp_data_cmd(ble_hci_cmd_set_scan_rsp_param_t *p_param);
 
 
 /** LE Set Advertising Enable command.
@@ -74,9 +75,11 @@ int8_t hci_le_set_scan_rsp_data_cmd(ble_hci_cmd_set_scan_rsp_param_t *p_param);
  * @param p_param : a pointer to the set advertising enable parameter.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_set_adv_enable_cmd(ble_hci_cmd_set_adv_enable_param_t *p_param);
+ble_err_t hci_le_set_adv_enable_cmd(ble_hci_cmd_set_adv_enable_param_t *p_param);
+
 
 #ifdef __cplusplus
 }

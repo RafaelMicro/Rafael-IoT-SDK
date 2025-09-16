@@ -1,0 +1,6 @@
+ms-python.python
+ms-python.vscode-pylance
+ms-vscode.cmake-tools
+ms-vscode.cpptools
+ms-vscode.vscode-serial-monitor
+marus25.cortex-debug

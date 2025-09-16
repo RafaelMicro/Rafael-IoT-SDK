@@ -663,6 +663,31 @@ enum zb_zcl_power_config_battery_alarm_state_e
 /*! @}
  *  @endcond */ /* internals_doc */
 
+/** @cond internals_doc */
+#define ZB_ZCL_POWER_CONFIG_BATTERY_ATTRIB_LIST_EXT_1(bat_num, main_voltage,                  \
+    voltage, size, quantity, rated_voltage, alarm_mask, voltage_min_threshold,              \
+    remaining, threshold1, threshold2, threshold3, min_threshold, percent_threshold1,       \
+    percent_threshold2, percent_threshold3, alarm_state)                                    \
+  ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_POWER_CONFIG_MAINS_VOLTAGE_ID, (main_voltage))                \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID(voltage, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_SIZE_ID(size, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_QUANTITY_ID(quantity, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_RATED_VOLTAGE_ID(rated_voltage, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_ALARM_MASK_ID(alarm_mask, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_MIN_THRESHOLD_ID(voltage_min_threshold, bat_num), \
+  /* ext attribute */  \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID(remaining, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_THRESHOLD1_ID(threshold1, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_THRESHOLD2_ID(threshold2, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_THRESHOLD3_ID(threshold3, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_MIN_THRESHOLD_ID(min_threshold, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_THRESHOLD1_ID(percent_threshold1, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_THRESHOLD2_ID(percent_threshold2, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_THRESHOLD3_ID(percent_threshold3, bat_num), \
+  ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_ALARM_STATE_ID(alarm_state, bat_num),
+/*! @}
+ *  @endcond */ /* internals_doc */
+
 /** @brief Declare attribute list for Power Configuration cluster - server side (Battery attribute
     list extended)
     @param attr_list - attribute list name
@@ -693,6 +718,41 @@ enum zb_zcl_power_config_battery_alarm_state_e
     remaining, threshold1, threshold2, threshold3, min_threshold, percent_threshold1,       \
     percent_threshold2, percent_threshold3, alarm_state)                                    \
   ZB_ZCL_FINISH_DECLARE_ATTRIB_LIST
+
+/*! @}
+ *  @endcond */ /* internals_doc */
+
+/** @brief Declare attribute list for Power Configuration cluster - server side (Battery attribute
+    list extended)
+    @param attr_list - attribute list name
+    @param voltage - pointer to variable to store BatteryVoltage attribute
+    @param size - pointer to variable to store BatterySize attribute
+    @param quantity - pointer to variable to store BatteryQuantity attribute
+    @param rated_voltage - pointer to variable to store BatteryRatedVoltage attribute
+    @param alarm_mask - pointer to variable to store BatteryAlarmMask attribute
+    @param voltage_min_threshold - pointer to variable to store BatteryVoltageMinThreshold attribute
+
+    @param remaining - pointer to variable to store BatteryPercentageRemaining attribute
+    @param threshold1 - pointer to variable to store BatteryVoltageThreshold1 attribute
+    @param threshold2 - pointer to variable to store BatteryVoltageThreshold2 attribute
+    @param threshold3 - pointer to variable to store BatteryVoltageThreshold3 attribute
+    @param min_threshold - pointer to variable to store BatteryPercentageMinThreshold attribute
+    @param percent_threshold1 - pointer to variable to store BatteryPercentageThreshold1 attribute
+    @param percent_threshold2 - pointer to variable to store BatteryPercentageThreshold2 attribute
+    @param percent_threshold3 - pointer to variable to store BatteryPercentageThreshold3 attribute
+    @param alarm_state - pointer to variable to store BatteryAlarmState attribute
+*/
+#define ZB_ZCL_DECLARE_POWER_CONFIG_BATTERY_ATTRIB_LIST_EXT_1(attr_list, main_voltage,        \
+    voltage, size, quantity, rated_voltage, alarm_mask, voltage_min_threshold,              \
+    remaining, threshold1, threshold2, threshold3, min_threshold, percent_threshold1,       \
+    percent_threshold2, percent_threshold3, alarm_state)                                    \
+  ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                               \
+  ZB_ZCL_POWER_CONFIG_BATTERY_ATTRIB_LIST_EXT_1(, main_voltage,                               \
+    voltage, size, quantity, rated_voltage, alarm_mask, voltage_min_threshold,              \
+    remaining, threshold1, threshold2, threshold3, min_threshold, percent_threshold1,       \
+    percent_threshold2, percent_threshold3, alarm_state)                                    \
+  ZB_ZCL_FINISH_DECLARE_ATTRIB_LIST
+
 
 /*! @} */ /* Power Configuration cluster attributes */
 

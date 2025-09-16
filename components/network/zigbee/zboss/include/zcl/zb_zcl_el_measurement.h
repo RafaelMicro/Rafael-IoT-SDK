@@ -849,6 +849,15 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DCPOWER_ID, (dcpower))                   \
   ZB_ZCL_FINISH_DECLARE_ATTRIB_LIST
 
+#define ZB_ZCL_DECLARE_ELECTRICAL_MEASUREMENT_ATTRIB_LIST_EXT(attr_list, measurement_type, dcpower,    \
+    rmsvoltage,rmscurrent,activepower)                                                             \
+  ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                                      \
+  ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_MEASUREMENT_TYPE_ID, (measurement_type)) \
+  ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DCPOWER_ID, (dcpower))                   \
+  ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSVOLTAGE_ID, (rmsvoltage))                \
+  ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSCURRENT_ID, (rmscurrent))                \
+  ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, (activepower))              \
+  ZB_ZCL_FINISH_DECLARE_ATTRIB_LIST
 /*!
     @cond internals_doc
   @{

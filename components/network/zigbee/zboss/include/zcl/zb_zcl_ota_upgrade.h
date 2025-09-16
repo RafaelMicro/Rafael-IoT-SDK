@@ -439,6 +439,16 @@ typedef ZB_PACKED_PRE struct zb_zcl_ota_upgrade_srv_upgrade_started_param_s
   zb_uint32_t    version;
 }
   ZB_PACKED_STRUCT zb_zcl_ota_upgrade_srv_upgrade_started_param_t;
+typedef ZB_PACKED_PRE struct zb_zcl_ota_upgrade_srv_image_block_param_s
+{
+  zb_zcl_addr_t *zcl_addr;
+  zb_uint16_t    image_type;
+  zb_uint32_t    version;
+  zb_uint32_t    file_offset;
+  //zb_uint16_t    data_size;
+  //zb_uint32_t    total_image_size;
+}
+  ZB_PACKED_STRUCT zb_zcl_ota_upgrade_srv_image_block_param_t;
 
 typedef ZB_PACKED_PRE struct zb_zcl_ota_upgrade_srv_upgrade_aborted_param_s
 {

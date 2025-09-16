@@ -77,7 +77,7 @@ comp_data_page_0;
 typedef struct __attribute__((packed))
 {
     uint8_t   page_num;
-    __packed union
+    union packed 
     {
         comp_data_page_0 comp_data;
     } data;
@@ -96,7 +96,7 @@ typedef struct __attribute__((packed))
     uint8_t   status;
     uint16_t  element_address;
     uint16_t  appkey_index;
-    __packed union
+    union 
     {
         uint16_t sig_model;
         uint32_t vendor_model;

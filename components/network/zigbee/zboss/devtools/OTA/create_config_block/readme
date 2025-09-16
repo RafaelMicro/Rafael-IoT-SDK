@@ -1,6 +1,0 @@
-Create configuration block utility (BMS)
-----------------------------------------------
-
-Usage:
-./create_config_block.exe - create binary file config_block.bin from text file config.txt (UNIX EOL) - only data, no CRC and special fields.
-./bianary_to_xpv.exe - create xpv (flashable) file config_block.xpv from config_block.bin. Start block address is set to 0x0003FFD4

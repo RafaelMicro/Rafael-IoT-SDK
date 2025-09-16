@@ -36,7 +36,6 @@
  *    INCLUDES
  *************************************************************************************************/
 #include <stdint.h>
-#include <stdbool.h>
 #include "ble_hci.h"
 
 #ifdef __cplusplus
@@ -68,9 +67,10 @@ extern "C" {
  * @ingroup hci_cmd_cntlr
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_read_local_ver_info_cmd(void);
+ble_err_t hci_read_local_ver_info_cmd(void);
 
 
 /** Read Local Supported Commands command.
@@ -78,9 +78,10 @@ int8_t hci_read_local_ver_info_cmd(void);
  * @ingroup hci_cmd_cntlr
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_read_local_supported_cmds_cmd(void);
+ble_err_t hci_read_local_supported_cmds_cmd(void);
 
 
 /** Read Local Supported Features command.
@@ -88,10 +89,10 @@ int8_t hci_read_local_supported_cmds_cmd(void);
  * @ingroup hci_cmd_cntlr
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_read_local_supported_feature_cmd(void);
-
+ble_err_t hci_read_local_supported_feature_cmd(void);
 
 
 /** Read BD_ADDR command.
@@ -99,21 +100,22 @@ int8_t hci_read_local_supported_feature_cmd(void);
  * @ingroup hci_cmd_cntlr
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_read_bd_addr_cmd(void);
+ble_err_t hci_read_bd_addr_cmd(void);
 
 
 /** LE Set Event Mask command.
  *
  * @ingroup hci_cmd_cntlr
  *
- * @param p_param : a pointer to the envent mask.
+ * @param p_param : a pointer to the event mask.
  *
  * @return BLE_ERR_OK   : success.
  * @return ERR_MEM  : failed to send HCI command.
  */
-int8_t hci_le_set_event_mask_cmd(uint8_t *p_param);
+ble_err_t hci_le_set_event_mask_cmd(uint8_t *p_param);
 
 
 /** LE Read Buffer Size command.
@@ -121,9 +123,10 @@ int8_t hci_le_set_event_mask_cmd(uint8_t *p_param);
  * @ingroup hci_cmd_cntlr
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_read_buffer_size_cmd(void);
+ble_err_t hci_le_read_buffer_size_cmd(void);
 
 
 /** LE Read Local Supported Features command.
@@ -131,10 +134,10 @@ int8_t hci_le_read_buffer_size_cmd(void);
  * @ingroup hci_cmd_cntlr
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_read_local_supported_feature_cmd(void);
-
+ble_err_t hci_le_read_local_supported_feature_cmd(void);
 
 
 /** LE Set Random Address command.
@@ -144,9 +147,10 @@ int8_t hci_le_read_local_supported_feature_cmd(void);
  * @param p_param : a pointer to the set random address parameter.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_set_random_addr_cmd(ble_hci_cmd_set_random_addr_param_t *p_param);
+ble_err_t hci_le_set_random_addr_cmd(ble_hci_cmd_set_random_addr_param_t *p_param);
 
 
 /** LE Read Filter Accept List Size command.
@@ -154,9 +158,10 @@ int8_t hci_le_set_random_addr_cmd(ble_hci_cmd_set_random_addr_param_t *p_param);
  * @ingroup hci_cmd_cntlr
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_read_filter_accept_list_size_cmd(void);
+ble_err_t hci_le_read_filter_accept_list_size_cmd(void);
 
 
 /** LE Clear Filter Accept List command.
@@ -164,29 +169,36 @@ int8_t hci_le_read_filter_accept_list_size_cmd(void);
  * @ingroup hci_cmd_cntlr
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_clear_filter_accept_list_cmd(void);
+ble_err_t hci_le_clear_filter_accept_list_cmd(void);
 
 
 /** LE Add Device To Filter Accept List command.
  *
  * @ingroup hci_cmd_cntlr
  *
+ * @param p_param : a pointer to the add device filter accept list parameter.
+ *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_add_device_to_filter_accept_list_cmd(ble_hci_cmd_add_device_to_accept_list_t *p_param);
+ble_err_t hci_le_add_device_to_filter_accept_list_cmd(ble_hci_cmd_add_device_to_accept_list_t *p_param);
 
 
 /** LE Remove Device From Filter Accept List command.
  *
  * @ingroup hci_cmd_cntlr
  *
+ * @param p_param : a pointer to the remove deice from filter accept list parameter.
+ *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_remove_device_from_filter_accept_list_cmd(ble_hci_cmd_remove_device_from_accept_list_t *p_param);
+ble_err_t hci_le_remove_device_from_filter_accept_list_cmd(ble_hci_cmd_remove_device_from_accept_list_t *p_param);
 
 
 /** LE Read Supported States command.
@@ -194,9 +206,10 @@ int8_t hci_le_remove_device_from_filter_accept_list_cmd(ble_hci_cmd_remove_devic
  * @ingroup hci_cmd_cntlr
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_read_supported_state_cmd(void);
+ble_err_t hci_le_read_supported_state_cmd(void);
 
 
 /** LE Read Antenna Information command.
@@ -204,9 +217,10 @@ int8_t hci_le_read_supported_state_cmd(void);
  * @ingroup hci_cmd_cntlr
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_read_antenna_info_cmd(void);
+ble_err_t hci_le_read_antenna_info_cmd(void);
 
 #ifdef __cplusplus
 }

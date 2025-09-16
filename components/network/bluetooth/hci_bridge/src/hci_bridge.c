@@ -28,7 +28,7 @@
 /**************************************************************************************************
  *    CONSTANTS AND DEFINES
  *************************************************************************************************/
-#define HCI_BRIDGE_FRAME_BUFFER_NUM 8
+#define HCI_BRIDGE_FRAME_BUFFER_NUM 12
 #define HCI_BRIDGE_FRAME_MAX_SIZE   (sizeof(ble_hci_message_t))
 
 typedef struct {
@@ -126,7 +126,6 @@ static void __hci_evt(hci_bridge_event_t evt) {
         enter_critical_section();
         if (!utils_dlist_empty(&g_hci_frame.rxEventList)) {
             pframe = (hci_rx_msg_t*)g_hci_frame.rxEventList.next;
-            g_hci_frame.dbgRxFrameNum--;
 
             utils_dlist_del(&pframe->dlist);
         }
@@ -155,10 +154,11 @@ static void __hci_signal(void) {
 static void __hci_proc(void* pvParameters) {
     hci_bridge_event_t sevent = HIC_INTERFACE_EVENT_STATE_NONE;
     for (;;) {
-        HCI_BRIDGE_GET_NOTIFY(sevent);
-        __hci_evt(sevent);
-        __hci_data(sevent);
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        if (ulTaskNotifyTake(pdFALSE, portMAX_DELAY) != 0) {
+            HCI_BRIDGE_GET_NOTIFY(sevent);
+            __hci_evt(sevent);
+            __hci_data(sevent);
+        }
     }
 }
 
@@ -166,6 +166,7 @@ static int __evt_cb(void* p_arg) {
     hci_rx_msg_t* p = NULL;
     uint16_t data_len;
     ble_hci_message_t* pmesg;
+    int ret = 0;
 
     do {
         enter_critical_section();
@@ -184,16 +185,24 @@ static int __evt_cb(void* p_arg) {
 
             enter_critical_section();
             utils_dlist_add_tail(&p->dlist, &g_hci_frame.rxEventList);
-
-            g_hci_frame.dbgRxFrameNum++;
-
             leave_critical_section();
 
             HCI_BRIDGE_NOTIFY(HIC_INTERFACE_EVENT_STATE_HCI_EVT);
+            if (p->pdata[1] == 0x01) {
+                ret = 1;
+            } else if (p->pdata[1] == 0x3e) {
+                if (p->pdata[3] != 0x02) {
+                    ret = 1;
+                }
+            } else if (p->pdata[1] == 0x0e) {
+                ret = 1;
+            } else if (p->pdata[1] == 0x05) {
+                ret = 1;
+            }
         }
     } while (0);
 
-    return 0;
+    return ret;
 }
 
 static int __data_cb(void* p_arg) {
@@ -211,7 +220,6 @@ static int __data_cb(void* p_arg) {
         if (p) {
             pmesg = (ble_hci_message_t*)(p_arg);
             data_len = pmesg->hci_message.hci_acl_data.length + 5;
-
             p->len = data_len;
             memcpy(p->pdata, pmesg, data_len);
 
@@ -247,7 +255,7 @@ void hci_bridge_init(void) {
     hosal_rf_callback_set(HOSAL_RF_BLE_EVENT_CALLBACK, __evt_cb, NULL);
     hosal_rf_callback_set(HOSAL_RF_BLE_RX_CALLBACK, __data_cb, NULL);
 
-    xTaskCreate(__hci_proc, "hci_if", 512, NULL, E_TASK_PRIORITY_OPENTHREAD,
+    xTaskCreate(__hci_proc, "bridge-hci", 512, NULL, E_TASK_PRIORITY_OPENTHREAD,
                 &g_hci_taskHandle);
 
     g_tx_sn = 0;
@@ -277,8 +285,13 @@ int hci_bridge_message_write(ble_hci_message_t* pmesg) {
                     pmesg->hci_message.hci_command.length
                     + 1 /*transport*/ + 2 /*opcode*/ + 1 /*length*/;
                 do {
-                    rval = hosal_rf_wrire_command((uint8_t*)pmesg,
+                    rval = hosal_rf_write_command((uint8_t*)pmesg,
                                                   hci_command_length);
+
+                    if (rval != HOSAL_RF_STATUS_SUCCESS) {
+                        log_error("hci_bridge_message_write failed %d ", rval);
+                        break;
+                    }
                 } while (rval != HOSAL_RF_STATUS_SUCCESS);
                 break;
 

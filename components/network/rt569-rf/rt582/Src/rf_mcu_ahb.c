@@ -204,7 +204,7 @@ bool RfMcu_RxQueueIsReadyAhb(void)
 
 uint16_t RfMcu_RxQueueReadAhb(uint8_t *rx_data, RF_MCU_RXQ_ERROR *rx_queue_error)
 {
-    uint16_t data_length = 0;
+    volatile uint16_t data_length = 0;
 
     if (!RfMcu_RxQueueIsReadyAhb())
     {
@@ -215,7 +215,9 @@ uint16_t RfMcu_RxQueueReadAhb(uint8_t *rx_data, RF_MCU_RXQ_ERROR *rx_queue_error
     (*rx_queue_error) = RF_MCU_RXQ_GET_SUCCESS;
 #if (RF_MCU_USING_REG_FIELD)
     data_length = (RF_MCU_RX_INFO_PTR->RX_PKT_LEN & COMM_SUBSYS_MAX_RX_Q_LEN);
+    data_length = (RF_MCU_RX_INFO_PTR->RX_PKT_LEN & COMM_SUBSYS_MAX_RX_Q_LEN);
 #else
+    data_length = ((COMM_SUBSYSTEM_AHB->COMM_SUBSYSTEM_RX_INFO >> 16) & COMM_SUBSYS_MAX_RX_Q_LEN);
     data_length = ((COMM_SUBSYSTEM_AHB->COMM_SUBSYSTEM_RX_INFO >> 16) & COMM_SUBSYS_MAX_RX_Q_LEN);
 #endif
     RfMcu_IoGetAhb(COMM_SUBSYS_RX_QUEUE_ID, rx_data, data_length);
@@ -242,7 +244,7 @@ bool RfMcu_EvtQueueIsReadyAhb(void)
 
 uint16_t RfMcu_EvtQueueReadAhb(uint8_t *evt, RF_MCU_RX_CMDQ_ERROR *rx_evt_error)
 {
-    uint16_t evt_length = 0;
+    volatile uint16_t evt_length = 0;
 
     if (!RfMcu_EvtQueueIsReadyAhb())
     {
@@ -253,7 +255,9 @@ uint16_t RfMcu_EvtQueueReadAhb(uint8_t *evt, RF_MCU_RX_CMDQ_ERROR *rx_evt_error)
     (*rx_evt_error) = RF_MCU_RX_CMDQ_GET_SUCCESS;
 #if (RF_MCU_USING_REG_FIELD)
     evt_length = (RF_MCU_TX_INFO_PTR->CMDR_LEN & COMM_SUBSYS_MAX_RX_CMDQ_LEN);
+    evt_length = (RF_MCU_TX_INFO_PTR->CMDR_LEN & COMM_SUBSYS_MAX_RX_CMDQ_LEN);
 #else
+    evt_length = ((COMM_SUBSYSTEM_AHB->COMM_SUBSYSTEM_TX_INFO >> 16) & COMM_SUBSYS_MAX_RX_CMDQ_LEN);
     evt_length = ((COMM_SUBSYSTEM_AHB->COMM_SUBSYSTEM_TX_INFO >> 16) & COMM_SUBSYS_MAX_RX_CMDQ_LEN);
 #endif
     RfMcu_IoGetAhb(COMM_SUBSYS_RX_CMD_QUEUE_ID, evt, evt_length);

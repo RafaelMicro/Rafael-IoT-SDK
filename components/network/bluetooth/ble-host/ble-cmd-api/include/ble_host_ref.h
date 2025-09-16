@@ -89,7 +89,9 @@ extern uint16_t const QUEUE_HOST_RX;                                    /**< Def
 extern uint16_t const QUEUE_HOST_ENCRYPT;                               /**< Define the size of the host encrypt queue for host task. */
 extern uint32_t param_host_timer[NUM_LL_LINK][REF_SIZE_CMDTMR >> 2];    /**< A predefined and reserved block of memory used for the BLE host timers. */
 extern l2cap_sdus_reassembly_t l2cap_sdus_reassembly[NUM_LL_LINK];      /**< A predefined and reserved block of memory used for the BLE HCI to reassemble incomplete ACL packets. */
-extern uint8_t param_host_identity[BLE_SUPPORT_NUM_CONN_MAX][22];       /**< A predefined and reserved block of memory used for the BLE Identity fuction. */
+extern uint8_t param_host_identity[NUM_LL_LINK][22];                    /**< A predefined and reserved block of memory used for the BLE Identity fuction. */
+extern uint8_t l2cap_identifier[NUM_LL_LINK];                           /** A predefined and reserved block of memory used for l2cap identifier variables. */
+extern uint32_t param_l2cap_credit_based[NUM_LL_LINK][5];               /** A predefined and reserved block of memory used for the BLE L2CAP credit information. */
 /** @} */
 
 #ifdef __cplusplus

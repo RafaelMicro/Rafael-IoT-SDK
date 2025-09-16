@@ -35,6 +35,9 @@ extern "C" {
 */
 typedef enum
 {
+    BLE_ERR_L2CAP_DATA_DEST_ID_UNMATCH    = -29,  /** @brief BLE l2cap data destination id is not match. */
+    BLE_ERR_L2CAP_DATA_CHANNEL_NOT_EXIST  = -28,  /** @brief BLE l2cap data channel is not exist. */
+    BLE_ERR_RESOURCE_NOT_ENOUGH           = -27,  /** @brief BLE resource is not enough. */
     BLE_ERR_HCI_TX_DATA_QUEUE_FULL        = -26,  /** @brief BLE tx data queue full. */
     BLE_ERR_HCI_TX_CMD_QUEUE_FULL         = -25,  /** @brief BLE tx command queue full. */
     BLE_ERR_SEQUENTIAL_PROTOCOL_VIOLATION = -24,  /** @brief Detecting a sequential protocol violation. Usually happens in there is an another GATT request already in progress please wait and retry.*/
@@ -150,6 +153,7 @@ typedef enum
     BLE_APP_RETURN_PARAMETER_EVENT,   /**< Queue type: BLE command request. */
     BLE_APP_GENERAL_EVENT,            /**< Queue type: BLE event. */
     BLE_APP_SERVICE_EVENT,            /**< Queue type: BLE service data. */
+    BLE_APP_L2CAP_EVENT,              /**< Queue type: BLE L2CAP data. */
 } ble_event_t;
 
 
@@ -166,6 +170,9 @@ typedef struct
     uint8_t     hci_tx_level;       /* Bluetooth LE task PRIORITY : HCI TX level */
     uint8_t     ble_host_level;     /* Bluetooth LE task PRIORITY : host level */
 } ble_task_priority_t;
+
+
+
 
 
 /**************************************************************************************************

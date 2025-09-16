@@ -6,7 +6,7 @@ static const ble_gap_addr_t  DEVICE_ADDR = {.addr_type = RANDOM_STATIC_ADDR,
                                             .addr = {0xD1, 0xD2, 0xC3, 0xC4, 0xE5, 0xC6 }
                                            };
 
-#define DEVICE_NAME 'A', 'T', '_', 'C', 'o', 'm', 'm', 'a', 'n', 'd'
+#define DEVICE_NAME  "AT_Command"
 
 static const uint8_t device_name_str[] = {DEVICE_NAME};
 
@@ -111,15 +111,14 @@ ble_err_t ble_adv_data_init(atcmd_t *this)
 ble_err_t ble_scan_rsp_init(atcmd_t *this)
 {
     ble_err_t status = BLE_ERR_OK;
-    uint8_t scan_rsp_len  = (1) + sizeof(device_name_str); //  1 byte data type
+    const uint8_t   SCANRSP_ADLENGTH  = (1) + strlen(device_name_str); //  1 byte data type
 
-    // scan response data
-    uint8_t adv_scan_rsp_data[] =
-    {
-        scan_rsp_len,                       // AD length
-        GAP_AD_TYPE_LOCAL_NAME_COMPLETE,    // AD data type
-        DEVICE_NAME,                        // the name is shown on scan list
-    };
+    //Scan response data
+    uint8_t adv_scan_rsp_data[2 + strlen(device_name_str)];
+    adv_scan_rsp_data[0] = SCANRSP_ADLENGTH;                      // AD length
+    adv_scan_rsp_data[1] = GAP_AD_TYPE_LOCAL_NAME_COMPLETE;       // AD data type
+    memcpy(&adv_scan_rsp_data[2], device_name_str, strlen(device_name_str)); // Copy the name
+
     this->ble_param.scan_rsp.length = sizeof(adv_scan_rsp_data);
     memcpy(this->ble_param.scan_rsp.data, adv_scan_rsp_data, sizeof(adv_scan_rsp_data));
     status = ble_cmd_adv_scan_rsp_set(&this->ble_param.scan_rsp);
@@ -166,6 +165,6 @@ ble_err_t ble_atcmd_gap_device_name_init(void)
 {
     ble_err_t status;
     // set GAP device name
-    status = ble_svcs_gaps_device_name_set((uint8_t *)device_name_str, sizeof(device_name_str));
+    status = ble_svcs_gaps_device_name_set((uint8_t *)device_name_str, strlen(device_name_str));
     return status;
 }

@@ -24,14 +24,10 @@
 #define RF_CAL_PWR_ON_MODE          (0x01)
 #define RF_CAL_MP_MODE              (0x02)
 #define RF_CAL_FT_MODE              (0x04)
+
 #ifndef RF_CAL_TYPE
-#if (CHIP_VERSION == RT58X_MPB)
-#if ((RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569M0) && (RF_MCU_CHIP_VER == RF_MCU_CHIP_VER_B))
-#define RF_CAL_TYPE                 (RF_CAL_OFF)
-#else
-// #define RF_CAL_TYPE                 (RF_CAL_PWR_ON_MODE|RF_CAL_MP_MODE)
-#define RF_CAL_TYPE                 (RF_CAL_OFF)
-#endif
+#if (defined(CONFIG_RT584S))
+#define RF_CAL_TYPE                 (RF_CAL_PWR_ON_MODE)
 #else
 #define RF_CAL_TYPE                 (RF_CAL_OFF)
 #endif
@@ -58,7 +54,11 @@
 #endif
 
 #ifndef RF_TX_POWER_COMP
+#if (defined(CONFIG_RT584H) || defined(CONFIG_RT584L))
+#define RF_TX_POWER_COMP            (TRUE)
+#else
 #define RF_TX_POWER_COMP            (FALSE)
+#endif
 #endif
 
 /**************************************************************************************************
@@ -85,7 +85,8 @@ typedef uint8_t RF_BAND;
 #define RF_BAND_SUB1G0                              ((RF_BAND)0x01)
 #define RF_BAND_SUB1G1                              ((RF_BAND)0x02)
 #define RF_BAND_SUB1G2                              ((RF_BAND)0x03)
-#define RF_BAND_MAX                                 ((RF_BAND)0x04)
+#define RF_BAND_SUB1G3                              ((RF_BAND)0x04)
+#define RF_BAND_MAX                                 ((RF_BAND)0x05)
 
 typedef uint8_t RF_BAND_SUPP_TYPE;
 #define RF_BAND_SUPP(x)                             ((RF_BAND_SUPP_TYPE)(1 << x))
@@ -96,8 +97,9 @@ typedef uint8_t RF_BAND_SUPP_TYPE;
  *************************************************************************************************/
 bool rf_common_tx_pwr_comp_set(int8_t offset, uint8_t poly_gain, uint8_t pa_pw_pre, uint8_t modemType);
 bool rf_common_tx_pwr_ch_comp_set(int8_t offset0, int8_t offset1, int8_t offset2, int8_t offset3, int8_t modemType);
+bool rf_common_tx_pwr_ch_seg_set(int8_t segA, int8_t segB, int8_t segC, int8_t modemType);
 bool rf_common_init_by_fw(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_func);
-
+bool rf_common_init_fw_preload(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_func);
 
 #endif  //_RF_COMMON_INIT_H__
 

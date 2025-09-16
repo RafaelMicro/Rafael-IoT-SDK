@@ -3,35 +3,38 @@
  * @brief FreeRTOSbySystem example file.
  *
  */
-
-
 /**************************************************************************************************
  *    INCLUDES
  *************************************************************************************************/
-
-#include "project_config.h"
-
 /* Scheduler includes. */
 #include "FreeRTOS.h"
 #include "task.h"
 #include "timers.h"
 #include "queue.h"
 #include "mesh_mdl_handler.h"
-#include "mesh_app.h"
 #include "ble_mesh_element.h"
-#include "hosal_rf.h"
 #include "log.h"
-
 
 #include "mmdl_opcodes.h"
 #include "mmdl_common.h"
 #include "mmdl_defs.h"
+#include "hosal_rf.h"
+
 #include "hosal_gpio.h"
 #include "hosal_sysctrl.h"
+#include "hosal_uart.h"
+#include "hosal_lpm.h"
+#include "hosal_sysctrl.h"
+#include "mcu.h"
 
 #include "ble_mesh_lib_api.h"
 #include "ble_host_cmd.h"
+#include "ble_l2cap.h"
+#include "ble_event.h"
 #include "mesh_task.h"
+#include "app_hooks.h"
+#include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 /**************************************************************************************************
  *    MACROS
@@ -40,25 +43,13 @@
 /**************************************************************************************************
  *    CONSTANTS AND DEFINES
  *************************************************************************************************/
-#define PWM_PWM0_COUNTER_MODE   PWM_COUNTER_MODE_UP         /*UP is up counter Mode ;UD is up and down Mode*/
-#define PWM_PWM0_SEQ_ORDER      PWM_SEQ_ORDER_R             /*Rseq or Tseq Selection or both*/
-#define PWM_PWM0_ELEMENT_NUM    1                           /*genrator Pulse number*/
-#define PWM_PWM0_REPEAT_NUM     0                           /*Repeat Pulse number*/
-#define PWM_PWM0_DLY_NUM        0                           /*Pulse delay number*/
-#define PWM_PWM0_CNT_END_VAL    10000                       /*Count end Value*/
-#define PWM_PWM0_CLK_DIV        PWM_CLK_DIV_4               /*PWM Input Clock Div*/
-#define PWM_PWM0_TRIG_SRC       PWM_TRIGGER_SRC_SELF        /*PWM Trigger Source by self or PWM1~PWM4*/
-#define PWM_PWM0_SEQ_MODE       PWM_SEQ_MODE_CONTINUOUS     /*Continuous and Noncontinuous mode*/
-#define PWM_PWM0_PLAY_CNT       0                           /*0:is infinite*/
-#define PWM_PWM0_SEQ_NUM        PWM_SEQ_NUM_1               /*use rdma single simple or two simple*/
-#define PWM_PWM0_DMA_SML_FMT    PWM_DMA_SMP_FMT_1           /*Pwm DMA Simple Format 0 or 1*/
 
 #define MAX_TRSP_DATA_LEN           (377)
 
 #define INVALID_DST_ADDRESS         (0x0000)
 
 // Advertising device name
-#define DEVICE_NAME                 'B', 'L', 'E', '_', 'M', 'E', 'S', 'H'
+#define DEVICE_NAME                 "BLE_MESH"
 /**************************************************************************************************
  *    TYPEDEFS
  *************************************************************************************************/
@@ -68,6 +59,21 @@ typedef struct
     const char          *p_cmd_header;
     void                (*p_cmd_process)(uint8_t *p_data);
 } user_cmd_t;
+
+typedef struct
+{
+    mesh_tlv_t *pt_tlv;
+    uint32_t event;
+    uint32_t data;
+} app_queue_t;
+
+typedef enum
+{
+    APP_BLE_MESH_EVT,
+    APP_BUTTON_EVT,
+    APP_UART_EVT,
+} app_evt_t;
+
 
 typedef enum
 {
@@ -80,31 +86,17 @@ typedef enum
 /**************************************************************************************************
  *    GLOBAL VARIABLES
  *************************************************************************************************/
-pwm_seq_para_head_t pwm_para_config[3];
-
-uint32_t pwm_rdma0_addr_temp[3];
-uint32_t pwm_rdma1_addr_temp[3];
-uint16_t pwm_count_end_val[3] = {PWM_PWM0_CNT_END_VAL, PWM_PWM0_CNT_END_VAL, PWM_PWM0_CNT_END_VAL};
-pwm_clk_div_t pwm_clk_div[3] = {PWM_PWM0_CLK_DIV, PWM_PWM0_CLK_DIV, PWM_PWM0_CLK_DIV};
-pwm_seq_order_t pwm_seq_order[3] = {PWM_PWM0_SEQ_ORDER, PWM_PWM0_SEQ_ORDER, PWM_PWM0_SEQ_ORDER};
-pwm_trigger_src_t pwm_trigger_src[3] = {PWM_PWM0_TRIG_SRC, PWM_PWM0_TRIG_SRC, PWM_PWM0_TRIG_SRC};
-uint16_t pwm_play_cnt[3] = {PWM_PWM0_PLAY_CNT, PWM_PWM0_PLAY_CNT, PWM_PWM0_PLAY_CNT};
-pwm_seq_num_t pwm_seq_num[3] = {PWM_PWM0_SEQ_NUM, PWM_PWM0_SEQ_NUM, PWM_PWM0_SEQ_NUM};
-pwm_seq_mode_t pwm_seq_mode[3] = {PWM_PWM0_SEQ_MODE, PWM_PWM0_SEQ_MODE, PWM_PWM0_SEQ_MODE};
-pwm_counter_mode_t pwm_counter_mode[3] = {PWM_PWM0_COUNTER_MODE, PWM_PWM0_COUNTER_MODE, PWM_PWM0_COUNTER_MODE};
-pwm_dma_smp_fmt_t pwm_dma_smp_fmt[3] = {PWM_PWM0_DMA_SML_FMT, PWM_PWM0_DMA_SML_FMT, PWM_PWM0_DMA_SML_FMT};
-uint8_t pwm_element_arr[3] = {PWM_PWM0_ELEMENT_NUM, PWM_PWM0_ELEMENT_NUM, PWM_PWM0_ELEMENT_NUM};
-uint8_t pwm_rep_arr[3] = {PWM_PWM0_REPEAT_NUM, PWM_PWM0_REPEAT_NUM, PWM_PWM0_REPEAT_NUM};
-uint8_t pwm_dly_arr[3] = {PWM_PWM0_DLY_NUM, PWM_PWM0_DLY_NUM, PWM_PWM0_DLY_NUM};
 
 extern ble_mesh_element_param_t g_element_info[];
 
+#define UART0_OPERATION_PORT            0
+HOSAL_UART_DEV_DECL(uart0_dev, UART0_OPERATION_PORT, CONFIG_UART_STDIO_TX_PIN, CONFIG_UART_STDIO_RX_PIN, UART_BAUDRATE_115200)
 
 /**************************************************************************************************
  *    GLOBAL FUNCTIONS
  *************************************************************************************************/
-extern int retarget_stdout_string(char *str, int length, UART_T *p_csr);
-extern int retarget_stdout_char(int ch, UART_T *p_csr);
+extern int retarget_stdout_string(char *str, int length, uart_t *p_csr);
+extern int retarget_stdout_char(int ch, uart_t *p_csr);
 extern void app_init(void);
 
 
@@ -142,24 +134,16 @@ static user_cmd_t g_user_cmd_list[] =
     },
 };
 
-
 static uint32_t app_main_event = APP_GATT_PROVISION_EVT;
-
-
-
-
 static uint16_t user_data_dst_addr = INVALID_DST_ADDRESS;
 static uint16_t user_data_appkey_idx = 0xFFFF;
 static uint8_t user_data_req_ack = 0;
-
 static uint8_t user_cmd_num = (sizeof(g_user_cmd_list) / sizeof(user_cmd_t));
-
 
 static const uint8_t         DEVICE_NAME_STR[] = {DEVICE_NAME};
 
 static TimerHandle_t unprov_idc_tmr;
 xQueueHandle app_msg_q;
-//static SemaphoreHandle_t semaphore_cb;
 
 /*this is pin mux setting*/
 static void init_default_pin_mux(void)
@@ -169,103 +153,13 @@ static void init_default_pin_mux(void)
     /*set all pin to gpio, except GPIO16, GPIO17 */
     for (i = 0; i < 32; i++)
     {
-#if 0
-        if (i == 20)
-        {
-            pin_set_mode(i, MODE_PWM0);
-        }
-        else if (i == 21)
-        {
-            pin_set_mode(i, MODE_PWM1);
-        }
-        else if (i == 22)
-        {
-            pin_set_mode(i, MODE_PWM2);
-        }
-        else 
-#endif
         if ((i != 16) && (i != 17))
         {
-            pin_set_mode(i, MODE_GPIO);
+            hosal_pin_set_mode(i, HOSAL_MODE_GPIO);
         }
     }
-    gpio_cfg_output(23);
-    gpio_pin_set(23);
-
 
     return;
-}
-
-void pwm_init_parameter(pwm_id_t id, pwm_seq_para_head_t *pwm_para_config)
-{
-    pwm_seq_para_t *pwm_seq = NULL;
-
-    pwm_para_config->pwm_id            = id;
-    pwm_para_config->pwm_play_cnt      = pwm_play_cnt[id]; //0 means continuous
-    pwm_para_config->pwm_seq_order     = pwm_seq_order[id];
-    pwm_para_config->pwm_seq_num       = pwm_seq_num[id];
-    pwm_para_config->pwm_seq_mode      = pwm_seq_mode[id];
-    pwm_para_config->pwm_triggered_src = pwm_trigger_src[id];
-    pwm_para_config->pwm_clk_div       = pwm_clk_div[id];
-    pwm_para_config->pwm_counter_mode  = pwm_counter_mode[id];
-    pwm_para_config->pwm_dma_smp_fmt   = pwm_dma_smp_fmt[id];
-
-    if (pwm_para_config->pwm_seq_num == PWM_SEQ_NUM_2)
-    {
-        pwm_seq = &(pwm_para_config->pwm_seq0);
-        pwm_seq->element_num    = pwm_element_arr[id];
-        pwm_seq->repeat_num     = pwm_rep_arr[id];
-        pwm_seq->delay_num      = pwm_dly_arr[id];
-        pwm_seq->rdma_addr      = (uint32_t)&pwm_rdma0_addr_temp[id];
-
-        pwm_seq = &(pwm_para_config->pwm_seq1);
-        pwm_seq->element_num    = pwm_element_arr[id];
-        pwm_seq->repeat_num     = pwm_rep_arr[id];
-        pwm_seq->delay_num      = pwm_dly_arr[id];
-        pwm_seq->rdma_addr      = (uint32_t)&pwm_rdma1_addr_temp[id];
-    }
-    else if (pwm_para_config->pwm_seq_num == PWM_SEQ_NUM_1)
-    {
-        if (pwm_para_config->pwm_seq_order == PWM_SEQ_ORDER_R)
-        {
-            pwm_seq = &(pwm_para_config->pwm_seq0);
-            pwm_seq->rdma_addr  = (uint32_t)&pwm_rdma0_addr_temp[id];
-        }
-        else if (pwm_para_config->pwm_seq_order == PWM_SEQ_ORDER_T)
-        {
-            pwm_seq = &(pwm_para_config->pwm_seq1);
-            pwm_seq->rdma_addr  = (uint32_t)&pwm_rdma1_addr_temp[id];
-        }
-
-        pwm_seq->element_num    = pwm_element_arr[id];
-        pwm_seq->repeat_num     = pwm_rep_arr[id];
-        pwm_seq->delay_num      = pwm_dly_arr[id];
-    }
-
-    if (pwm_para_config->pwm_dma_smp_fmt == PWM_DMA_SMP_FMT_0)
-    {
-        pwm_para_config->pwm_count_end_val = pwm_count_end_val[id];
-    }
-    else
-    {
-        pwm_para_config->pwm_count_end_val = 0x00;
-    }
-
-}
-
-void set_duty_cycle(pwm_seq_para_head_t *pwm_para_config, uint16_t current_lv)
-{
-    uint32_t dutycycle ;
-    dutycycle = (4000 * current_lv) / 65535;
-
-    pwm_seq_para_t *pwm_seq;
-    uint32_t *rdma_addr;
-
-    pwm_seq = &pwm_para_config->pwm_seq0;
-    rdma_addr = (uint32_t *)pwm_seq->rdma_addr;
-    *(rdma_addr)  = PWM_FILL_SAMPLE_DATA_MODE1(0, 4000 - dutycycle, 4000);
-
-    Pwm_Start(pwm_para_config);
 }
 
 static uint8_t parse_hex_digit(char c)
@@ -290,48 +184,32 @@ static uint8_t parse_hex_digit(char c)
 
 static void unprov_tmr_cb(TimerHandle_t t_timer)
 {
-    //extern void set_duty_cycle(pwm_seq_para_head_t *pwm_para_config, uint16_t current_lv);
-    extern pwm_seq_para_head_t pwm_para_config[3];
-    extern light_lightness_state_t  el0_light_lightness_state;
     static uint8_t toggle;
 
     if (pib_is_provisioned())
     {
-        //set_duty_cycle(&pwm_para_config[0], el0_light_lightness_state.lightness_actual);
-        //set_duty_cycle(&pwm_para_config[1], el0_light_lightness_state.lightness_actual);
-        //set_duty_cycle(&pwm_para_config[2], el0_light_lightness_state.lightness_actual);
-        hosal_gpio_pin_write(20, 0);
+        hosal_pwm_fmt0_duty(ELEMENT0_PWN_ID, 0);
         xTimerStop(unprov_idc_tmr, 0);
     }
     else
     {
-        hosal_gpio_pin_toggle(20);
-        hosal_gpio_pin_toggle(21);
-        #if 0
         toggle ^= 1;
         if (toggle)
         {
-            //set_duty_cycle(&pwm_para_config[0], 0xFFFF);
-            //set_duty_cycle(&pwm_para_config[1], 0xFFFF);
-            //set_duty_cycle(&pwm_para_config[2], 0xFFFF);
-            hosal_gpio_pin_write(20, 0);
+            hosal_pwm_fmt0_duty(ELEMENT0_PWN_ID, 0);
         }
         else
         {
-            //set_duty_cycle(&pwm_para_config[0], 0);
-            //set_duty_cycle(&pwm_para_config[1], 0);
-            //set_duty_cycle(&pwm_para_config[2], 0);
-            hosal_gpio_pin_write(20, 1);
+            hosal_pwm_fmt0_duty(ELEMENT0_PWN_ID, 100);
+            hosal_pwm_fmt0_duty(ELEMENT0_PWN_ID, 100);
         }
-        #endif
     }
 }
-
-
 
 static void user_data_dst_address_set(uint8_t *p_rx_data)
 {
     uint8_t dst_addr[4];
+
     dst_addr[0] = parse_hex_digit((char)p_rx_data[0]);
     dst_addr[1] = parse_hex_digit((char)p_rx_data[1]);
     dst_addr[2] = parse_hex_digit((char)p_rx_data[2]);
@@ -341,14 +219,14 @@ static void user_data_dst_address_set(uint8_t *p_rx_data)
                           ((dst_addr[1] & 0x0F) << 8) |
                           ((dst_addr[2] & 0x0F) << 4) | (dst_addr[3] & 0x0F));
 
-    printf("destination address for uart data: 0x%04x\n", user_data_dst_addr);
+    printf("Destination address of uart data: 0x%04x\n", user_data_dst_addr);
 }
 
 static void user_data_tx_ack_set(uint8_t *p_rx_data)
 {
     user_data_req_ack = parse_hex_digit((char)p_rx_data[0]);
 
-    printf("uart data tx with ack %d\n", user_data_req_ack);
+    printf("Uart data tx with ack %d\n", user_data_req_ack);
 }
 
 static void uart_data_handler(char ch)
@@ -364,7 +242,7 @@ static void uart_data_handler(char ch)
 
     if (index > (MAX_TRSP_DATA_LEN + 1)) /* (+1) length '\r' or '\n' */
     {
-        printf("uart data out of memory %d\n", index - 1);
+        printf("Uart data out of memory %d\n", index - 1);
         index = 0;
     }
     else if ((ch == '\n') || (ch == '\r'))
@@ -385,18 +263,17 @@ static void uart_data_handler(char ch)
             {
                 if (user_data_appkey_idx == 0xFFFF)
                 {
-                    printf("no APP key bind to Rafael TRSP client model\n");
+                    printf("No APP key bind to Rafael TRSP client model\n");
                 }
                 else if (pib_is_provisioned())
                 {
-                    printf("Send Rafael TRSP set, dst addr 0x%04x\n", user_data_dst_addr);
+                    printf("Send Rafael TRSP set to 0x%04x\n", user_data_dst_addr);
 
                     for (i = 0; i < (index - 1); i++)
                     {
                         printf("%02x ", rx_buffer[i]);
                     }
                     printf("\n... " );
-
 
                     p_raf_trsp_set_msg = pvPortMalloc(sizeof(raf_trsp_set_msg_t) + (index - 1/*(-1) removed '\n' or '\r'*/));
                     if (p_raf_trsp_set_msg == NULL)
@@ -418,7 +295,6 @@ static void uart_data_handler(char ch)
                         else
                         {
                             status = mmdl_rafael_trsp_send_unack_set(tx_info, p_raf_trsp_set_msg);
-
                         }
                         printf("result %d\n", status);
                         vPortFree(p_raf_trsp_set_msg);
@@ -426,14 +302,13 @@ static void uart_data_handler(char ch)
                 }
                 else
                 {
-                    printf("device was not provision\n");
+                    printf("Device was not provision\n");
                 }
-
             }
             else
             {
-                printf("destination address invalid, uart data ignore\n");
-                printf("command example:\n");
+                printf("Set destination address of TRSP data.\n");
+                printf("Command example:\n");
                 for (i = 0 ; i < user_cmd_num; i++)
                 {
                     printf("%s\n", g_user_cmd_list[i].p_cmd_example);
@@ -441,7 +316,6 @@ static void uart_data_handler(char ch)
             }
         }
         index = 0;
-
     }
 }
 
@@ -481,15 +355,9 @@ static uint8_t app_button_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
 
 static uint8_t app_uart_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
 {
-    uint8_t memory_free = false;
-    char ch;
-#if 0
-    while (bsp_console_stdin_str(&ch, 1) > 0)
-    {
-        uart_data_handler(ch);
-    }
-    return memory_free;
-#endif
+    uart_data_handler(data);
+    
+    return false;
 }
 
 static void ble_trsps_evt_msg_handler(uint16_t len, uint8_t *p_trsps_data)
@@ -561,13 +429,9 @@ static uint8_t app_mesh_event_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
         mesh_cfg_mdl_app_bind_idc_t *p_app_bind_idc;
         p_app_bind_idc = (mesh_cfg_mdl_app_bind_idc_t *)p_mesh_tlv->value;
 
-        if (p_app_bind_idc->model_id == MMDL_RAFAEL_TRSP_SR_MDL_ID)
+        printf("Appkey %d bind to model 0x%04x\n", p_app_bind_idc->appkey_index, p_app_bind_idc->model_id);
+        if (p_app_bind_idc->model_id == MMDL_RAFAEL_TRSP_CL_MDL_ID)
         {
-            printf("Appkey index %d bind to Rafael TRSP server model\n", p_app_bind_idc->appkey_index);
-        }
-        else if (p_app_bind_idc->model_id == MMDL_RAFAEL_TRSP_CL_MDL_ID)
-        {
-            printf("Appkey index %d bind to Rafael TRSP client model\n", p_app_bind_idc->appkey_index);
             user_data_appkey_idx = p_app_bind_idc->appkey_index;
         }
     }
@@ -597,7 +461,7 @@ static uint8_t app_mesh_event_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
     {
         mesh_proxy_adv_enable_idc_t *p_adv_enable_status;
         p_adv_enable_status = (mesh_proxy_adv_enable_idc_t *)p_mesh_tlv->value;
-        printf("Proxy ADV enable result: %d\n", p_adv_enable_status->status);
+        //printf("Proxy ADV enable result: %d\n", p_adv_enable_status->status);
     }
     break;
 
@@ -663,7 +527,7 @@ static void app_main_task(void)
     app_queue_t app_q;
     uint8_t i, j;
 
-    ble_mesh_device_name_set(sizeof(DEVICE_NAME_STR), (uint8_t *)DEVICE_NAME_STR);
+    ble_mesh_device_name_set(strlen(DEVICE_NAME_STR), (uint8_t *)DEVICE_NAME_STR);
     if (pib_is_provisioned())
     {
         for (i = 0 ; i < ble_mesh_element_count ; i++)
@@ -703,14 +567,13 @@ static void app_main_task(void)
     }
 }
 
-
 static ble_err_t mesh_app_evt_indication_cb(void *p_param)
 {
     ble_err_t status;
     app_queue_t app_q;
 
     status = BLE_ERR_OK;
-    
+
     do
     {
         if (p_param == NULL)
@@ -746,11 +609,11 @@ static ble_err_t ble_app_event_cb(void *p_param)
 {
     ble_err_t status;
     mesh_tlv_t *p_tlv;
+
     status = BLE_ERR_OK;
 
-    
     do {
-        p_tlv = pvPortMalloc(sizeof(mesh_tlv_t) + sizeof(ble_evt_param_t));
+        p_tlv = pvPortMalloc(sizeof(mesh_tlv_t) + sizeof(ble_evt_param_t) + ((ble_evt_param_t *)p_param)->extended_length);
         if (p_tlv == NULL)
         {
             status = BLE_ERR_DATA_MALLOC_FAIL;
@@ -758,7 +621,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
         }
 
         p_tlv->type = MSG_TAG_BEARER_HCI_EVENT;
-        memcpy(p_tlv->value, p_param, sizeof(ble_evt_param_t));
+        memcpy(p_tlv->value, p_param, sizeof(ble_evt_param_t) + ((ble_evt_param_t *)p_param)->extended_length);
 
         if (mesh_queue_sendto(MESH_LAYER_BEARER, p_tlv) != MESH_SUCCESS)
         {
@@ -774,25 +637,25 @@ static ble_err_t ble_service_data_cb(void *p_param)
     ble_err_t status;
     ble_evt_att_param_t *p_evt_att;
     mesh_tlv_t *p_tlv;
+
     status = BLE_ERR_OK;
     do {
-        {
-            p_evt_att = p_param;
-            p_tlv = pvPortMalloc(sizeof(ble_tlv_t) + sizeof(ble_evt_att_param_t) + p_evt_att->length);
-            if (p_tlv == NULL)
-            {
-                status = BLE_ERR_DATA_MALLOC_FAIL;
-                //xSemaphoreGive(semaphore_cb);
-                break;
-            }
-            p_tlv->type = MSG_TAG_BEARER_HCI_ACL_DATA;
-            memcpy(p_tlv->value, p_param, sizeof(ble_evt_att_param_t) + p_evt_att->length);
 
-            if (mesh_queue_sendto(MESH_LAYER_BEARER, p_tlv) != MESH_SUCCESS)
-            {
-                status = BLE_BUSY;
-                //xSemaphoreGive(semaphore_cb);
-            }
+        p_evt_att = p_param;
+        p_tlv = pvPortMalloc(sizeof(ble_tlv_t) + sizeof(ble_evt_att_param_t) + p_evt_att->length);
+        if (p_tlv == NULL)
+        {
+            status = BLE_ERR_DATA_MALLOC_FAIL;
+            //xSemaphoreGive(semaphore_cb);
+            break;
+        }
+        p_tlv->type = MSG_TAG_BEARER_HCI_ACL_DATA;
+        memcpy(p_tlv->value, p_param, sizeof(ble_evt_att_param_t) + p_evt_att->length);
+
+        if (mesh_queue_sendto(MESH_LAYER_BEARER, p_tlv) != MESH_SUCCESS)
+        {
+            status = BLE_BUSY;
+            //xSemaphoreGive(semaphore_cb);
         }
 
     } while (0);
@@ -805,12 +668,11 @@ void app_init(void)
     mesh_task_priority_t task_priority_cfg;
     ble_task_priority_t ble_task_level;
 
-
     pib_init(NULL, g_element_info, ble_mesh_element_count, NULL);
 
     mmdl_init();
 
-    app_msg_q = xQueueCreate(16, sizeof(app_queue_t));
+    app_msg_q = xQueueCreate(32, sizeof(app_queue_t));
 
     unprov_idc_tmr = xTimerCreate("100ms", pdMS_TO_TICKS(100), pdTRUE, (void *)0, unprov_tmr_cb);
 
@@ -824,13 +686,13 @@ void app_init(void)
         printf("ble_host_callback_set(APP_SERVICE_EVENT) fail...\n");
     }
 
-
     ble_task_level.hci_tx_level = configMAX_PRIORITIES - 6;
     ble_task_level.ble_host_level = configMAX_PRIORITIES - 7;    
     if (ble_host_stack_init(&ble_task_level) == 0) {
         printf("BLE stack initial success...\n");
     }
-    else {
+    else
+    {
         printf("BLE stack initial fail...\n");
     }
 
@@ -840,53 +702,21 @@ void app_init(void)
     {
         printf("BLE Mesh stack initial success...\n");
     }
-    else {
+    else
+    {
         printf("BLE Mesh stack initial fail...\n");
     }
-
-
-    
 }
 
-#if 0
-void app_bsp_isr_callback(bsp_event_t event)
-{
-    BaseType_t context_switch = pdFALSE;
-    app_queue_t t_app_q;
-
-    switch (event)
-    {
-    case BSP_EVENT_BUTTONS_0:
-    case BSP_EVENT_BUTTONS_1:
-    case BSP_EVENT_BUTTONS_2:
-    case BSP_EVENT_BUTTONS_3:
-    case BSP_EVENT_BUTTONS_4:
-        t_app_q.event = APP_BUTTON_EVT;
-        t_app_q.data = event;
-
-        xQueueSendToBackFromISR(app_msg_q, &t_app_q, &context_switch);
-        break;
-    case BSP_EVENT_UART_RX_RECV:
-    case BSP_EVENT_UART_RX_DONE:
-    {
-        t_app_q.event = APP_UART_EVT;
-
-        xQueueSendToBackFromISR(app_msg_q, &t_app_q, &context_switch);
-    }
-    break;
-
-    default:
-        break;
-    }
-
-}
-#endif 
 void button_cb(uint32_t pin, void* isr_param) 
 {
-    BaseType_t context_switch = pdFALSE;
+    BaseType_t context_switch;
     app_queue_t t_app_q;
+    uint32_t pin_value;
 
-    printf("GPIO%d=%d\r\n", pin, hosal_gpio_pin_get(pin));
+    hosal_gpio_pin_get(pin, &pin_value);
+    printf("GPIO%d=%d\r\n", pin, pin_value);
+    
     switch (pin)
     {
     case 0:
@@ -925,31 +755,117 @@ void button_init(void)
         hosal_gpio_cfg_input(i, pin_cfg);    
         hosal_gpio_int_enable(i);
     }
-
+    NVIC_EnableIRQ(Gpio_IRQn);
 }
-int32_t main(void)
+
+static int uart0_rx_callback(void *p_arg)
 {
+    BaseType_t context_switch;
+    app_queue_t t_app_q;
+    char ch;
+    
+    while(hosal_uart_receive(&uart0_dev, &ch, 1) > 0)
+    {
+        t_app_q.event = APP_UART_EVT;
+        t_app_q.data = ch;
+        xQueueSendToBackFromISR(app_msg_q, &t_app_q, &context_switch);
+    }
+    return 0;
+}
 
-    init_default_pin_mux();
-    Delay_Init();
+static int uart0_receive_line_callback(void* p_arg)
+{
+    if (hosal_uart_get_lsr(&uart0_dev) & UART_LSR_BI)
+    {
+        char ch;
+
+        hosal_uart_receive(&uart0_dev, &ch, 1);
+        //hosal_uart_receive(&uart0_dev, &ch, 1);
+        printf("break\n");
+    }
+}
+
+static void uart_init(void)
+{
+    /*Init UART In the first place*/
+    hosal_uart_init(&uart0_dev);
+
+
+    hosal_uart_callback_set(&uart0_dev, HOSAL_UART_TX_DMA_CALLBACK, NULL, &uart0_dev);
+
+    /* Configure UART Rx interrupt callback function */
+    hosal_uart_callback_set(&uart0_dev, HOSAL_UART_RX_CALLBACK, uart0_rx_callback, &uart0_dev);
+    hosal_uart_callback_set(&uart0_dev, HOSAL_UART_RECEIVE_LINE_STATUS_CALLBACK, uart0_receive_line_callback, &uart0_dev);
+    
+    /* Configure UART to interrupt mode */
+    hosal_uart_ioctl(&uart0_dev, HOSAL_UART_MODE_SET, (void *)HOSAL_UART_MODE_INT_RX);
+    /* Configure UART to interrupt mode */
+    hosal_uart_ioctl(&uart0_dev, HOSAL_UART_RECEIVE_LINE_STATUS_ENABLE, (void *)NULL);
+
+    __NVIC_SetPriority(Uart0_IRQn, 6);
+}
+
+/**
+ * @brief Main entry point for the application.
+ *
+ * This function initializes the RF module, starts the application initialization,
+ * and enters an infinite loop to keep the application running.
+ *
+ * @param pvParameters Pointer to parameters passed to the task (not used).
+ * @return void This function does not return a value.
+ */
+static void app_main_entry(void* pvParameters)
+{
+    hosal_pwm_dev_t pwm_dev;
+    hosal_lpm_init();
     hosal_rf_init(HOSAL_RF_MODE_BLE_CONTROLLER);
-    #if 0
-    pwm_init_parameter((pwm_id_t)0, &pwm_para_config[0]);
-    Pwm_Init(&pwm_para_config[0]);
-    pwm_init_parameter((pwm_id_t)1, &pwm_para_config[1]);
-    Pwm_Init(&pwm_para_config[1]);
-    pwm_init_parameter((pwm_id_t)2, &pwm_para_config[2]);
-    Pwm_Init(&pwm_para_config[2]);
-    set_duty_cycle(&pwm_para_config[0], 0xFFFF);
-    set_duty_cycle(&pwm_para_config[1], 0xFFFF);
-    set_duty_cycle(&pwm_para_config[2], 0xFFFF);
-    #endif
-    button_init();
 
+    pwm_dev.config.id = ELEMENT0_PWN_ID;
+    pwm_dev.config.frequency = 16000;//16K
+    pwm_dev.config.pin_out = 20;	
+    pwm_dev.config.count_end_val = 3000;
+    hosal_pwm_init_fmt0(&pwm_dev); //for element 0
+
+    pwm_dev.config.id = ELEMENT1_PWN_ID;
+    pwm_dev.config.pin_out = 21;
+    hosal_pwm_init_fmt0(&pwm_dev); //for element 1
+
+    button_init();
+    uart_stdio_deinit();
+    uart_init();
     app_init();
     app_main_task();
     while (1)
     {
     }
+}
+
+/**
+ * @brief Application entry point.
+ *
+ * Initializes hardware, configures peripherals, and starts the main application task.
+ *
+ * @return int Not used.
+ */
+int main(void)
+{
+    init_default_pin_mux();
+    uart_stdio_init();
+    vHeapRegionsInt();
+    _dump_boot_info();
+
+    if (xTaskCreate(app_main_entry, (char*)"main",
+                    CONFIG_HOSAL_SOC_MAIN_ENTRY_TASK_SIZE, NULL,
+                    E_TASK_PRIORITY_APP, NULL)
+        != pdPASS) {
+        puts("Task create fail....\r\n");
+    }
+    puts("[OS] Starting OS Scheduler...\r\n");
+    puts("\r\n");
+    vTaskStartScheduler();
+    while (1) {
+    }
+
+    return 0;
 }
 

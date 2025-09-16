@@ -39,9 +39,9 @@ extern "C" {
 #define HCI_EVENT_CODE_CONNECTION_REQUEST                                       0x04  /**< Connection request event. */
 #define HCI_EVENT_CODE_DISCONNECTION_COMPLETE                                   0x05  /**< Disconnection complete event. */
 #define HCI_EVENT_CODE_AUTHENTICATION_COMPLETE                                  0x06  /**< Authentication complete event. */
-#define HCI_EVENT_CODE_REMOTE_NAME_REQUEST_COMPLETE                             0x07  /**< Rmote name request complete event. */
+#define HCI_EVENT_CODE_REMOTE_NAME_REQUEST_COMPLETE                             0x07  /**< Remote name request complete event. */
 #define HCI_EVENT_CODE_ENCRYPTION_CHANGE                                        0x08  /**< Encryption change event. */
-#define HCI_EVENT_CODE_CHANGE_CONNECTION_LINK_KEY_COMLETE                       0x09  /**< Change connection link key complate event. */
+#define HCI_EVENT_CODE_CHANGE_CONNECTION_LINK_KEY_COMPLETE                      0x09  /**< Change connection link key complete event. */
 #define HCI_EVENT_CODE_LINK_KEY_TYPE_CHANGED                                    0x0A  /**< Link key type changed event. */
 #define HCI_EVENT_CODE_READ_REMOTE_SUPPORTED_FEATURES_COMPLETE                  0x0B  /**< Read remote supported features complete event. */
 #define HCI_EVENT_CODE_READ_REMOTE_VERSION_INFORMATION_COMPLETE                 0x0C  /**< Read remote version information complete event. */
@@ -97,6 +97,7 @@ extern "C" {
 #define HCI_EVENT_CODE_AUTHENTICATED_PAYLOAD_TIMEOUT_EXPIRED                    0x57  /**< Authenticated payload timeout expired event. */
 #define HCI_EVENT_CODE_SAM_STATUS_CHANGE                                        0x58  /**< SAM status change event. */
 #define HCI_EVENT_CODE_VENDOR_EVENT                                             0xFF  /**< vendor event. */
+
 /**************************************************
   HCI LE Sub Event Code
  *************************************************/
@@ -105,7 +106,7 @@ extern "C" {
 #define HCI_EVENT_CODE_LE_CONNECTION_UPDATE_COMPLETE                            0x03  /**< LE connection update complete sub-event. */
 #define HCI_EVENT_CODE_LE_READ_REMOTE_EXTENDED_FEATURES_COMPLETE                0x04  /**< LE read remote extended features complete sub-event. */
 #define HCI_EVENT_CODE_LE_LONG_TERM_KEY_REQUEST                                 0x05  /**< LE long term key request sub-event. */
-#define HCI_EVENT_CODE_LE_REMOETE_CONNECTION_PARAMETE_REQUEST                   0x06  /**< LE remote connection parameter request sub-event. */
+#define HCI_EVENT_CODE_LE_REMOTE_CONNECTION_PARAMETER_REQUEST                   0x06  /**< LE remote connection parameter request sub-event. */
 #define HCI_EVENT_CODE_LE_DATA_LENGTH_CHANGE                                    0x07  /**< LE data length change sub-event. */
 #define HCI_EVENT_CODE_LE_READ_LOCAL_P256_PUBLIC_KEY_COMPLETE                   0x08  /**< LE read local P-256 public key complete sub-event. */
 #define HCI_EVENT_CODE_LE_GENERATE_DHKEY_COMPLETE                               0x09  /**< LE generate DHKey complete  sub-event. */
@@ -128,13 +129,19 @@ extern "C" {
 #define HCI_EVENT_CODE_LE_CIS_REQUEST                                           0x1A  /**< LE CIS request sub-event. */
 #define HCI_EVENT_CODE_LE_CREATE_BIG_COMPLETE                                   0x1B  /**< LE create BIG complete sub-event. */
 #define HCI_EVENT_CODE_LE_TERMINATE_BIG_COMPLETE                                0x1C  /**< LE terminate BIG complete sub-event. */
-#define HCI_EVNET_CODE_LE_BIG_SYNC_ESTABLISHED                                  0x1D  /**< LE BIG sync established sub-event. */
+#define HCI_EVENT_CODE_LE_BIG_SYNC_ESTABLISHED                                  0x1D  /**< LE BIG sync established sub-event. */
 #define HCI_EVENT_CODE_LE_BIG_SYNC_LOST                                         0x1E  /**< LE BIG sync lost sub-event. */
 #define HCI_EVENT_CODE_LE_REQUEST_PEER_SCA_COMPLETE                             0x1F  /**< LE request peer SCA complete sub-event. */
 #define HCI_EVENT_CODE_LE_PATH_LOSS_THRESHOLD                                   0x20  /**< LE path loss threshold sub-event. */
 #define HCI_EVENT_CODE_LE_TRANSMIT_POWER_REPORTING                              0x21  /**< LE transmit power reporting sub-event. */
 #define HCI_EVENT_CODE_LE_BIGINFO_ADVERTISING_REPORT                            0x22  /**< LE BIGInfo advertising report sub-event. */
 #define HCI_EVENT_CODE_LE_SUBRATE_CHANGE                                        0x23  /**< LE subrate change sub-event. */
+#define HCI_EVENT_CODE_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_v2              0x24  /**< LE periodic advertising sync established sub-event v2. */
+#define HCI_EVENT_CODE_LE_PERIODIC_ADVERTISING_REPORT_v2                        0x25  /**< LE periodic advertising report sub-event v2. */
+#define HCI_EVENT_CODE_LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_v2        0x26  /**< LE periodic advertising sync transfer received sub-event v2. */
+#define HCI_EVENT_CODE_LE_PERIODIC_ADVERTISING_SUBEVENT_DATA_REQUEST            0x27  /**< LE periodic advertising subevent data request. */
+#define HCI_EVENT_CODE_LE_PERIODIC_ADVERTISING_RESPONSE_REPORT                  0x28  /**< LE periodic advertising response report sub-event. */
+#define HCI_EVENT_CODE_LE_ENHANCED_CONNECTION_COMPLETE_v2                       0x29  /**< LE enhanced connection complete sub-event v2. */
 
 
 #define HCI_SUBEVENT_VENDOR_SCAN_REQUEST_REPORT                                 0x01  /**< Vendor sub event : scan request report. */
@@ -195,7 +202,7 @@ typedef struct __attribute__((packed)) ble_hci_evt_param_read_remote_ver_info_s
 
 
 /**
- * @defgroup hci_evt_encry_change Encryption Change Event.
+ * @defgroup hci_evt_encrypt_change Encryption Change Event.
  * @{
  * @ingroup ble_hci_evt_events
  * @detail event_cdoe = 0x08
@@ -227,7 +234,7 @@ typedef struct __attribute__((packed)) ble_hci_evt_param_key_refresh_complete_s
  * @defgroup hci_evt_cmd_status Command Status Event.
  * @{
  * @ingroup ble_hci_evt_events
- * @dtail event_code = 0x0F
+ * @detail event_code = 0x0F
 */
 typedef struct __attribute__((packed)) ble_hci_evt_param_cmd_status_s
 {
@@ -238,11 +245,12 @@ typedef struct __attribute__((packed)) ble_hci_evt_param_cmd_status_s
 } ble_hci_evt_param_cmd_status_t;
 /** @} */
 
+
 /**
  * @defgroup hci_evt_num_complete Number Of Completed Packets Event.
  * @{
  * @ingroup ble_hci_evt_events
- * @dtail event_code = 0x13
+ * @detail event_code = 0x13
 */
 typedef struct  __attribute__((packed)) ble_hci_evt_param_num_of_complete_packets_s
 {
@@ -801,7 +809,6 @@ typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_conn_para_req_s
 /** @} */
 
 
-
 /**
  * @defgroup hci_evt_meta_read_remote_features LE Read Remote Features Event.
  * @{
@@ -821,7 +828,7 @@ typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_read_remote_fea
  * @{
  * @ingroup ble_hci_meta_evt_param
 */
-typedef struct __attribute__((packed)) ble_hci__le_meta_evt_param_data_length_change_s
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_data_length_change_s
 {
     uint16_t  conn_handle;                /**< Connection handle. */
     uint16_t  max_tx_octets;              /**< The maximum number of payload octets in a LLData PDU. */
@@ -949,9 +956,8 @@ typedef struct __attribute__((packed))
     uint8_t             supported_rates;               /**< Supported switching sampling rates. */
     uint8_t             num_antennae;                  /**< The number of antennae supported. */
     uint8_t             max_pattern_length;            /**< Maximum length of antenna switching pattern supported. */
-    uint8_t             max_cte_length;                /**< Maximum length of a transmitted constant tone extension supported in 8us uints. */
-}
-ble_hci_return_param_read_antenna_info_t;
+    uint8_t             max_cte_length;                /**< Maximum length of a transmitted constant tone extension supported in 8us units. */
+} ble_hci_return_param_read_antenna_info_t;
 /** @} */
 
 
@@ -978,7 +984,7 @@ typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_conn_iq_report_
 
 
 /**
- * @defgroup hci_evt_meta_conn_iq_report LE CTE Request failed Event.
+ * @defgroup hci_evt_meta_cte_req_fail LE CTE Request failed Event.
  * @{
  * @ingroup ble_hci_meta_evt_param
 */
@@ -991,10 +997,247 @@ typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_cte_req_failed_
 
 
 /**
+ * @defgroup hci_evt_meta_padv_sync_established LE Periodic advertising syn established Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_padv_sync_est_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint16_t  sync_handle;                /**< Sync handle. */
+    uint8_t   adv_sid;                    /**< Advertising SID. */
+    uint8_t   adv_addr_type;              /**< Advertiser address type. */
+    uint8_t   adv_addr[BLE_ADDR_LEN];     /**< Advertiser address. */
+    uint8_t   adv_phy;                    /**< Advertiser PHY. */
+    uint16_t  padv_interval;              /**< Periodic Advertising interval. */
+    uint8_t   adv_clk_acc;                /**< Advertiser clock accuracy. */
+} ble_hci_le_meta_evt_param_padv_sync_est_t;
+/** @} */
+
+
+/**
+ * @defgroup hci_evt_meta_padv_sync_established_v2 LE Periodic advertising syn established Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_padv_sync_est_v2_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint16_t  sync_handle;                /**< Sync handle. */
+    uint8_t   adv_sid;                    /**< Advertising SID. */
+    uint8_t   adv_addr_type;              /**< Advertiser address type. */
+    uint8_t   adv_addr[BLE_ADDR_LEN];     /**< Advertiser address. */
+    uint8_t   adv_phy;                    /**< Advertiser PHY. */
+    uint16_t  padv_interval;              /**< Periodic Advertising interval. */
+    uint8_t   adv_clk_acc;                /**< Advertiser clock accuracy. */
+    uint8_t   num_subevent;               /**< number of sub event. */
+    uint8_t   subevent_interval;          /**< sub event interval. */
+    uint8_t   resp_slot_delay;            /**< Response slot delay. */
+    uint8_t   resp_slot_spacing;          /**< Response slot spacing. */
+} ble_hci_le_meta_evt_param_padv_sync_est_v2_t;
+/** @} */
+
+
+/**
+ * @defgroup hci_evt_meta_padv_report LE Periodic advertising report Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_padv_report_s
+{
+    uint16_t  sync_handle;                /**< Sync handle. */
+    int8_t    tx_power;                   /**< tx power level. */
+    int8_t    rssi;                       /**< RSSI value. */
+    uint8_t   cte_type;                   /**< CTE Type. */
+    uint8_t   data_status;                /**< data status. */
+    uint8_t   data_length;                /**< data length. */
+    uint8_t   data[];                     /**< data. */
+} ble_hci_le_meta_evt_param_padv_report_t;
+/** @} */
+
+
+/**
+ * @defgroup hci_evt_meta_padv_report LE Periodic advertising report v2 Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_padv_report_v2_s
+{
+    uint16_t  sync_handle;                /**< Sync handle. */
+    int8_t    tx_power;                   /**< tx power level. */
+    int8_t    rssi;                       /**< RSSI value. */
+    uint8_t   cte_type;                   /**< CTE Type. */
+    uint16_t  periodic_evt_cnt;           /**< Periodic Event Counter. */
+    uint8_t   subevent;                   /**< Subevent. */
+    uint8_t   data_status;                /**< data status. */
+    uint8_t   data_length;                /**< data length. */
+    uint8_t   data[];                     /**< data. */
+} ble_hci_le_meta_evt_param_padv_report_v2_t;
+/** @} */
+
+
+/**
+ * @defgroup hci_evt_meta_padv_sync_transfer_rcvd LE Periodic advertising sync transfer received Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_padv_sync_transfer_rcvd_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint16_t  conn_handle;                /**< Connection handle. */
+    uint16_t  service_data;               /**< Service data. */
+    uint16_t  sync_handle;                /**< Sync handle. */
+    uint8_t   adv_sid;                    /**< Advertising SID. */
+    uint8_t   adv_addr_type;              /**< Advertiser address type. */
+    uint8_t   adv_addr[BLE_ADDR_LEN];     /**< Advertiser address. */
+    uint8_t   adv_phy;                    /**< Advertiser PHY. */
+    uint16_t  padv_interval;              /**< Periodic Advertising interval. */
+    uint8_t   adv_clk_acc;                /**< Advertiser clock accuracy. */
+} ble_hci_le_meta_evt_param_padv_sync_transfer_rcvd_t;
+/** @} */
+
+
+/**
+ * @defgroup hci_evt_meta_padv_sync_transfer_rcvd_v2 LE Periodic advertising sync transfer received v2 Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_padv_sync_transfer_rcvd_v2_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint16_t  conn_handle;                /**< Connection handle. */
+    uint16_t  service_data;               /**< Service data. */
+    uint16_t  sync_handle;                /**< Sync handle. */
+    uint8_t   adv_sid;                    /**< Advertising SID. */
+    uint8_t   adv_addr_type;              /**< Advertiser address type. */
+    uint8_t   adv_addr[BLE_ADDR_LEN];     /**< Advertiser address. */
+    uint8_t   adv_phy;                    /**< Advertiser PHY. */
+    uint16_t  padv_interval;              /**< Periodic Advertising interval. */
+    uint8_t   adv_clk_acc;                /**< Advertiser clock accuracy. */
+    uint8_t   num_subevent;               /**< number of sub event. */
+    uint8_t   subevent_interval;          /**< sub event interval. */
+    uint8_t   resp_slot_delay;            /**< Response slot delay. */
+    uint8_t   resp_slot_spacing;          /**< Response slot spacing. */
+} ble_hci_le_meta_evt_param_padv_sync_transfer_rcvd_v2_t;
+/** @} */
+
+
+/**
+ * @defgroup hci_evt_meta_padv_subevent_data_req LE Periodic advertising subevent data req Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_padv_subevent_data_req_s
+{
+    uint8_t   adv_handle;                 /**< Advertising handle. */
+    uint8_t   subevent_start;             /**< Subevent start. */
+    uint8_t   subevent_data_cnt;          /**< Subevent data counter. */
+} ble_hci_le_meta_evt_param_padv_subevent_data_req_t;
+/** @} */
+
+typedef struct padv_rsp_rpt_s
+{
+    uint8_t tx_power;
+    uint8_t rssi;
+    uint8_t cte_type;
+    uint8_t response_slot;
+    uint8_t data_status;
+    uint8_t data_length;
+    uint8_t data[];
+} padv_rsp_rpt_t;
+
+
+/**
+ * @defgroup hci_evt_meta_padv_rsp_report LE Periodic advertising response report Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_padv_rsp_report_s
+{
+    uint8_t   adv_handle;                 /**< Advertising handle. */
+    uint8_t   subevent;                   /**< Subevent. */
+    uint8_t   tx_status;                  /**< Tx status. */
+    uint8_t   num_responses;              /**< Number of responses. */
+    padv_rsp_rpt_t rsp_info[];            /**< Response information. */
+} ble_hci_le_meta_evt_param_padv_rsp_report_t;
+/** @} */
+
+
+/**
+ * @defgroup hci_evt_meta_enhanced_conn_complete LE enhanced connection complete Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_enhanced_conn_complete_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint16_t  conn_handle;                /**< Connection handle. */
+    uint8_t   role;                       /**< Role. */
+    uint8_t   peer_addr_type;             /**< Peer address type. */
+    uint8_t   peer_addr[BLE_ADDR_LEN];    /**< Peer address. */
+    uint8_t   local_resolvable_priv_addr[BLE_ADDR_LEN];    /**< Local resolvable private address. */
+    uint8_t   peer_resolvable_priv_addr[BLE_ADDR_LEN];    /**< Peer resolvable private address. */
+    uint16_t  conn_interval;              /**< Connection interval. */
+    uint16_t  periph_latency;             /**< Peripheral latency. */
+    uint16_t  supv_timeout;               /**< Supervision timeout. */
+    uint8_t   central_clk_acc;            /**< Central clock accuracy. */
+} ble_hci_le_meta_evt_param_enhanced_conn_complete_t;
+/** @} */
+
+
+/**
+ * @defgroup hci_evt_meta_enhanced_conn_complete_v2 LE enhanced connection complete v2 Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_enhanced_conn_complete_v2_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint16_t  conn_handle;                /**< Connection handle. */
+    uint8_t   role;                       /**< Role. */
+    uint8_t   peer_addr_type;             /**< Peer address type. */
+    uint8_t   peer_addr[BLE_ADDR_LEN];    /**< Peer address. */
+    uint8_t   local_resolvable_priv_addr[BLE_ADDR_LEN];    /**< Local resolvable private address. */
+    uint8_t   peer_resolvable_priv_addr[BLE_ADDR_LEN];    /**< Peer resolvable private address. */
+    uint16_t  conn_interval;              /**< Connection interval. */
+    uint16_t  periph_latency;             /**< Peripheral latency. */
+    uint16_t  supv_timeout;               /**< Supervision timeout. */
+    uint8_t   central_clk_acc;            /**< Central clock accuracy. */
+    uint8_t   adv_handle;                 /**< Advertising handle. */
+    uint16_t  sync_handle;                /**< Sync handle. */
+} ble_hci_le_meta_evt_param_enhanced_conn_complete_v2_t;
+/** @} */
+
+/**
+ * @defgroup hci_evt_meta_padv_sync_lost LE advertising set terminated Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_adv_set_terminated_s
+{
+    uint8_t   status;                        /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint8_t   adv_handle;                    /**< Advertising handle. */
+    uint16_t  conn_handle;                   /**< Connection handle. */
+    uint8_t   num_completed_ext_adv_events;  /**< Number of completed extended advertising events transmitted by the controller. */
+} ble_hci_le_meta_evt_param_adv_set_terminated_t;
+/** @} */
+
+/**
+ * @defgroup hci_evt_meta_adv_set_terminate LE periodic advertising sync lost Event.
+ * @{
+ * @ingroup ble_hci_meta_evt_param
+*/
+typedef struct __attribute__((packed)) ble_hci_le_meta_evt_param_padv_sync_lost_s
+{
+    uint16_t sync_handle;               /**< Sync handle. */
+} ble_hci_le_meta_evt_param_padv_sync_lost_t;
+
+
+/**
  * @defgroup hci_evt_vendor Vendor Event.
  * @{
  * @ingroup ble_hci_evt_events
- * @detail event_cdoe = 0xFF
+ * @detail event_code = 0xFF
 */
 typedef struct __attribute__((packed)) ble_hci_evt_param_vendor_s
 {
@@ -1007,12 +1250,104 @@ typedef struct __attribute__((packed)) ble_hci_evt_param_vendor_s
 } ble_hci_evt_param_vendor_t;
 /** @} */
 
+typedef struct __attribute__((packed)) ble_hci_return_param_set_padv_receive_enable_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+} ble_hci_return_param_set_padv_receive_enable_t;
+
+typedef struct __attribute__((packed)) ble_hci_return_param_set_adv_set_random_addr_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */             
+} ble_hci_return_param_set_adv_set_random_addr_t;
+
+typedef struct __attribute__((packed)) ble_hci_return_param_set_extended_adv_param_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint8_t   select_tx_power;                
+} ble_hci_return_param_set_extended_adv_param_t;
+
+typedef struct __attribute__((packed)) ble_hci_return_param_set_extended_adv_enable_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */              
+} ble_hci_return_param_set_extended_adv_enable_t;
+
+typedef struct __attribute__((packed)) ble_hci_return_param_set_extended_adv_data_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */              
+} ble_hci_return_param_set_extended_adv_data_t;
+
+typedef struct __attribute__((packed)) ble_hci_return_param_set_padv_param_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint8_t   adv_handle;                
+} ble_hci_return_param_set_padv_param_t;
+
+typedef struct __attribute__((packed)) ble_hci_return_param_set_padv_data_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */               
+} ble_hci_return_param_set_padv_data_t;
+
+typedef struct __attribute__((packed)) ble_hci_return_param_set_padv_enable_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */               
+} ble_hci_return_param_set_padv_enable_t;
+
+typedef struct __attribute__((packed)) ble_hci_return_param_set_padv_set_info_transfer_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */     
+    uint16_t  conn_handle;                /**< Connection handle. */          
+} ble_hci_return_param_set_padv_set_info_transfer_t;
+
+/**
+ * @defgroup hci_evt_return_param_padv_sync_transfer_param LE Set padv sync transfer parameter Event.
+ * @{
+ * @ingroup ble_hci_evt_return_param
+*/
+typedef struct __attribute__((packed)) ble_hci_return_param_padv_sync_transfer_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint16_t  conn_handle;                /**< Connection handle. */
+} ble_hci_return_param_padv_sync_transfer_t;
+
+/**
+ * @defgroup hci_evt_return_param_default_padv_sync_transfer_param LE Set default padv sync transfer parameter Event.
+ * @{
+ * @ingroup ble_hci_evt_return_param
+*/
+typedef struct __attribute__((packed)) ble_hci_return_param_default_padv_sync_transfer_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+} ble_hci_return_param_default_padv_sync_transfer_t;
+
+
+typedef struct __attribute__((packed)) ble_hci_return_param_set_psync_subevent_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint8_t   sync_handle;                /**< Sync handle. */
+} ble_hci_return_param_set_psync_subevent_t;
+
+typedef struct __attribute__((packed)) ble_hci_return_param_padv_termiate_sync_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+} ble_hci_return_param_padv_termiate_sync_t;
+
+typedef struct __attribute__((packed)) ble_hci_return_param_set_padv_subevent_data_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint8_t   adv_handle;                /**< Sync handle. */
+} ble_hci_return_param_set_padv_subevent_data_t;
+
+typedef struct __attribute__((packed)) ble_hci_return_param_set_padv_rsp_data_s
+{
+    uint8_t   status;                     /**< @ref hci_cmd_param_error_code "ble_hci_error_code_t". */
+    uint8_t   sync_handle;                /**< Sync handle. */
+} ble_hci_return_param_set_padv_rsp_data_t;
 
 /**
  * @defgroup hci_evt_cmd_complete Command Complete Event
  * @{
  * @ingroup ble_hci_evt_events
- * @detaul event_cdoe = 0x0E
+ * @default event_code = 0x0E
  */
 typedef struct __attribute__((packed))
 {
@@ -1051,6 +1386,21 @@ typedef struct __attribute__((packed))
         ble_hci_return_param_cte_req_t                              set_cte_req;
         ble_hci_return_param_cte_rsp_t                              set_cte_rsp;
         ble_hci_return_param_read_antenna_info_t                    read_antenna_info;
+        ble_hci_return_param_set_adv_set_random_addr_t              set_adv_set_random_addr;
+        ble_hci_return_param_set_padv_receive_enable_t              set_padv_receive_enable;
+        ble_hci_return_param_set_padv_subevent_data_t               set_padv_subevent_data;
+        ble_hci_return_param_set_padv_rsp_data_t                    set_padv_rsp_data;
+        ble_hci_return_param_set_extended_adv_param_t               set_extended_adv_params;
+        ble_hci_return_param_set_extended_adv_enable_t              set_extended_adv_enable;
+        ble_hci_return_param_set_extended_adv_data_t                set_extended_adv_data;
+        ble_hci_return_param_set_padv_param_t                       set_padv_params;
+        ble_hci_return_param_set_padv_data_t                        set_padv_data;
+        ble_hci_return_param_set_padv_enable_t                      set_padv_enable;
+        ble_hci_return_param_set_padv_set_info_transfer_t           set_padv_set_info_transfer;
+        ble_hci_return_param_default_padv_sync_transfer_t           default_padv_sync_transfer;
+        ble_hci_return_param_padv_sync_transfer_t                   padv_sync_transfer;
+        ble_hci_return_param_set_psync_subevent_t                   set_psync_subevent;
+        ble_hci_return_param_padv_termiate_sync_t                   padv_sync_terminate;
     }
     para;
 }
@@ -1062,7 +1412,7 @@ ble_hci_evt_param_cmd_complete_t;
  * @defgroup hci_le_meta_evt LE Meta Event
  * @{
  * @ingroup ble_hci_evt_events
- * @detaul event_cdoe = 0x3E
+ * @default event_code = 0x3E
  */
 typedef struct __attribute__((packed))
 {
@@ -1072,6 +1422,18 @@ typedef struct __attribute__((packed))
         ble_hci_le_meta_evt_param_conn_complete_t                    conn_complete;
         ble_hci_le_meta_evt_param_conn_iq_report_t                   conn_iq_report;
         ble_hci_le_meta_evt_param_cte_req_failed_t                   cte_req_failed;
+
+        ble_hci_le_meta_evt_param_padv_sync_est_t                    padv_sync_est;
+        ble_hci_le_meta_evt_param_padv_sync_est_v2_t                 padv_sync_est_v2;
+        ble_hci_le_meta_evt_param_padv_report_t                      padv_report;
+        ble_hci_le_meta_evt_param_padv_report_v2_t                   padv_report_v2;
+        ble_hci_le_meta_evt_param_padv_sync_transfer_rcvd_t          padv_sync_transfer_rcvd;
+        ble_hci_le_meta_evt_param_padv_sync_transfer_rcvd_v2_t       padv_sync_transfer_rcvd_v2;
+        ble_hci_le_meta_evt_param_padv_subevent_data_req_t           padv_subevent_data_req;
+        ble_hci_le_meta_evt_param_padv_rsp_report_t                  padv_rsp_report;
+        ble_hci_le_meta_evt_param_enhanced_conn_complete_t           enhanced_conn_complete;
+        ble_hci_le_meta_evt_param_enhanced_conn_complete_v2_t        enhanced_conn_complete_v2;
+        ble_hci_le_meta_evt_param_padv_sync_lost_t                   padv_sync_lost;
     }
     para;
 }

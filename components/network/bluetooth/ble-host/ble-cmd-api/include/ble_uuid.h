@@ -58,6 +58,7 @@ extern "C" {
 #define GATT_SERVICES_BOND_MANAGEMENT                       0x181E    /**< Bond Management Service UUID. */
 #define GATT_SERVICES_MESH_PROVISIONING                     0x1827    /**< Mesh Provisioning Service UUID. */
 #define GATT_SERVICES_MESH_PROXY                            0x1828    /**< Mesh Proxy Service UUID. */
+#define GATT_SERVICES_ELECTRONIC_SHELF_LABEL                0x1857    /**< Electronic Shelf Label Service UUID. */
 /** @} */
 
 

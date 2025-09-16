@@ -16,6 +16,7 @@ extern "C"
 #endif
 
 #define AHB_ALIGN_4(x)                          (((uintptr_t)(x) + 0x3) & ~0x3)
+typedef void (*RF_MCU_DMA_ISR_CB)(void);
 
 /* 0x00 */
 #define RF_MCU_AHB_DMA_ADDR_REG \

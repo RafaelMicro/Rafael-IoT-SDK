@@ -1,11 +1,67 @@
 mainmenu "Rafael SDK Configuration"
 osource "${APPLICATION_SOURCE_DIR}/VERSION"
-menu "-------- USER SPACE --------"
+menu "-------- SDK   Configuration --------"
 endmenu
-source "config/example.config"
 source "config/devices.config"
-source "config/components.config"
-menu "-------- KERNEL SPACE --------"
-endmenu
+
+if (RT581 || RT582 || RT583 || RT584H ||  RT584S || RT584L)
+choice APPLICATION_EXAMPLES_TYPE
+	prompt "Select Application"
+	default BASIC_EXAMPLE
+
+config HELLOWORLD
+	bool "hellow-world"
+	select BUILD_COMPONENT_LOG
+    select BUILD_COMPONENT_RT569
+    select BUILD_COMPONENT_RUCI
+    select BUILD_COMPONENT_UART_STDIO
+    select BUILD_COMPONENT_UTILITY
+
+config BASIC_EXAMPLE
+	bool "Basic peripheral"
+
+config BLUETOOTH_LE_EXAMPLE
+	bool "Bluetooth"
+
+config SUBG_EXAMPLE
+	bool "Sub-G"
+
+config ZIGBEE_EXAMPLE
+	bool "Zigbee"
+
+
+if BASIC_EXAMPLE
+source "config/examples/basic_examples.config"
+endif
+
+if BLUETOOTH_LE_EXAMPLE
+source "config/examples/ble_example.config"
+source "config/components/network/bluetooth/ble.config"
+endif
+
+if SUBG_EXAMPLE 
+source "config/examples/sub-g_examples.config"
+source "config/components/network/subg_ctrl/subg_ctrl.config"
+endif
+
+if ZIGBEE_EXAMPLE 
+source "config/examples/zigbee_examples.config"
+source "config/components/network/zigbee/zigbee.config"
+endif
+
+if HELLOWORLD 
+source "examples/helloworld/Kconfig"
+endif
+endchoice
+endif
+
+
+source "config/platform.config"
+source "config/components/cpc/cpc.config"
+source "config/components/network/rf/rf.config"
+source "config/components/network/rt569-rf/rt569-rf.config"
+
+source "config/components/platform/crypto/crypto.config"
+source "config/components/utility/utility.config"
+source "config/build_project.config"
 source "config/compilier.config"
-source "components/Kconfig"

@@ -51,6 +51,37 @@ typedef struct ruci_para_set_rf_frequency_s
         ((ruci_para_set_rf_frequency_t *)msg)->rf_frequency                   = rf_frequency_in;                        \
         }while(0)
 
+// RUCI: SetWakeOnRadio --------------------------------------------------------
+#define RUCI_SET_WAKE_ON_RADIO                  RUCI_NUM_SET_WAKE_ON_RADIO, ruci_elmt_type_set_wake_on_radio, ruci_elmt_num_set_wake_on_radio
+#define RUCI_CODE_SET_WAKE_ON_RADIO             0x02
+#define RUCI_LEN_SET_WAKE_ON_RADIO              13
+#define RUCI_NUM_SET_WAKE_ON_RADIO              6
+#define RUCI_PARA_LEN_SET_WAKE_ON_RADIO         10
+#if (RUCI_ENDIAN_INVERSE)
+extern const uint8_t ruci_elmt_type_set_wake_on_radio[];
+extern const uint8_t ruci_elmt_num_set_wake_on_radio[];
+#endif /* RUCI_ENDIAN_INVERSE */
+typedef struct ruci_para_set_wake_on_radio_s
+{
+    ruci_head_t     ruci_header;
+    uint8_t         sub_header;
+    uint8_t         length;
+    uint32_t        rf_frequency;
+    uint16_t        rx_on_time;
+    uint32_t        sleep_time;
+} ruci_para_set_wake_on_radio_t;
+
+/* User should provide msg buffer is greater than sizeof(ruci_para_set_rf_frequency_t) */
+#define SET_RUCI_PARA_SET_WAKE_ON_RADIO(msg, rf_frequency_in, rx_on_time_in, sleep_time_in)        \
+        do{                                                                                                            \
+        ((ruci_para_set_wake_on_radio_t *)msg)->ruci_header.u8                 = RUCI_PCI_COMMON_CMD_HEADER;             \
+        ((ruci_para_set_wake_on_radio_t *)msg)->sub_header                     = RUCI_CODE_SET_WAKE_ON_RADIO;             \
+        ((ruci_para_set_wake_on_radio_t *)msg)->length                         = RUCI_PARA_LEN_SET_WAKE_ON_RADIO;         \
+        ((ruci_para_set_wake_on_radio_t *)msg)->rf_frequency                   = rf_frequency_in;                        \
+        ((ruci_para_set_wake_on_radio_t *)msg)->rx_on_time                     = rx_on_time_in;                          \
+        ((ruci_para_set_wake_on_radio_t *)msg)->sleep_time                     = sleep_time_in;                          \
+        }while(0)
+
 // RUCI: set_rx_enable ---------------------------------------------------------
 #define RUCI_SET_RX_ENABLE                      RUCI_NUM_SET_RX_ENABLE, ruci_elmt_type_set_rx_enable, ruci_elmt_num_set_rx_enable
 #define RUCI_CODE_SET_RX_ENABLE                 0x03
@@ -132,6 +163,36 @@ typedef struct ruci_para_set_2ch_scan_frequency_s {
         ((ruci_para_set_2ch_scan_frequency_t *)msg)->enable_flag                  = scan_enable_in;                         \
         ((ruci_para_set_2ch_scan_frequency_t *)msg)->rf_frequency1                = rf_frequency1_in;                       \
         ((ruci_para_set_2ch_scan_frequency_t *)msg)->rf_frequency2                = rf_frequency2_in;                       \
+        }while(0)
+
+// RUCI: SetRxReserveEnable -----------------------------------------------------------
+#define RUCI_SET_RX_RESERVE_ENABLE              RUCI_NUM_SET_RX_RESERVE_ENABLE, ruci_rlmt_type_set_rx_reserve_enable, ruci_elmt_num_set_rx_reserve_enable
+#define RUCI_CODE_SET_RX_RESERVE_ENABLE         0x06
+#define RUCI_LEN_SET_RX_RESERVE_ENABLE          11
+#define RUCI_NUM_SET_RX_RESERVE_ENABLE          5
+#define RUCI_PARA_LEN_SET_RX_RESERVE_ENABLE     8
+#define RUCI_OPCODE_SET_RX_RESERVE_ENABLE       RUCI_OPCODE_MERGE(RUCI_CODE_SET_RX_RESERVE_ENABLE, RUCI_PARA_LEN_SET_RX_RESERVE_ENABLE)
+#if (RUCI_ENDIAN_INVERSE)
+extern const uint8_t ruci_rlmt_type_set_rx_reserve_enable[];
+extern const uint8_t ruci_elmt_num_set_rx_reserve_enable[];
+#endif /* RUCI_ENDIAN_INVERSE */
+typedef struct ruci_para_set_rx_reserve_enable_s 
+{
+    ruci_head_t      ruci_header;
+    uint8_t          sub_header;
+    uint8_t          length;
+    uint32_t         rx_start_time;
+    uint32_t         rx_on_time;
+} ruci_para_set_rx_reserve_enable_t;
+
+/* User should provide msg buffer is greater than sizeof(ruci_para_set_rf_frequency_t) */
+#define SET_RUCI_PARA_SET_RX_RESERVE_ENABLE(msg, rx_start_time_in, rx_on_time_in)                                 \
+        do{                                                                                                             \
+        ((ruci_para_set_rx_reserve_enable_t *)msg)->ruci_header.u8               = RUCI_PCI_COMMON_CMD_HEADER;             \
+        ((ruci_para_set_rx_reserve_enable_t *)msg)->sub_header                   = RUCI_CODE_SET_RX_RESERVE_ENABLE;        \
+        ((ruci_para_set_rx_reserve_enable_t *)msg)->length                       = RUCI_PARA_LEN_SET_RX_RESERVE_ENABLE;    \
+        ((ruci_para_set_rx_reserve_enable_t *)msg)->rx_start_time                = rx_start_time_in;                       \
+        ((ruci_para_set_rx_reserve_enable_t *)msg)->rx_on_time                   = rx_on_time_in;                          \
         }while(0)
 
 // RUCI: get_crc_count ---------------------------------------------------------

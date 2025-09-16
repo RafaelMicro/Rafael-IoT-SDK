@@ -16,8 +16,7 @@
 /**************************************************************************************************
  *    INCLUDES
  *************************************************************************************************/
-/*
- * hci_cmd_controller.h includes
+/*  hci_cmd_controller.h includes
  *  [OGF = 0x03]
  *  - OCF = 0x0001 : Set Event Mask command
  *  - OCF = 0x0003 : Reset command
@@ -44,10 +43,10 @@
 #include "hci_cmd_controller.h"
 
 
-/*
- * hci_cmd_controller.h includes
+/*  hci_cmd_controller.h includes
  *  [OGF = 0x3F]
  *  - OCF = 0x0001 : Set Controller Information vendor command
+ *  - OCF = 0x0082 : Set Scan Request Report command
  */
 #include "hci_cmd_vendor.h"
 
@@ -62,16 +61,51 @@
 #include "hci_cmd_advertising.h"
 
 
+/*  hci_cmd_extended_advertising.h includes
+ *  [OGF = 0x08]
+ *  - OCF = 0x0035 : LE Set Advertising set random address command
+ *  - OCF = 0x0036 : LE Set extended advertising parameters command
+ *  - OCF = 0x0037 : LE Set extended advertising data command
+ *  - OCF = 0x0038 : LE Set extended scan response data command
+ *  - OCF = 0x0039 : LE Set extended advertising enable command
+ *  - OCF = 0x003A : LE Set read maximum advertising data length command
+ *  - OCF = 0x003B : LE Set read number of supported advertising set command
+ *  - OCF = 0x003C : LE Set remove advertising set command
+ *  - OCF = 0x003D : LE Set clear advertising sets command
+ *  - OCF = 0x003E : LE Set periodic advertising parameters command
+ *  - OCF = 0x003F : LE Set periodic advertising data command
+ *  - OCF = 0x0040 : LE Set periodic advertising enable command
+ *  - OCF = 0x0044 : LE Set periodic advertising create sync command
+ *  - OCF = 0x0045 : LE Set periodic advertising create sync cancel command
+ *  - OCF = 0x0046 : LE Set periodic advertising terminate sync command
+ *  - OCF = 0x0047 : LE Add device to periodic advertiser list command
+ *  - OCF = 0x0048 : LE Remove device from periodic advertiser list command
+ *  - OCF = 0x0049 : LE Clear periodic advertiser list command
+ *  - OCF = 0x004A : LE Read periodic advertiser list size command
+ *  - OCF = 0x0059 : LE Set periodic advertising receive enable command
+ *  - OCF = 0x005A : LE periodic advertising sync transfer command
+ *  - OCF = 0x005B : LE periodic advertising set info transfer command
+ *  - OCF = 0x005C : LE Set periodic advertising sync transfer parameters command
+ *  - OCF = 0x005D : LE Set default periodic advertising sync transfer parameters command
+ *  - OCF = 0x0082 : LE Set periodic advertising subevent data command
+ *  - OCF = 0x0083 : LE Set periodic advertising response data command
+ *  - OCF = 0x0084 : LE Set periodic sync subevent command
+ *  - OCF = 0x0086 : LE Set periodic advertising parameters v2 command
+ */
+#include "hci_cmd_extended_advertising.h"
+
+
 /*  hci_cmd_scan.h includes
  *  [OGF = 0x08]
  *  - OCF = 0x000B : LE Set Scan Parameters command
  *  - OCF = 0x000C : LE Set Scan Enable command
+ *  - OCF = 0x0041 : LE Set Extended Scan Parameters command
+ *  - OCF = 0x0042 : LE Set Extended Scan Enable command
  */
 #include "hci_cmd_scan.h"
 
 
-/*
- * hci_cmd_connect.h includes
+/*  hci_cmd_connect.h includes
  *  [OGF = 0x01]
  *  - OCF = 0x0001 : Disconnect command
  *
@@ -94,6 +128,8 @@
  *  - OCF = 0x0030 : LE Read PHY command
  *  - OCF = 0x0031 : LE Set Default PHY command
  *  - OCF = 0x0032 : LE Set PHY command
+ *  - OCF = 0x0043 : LE Extended Create Connection command
+ *  - OCF = 0x0085 : LE Extended Create Connection v2 command
  */
 #include "hci_cmd_connect.h"
 
@@ -111,11 +147,15 @@
 
 /*  hci_cmd_privacy.h includes
  *  [OGF = 0x08]
- *  - OCF = 0x0017 : LE Encrypt command
- *  - OCF = 0x0018 : LE Rand command
- *  - OCF = 0x0019 : LE Enable Encryption command
- *  - OCF = 0x001A : LE Long Term Key Request Reply command
- *  - OCF = 0x001B : LE Long Term Key Request Negative Reply command
+ *  - OCF = 0x0027 : LE Add Device To Resolving List command
+ *  - OCF = 0x0028 : LE Remove Device From Resolving List command
+ *  - OCF = 0x0029 : LE Clear Resolving List command
+ *  - OCF = 0x002A : LE Read Resolving List Size command
+ *  - OCF = 0x002B : LE Read Peer Resolvable Address command
+ *  - OCF = 0x002C : LE Read Local Resolvable Address command
+ *  - OCF = 0x002D : LE Set Address Resolution Enable command
+ *  - OCF = 0x002E : LE Set Resolvable Private Address Timeout command
+ *  - OCF = 0x004E : LE Set Privacy Mode command
  */
 #include "hci_cmd_privacy.h"
 
@@ -128,6 +168,7 @@
  *  - OCF = 0x0057 : LE Connection CTE Response Enable command
  */
 #include "hci_cmd_connect_cte.h"
+
 
 #ifdef __cplusplus
 extern "C" {

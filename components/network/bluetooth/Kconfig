@@ -1,8 +1,0 @@
-if BUILD_COMPONENT_BLUETOOTH_LE_HOST
-menu "BLE MAX LINK NUM"
-config BLE_SUPPORT_NUM_CONN_MAX
-    int "Bluetooth LE MAX LINK NUM"
-	def_int 1
-    range 0 8
-endmenu
-endif # BUILD_COMPONENT_BLUETOOTH_LE_HOST

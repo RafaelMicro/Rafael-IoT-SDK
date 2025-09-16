@@ -272,7 +272,15 @@ macro(setup_project name)
   # target_link_libraries(sdk_intf_lib INTERFACE verify)
 
   set(proj_name ${name}_${CONFIG_CHIP})
+  if((DEFINED CONFIG_RT584S) OR (DEFINED CONFIG_RT584H) OR (DEFINED CONFIG_RT584L) OR (DEFINED CONFIG_RT584_NONE_OS))
+  set(MY_CHIP "rt584")
+  elseif((DEFINED CONFIG_RT581) OR (DEFINED CONFIG_RT582) OR (DEFINED CONFIG_RT583) OR (DEFINED CONFIG_RT582_NONE_OS))
+  set(MY_CHIP "rt58x")
+  endif()
 
+  configure_file(
+    ${CMAKE_SOURCE_DIR}/.vscode/launch.json.in 
+    ${CMAKE_SOURCE_DIR}/.vscode/launch.json @ONLY)
   set(HEX_FILE ${CMAKE_BINARY_DIR}/${proj_name}.hex)
   set(BIN_FILE ${CMAKE_BINARY_DIR}/${proj_name}.bin)
   set(MAP_FILE ${CMAKE_BINARY_DIR}/${proj_name}.map)
@@ -378,10 +386,10 @@ endfunction()
 function(app_git_version git_version)
     execute_process(
         COMMAND git describe --dirty=-test --always --tags --long --match "${CONFIG_BUILD_PORJECT}*"
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         OUTPUT_VARIABLE GIT_REV OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
     )
-    message("${CONFIG_BUILD_PORJECT}-" "${GIT_REV}")
     string(REPLACE "${CONFIG_BUILD_PORJECT}-" "" var ${GIT_REV}) 
     set(${git_version} ${var} PARENT_SCOPE)
 endfunction()
@@ -390,6 +398,7 @@ function(show_banner)
   sdk_ifndef(_git_hash "")
   get_git_hash(_git_hash)
   add_compile_options(-DRAFAEL_SDK_VER="${_git_hash}")
+
   message("   _____       ______         _   _____   _______    _____ _____  _  __")
   message("  |  __ \\     |  ____|       | | |_   _| |__   __|  / ____|  __ \\| |/ /")
   message("  | |__) |__ _| |__ __ _  ___| |   | |  ___ | |    | (___ | |  | | ' /")

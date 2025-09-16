@@ -472,6 +472,60 @@ typedef struct ruci_para_set_tx_power_by_s
         ((ruci_para_set_tx_power_by_t *)msg)->tx_power                       = tx_power_in;                            \
         }while(0)
 
+        // RUCI: set_calibration_setting_s ---------------------------------------------
+#define RUCI_SET_CALIBRATION_SETTING_S          RUCI_NUM_SET_CALIBRATION_SETTING_S, ruci_elmt_type_set_calibration_setting_s, ruci_elmt_num_set_calibration_setting_s
+#define RUCI_CODE_SET_CALIBRATION_SETTING_S     0x0F
+#define RUCI_LEN_SET_CALIBRATION_SETTING_S      24
+#define RUCI_NUM_SET_CALIBRATION_SETTING_S      11
+#define RUCI_PARA_LEN_SET_CALIBRATION_SETTING_S 21
+#if (RUCI_ENDIAN_INVERSE)
+extern const uint8_t ruci_elmt_type_set_calibration_setting_s[];
+extern const uint8_t ruci_elmt_num_set_calibration_setting_s[];
+#endif /* RUCI_ENDIAN_INVERSE */
+typedef struct ruci_para_set_calibration_setting_s_s
+{
+    ruci_head_t     ruci_header;
+    uint8_t         sub_header;
+    uint8_t         length;
+    uint8_t         rf_band;
+    uint8_t         status;
+    uint8_t         rx_filter;
+    uint8_t         tx_lo[2];
+    uint8_t         tx_sb[3];
+    uint8_t         r_x_tia_dc[4];
+    uint8_t         rx_img[4];
+    uint8_t         tx_hd3[5];
+} ruci_para_set_calibration_setting_s_t;
+
+/* User should provide msg buffer is greater than sizeof(ruci_para_set_calibration_setting_s_t) */
+#define SET_RUCI_PARA_SET_CALIBRATION_SETTING_S(msg, rf_band_in, status_in, rx_filter_in, tx_lo_0_in, tx_lo_1_in, tx_sb_0_in, tx_sb_1_in, tx_sb_2_in, r_x_tia_dc_0_in, r_x_tia_dc_1_in, r_x_tia_dc_2_in, r_x_tia_dc_3_in, rx_img_0_in, rx_img_1_in, rx_img_2_in, rx_img_3_in, tx_hd3_0_in, tx_hd3_1_in, tx_hd3_2_in, tx_hd3_3_in, tx_hd3_4_in)        \
+        do{                                                                                                            \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->ruci_header.u8                 = RUCI_CMN_HAL_CMD_HEADER;                \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->sub_header                     = RUCI_CODE_SET_CALIBRATION_SETTING_S;    \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->length                         = RUCI_PARA_LEN_SET_CALIBRATION_SETTING_S;\
+        ((ruci_para_set_calibration_setting_s_t *)msg)->rf_band                        = rf_band_in;                             \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->status                         = status_in;                              \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->rx_filter                      = rx_filter_in;                           \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->tx_lo[0]                       = tx_lo_0_in;                             \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->tx_lo[1]                       = tx_lo_1_in;                             \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->tx_sb[0]                       = tx_sb_0_in;                             \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->tx_sb[1]                       = tx_sb_1_in;                             \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->tx_sb[2]                       = tx_sb_2_in;                             \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->r_x_tia_dc[0]                  = r_x_tia_dc_0_in;                        \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->r_x_tia_dc[1]                  = r_x_tia_dc_1_in;                        \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->r_x_tia_dc[2]                  = r_x_tia_dc_2_in;                        \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->r_x_tia_dc[3]                  = r_x_tia_dc_3_in;                        \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->rx_img[0]                      = rx_img_0_in;                            \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->rx_img[1]                      = rx_img_1_in;                            \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->rx_img[2]                      = rx_img_2_in;                            \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->rx_img[3]                      = rx_img_3_in;                            \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->tx_hd3[0]                      = tx_hd3_0_in;                            \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->tx_hd3[1]                      = tx_hd3_1_in;                            \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->tx_hd3[2]                      = tx_hd3_2_in;                            \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->tx_hd3[3]                      = tx_hd3_3_in;                            \
+        ((ruci_para_set_calibration_setting_s_t *)msg)->tx_hd3[4]                      = tx_hd3_4_in;                            \
+        }while(0)
+
 #pragma pack(pop)
 #endif /* RUCI_ENABLE_CMN */
 #endif /* _RUCI_CMN_HAL_CMD_H */

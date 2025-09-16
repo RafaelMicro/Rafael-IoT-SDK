@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 
-#include "Cfg_mdl_type.h"
+#include "cfg_mdl_type.h"
 
 uint32_t hb_publ_set(req_hb_publ_frame_t *pReqHbpublFrmPtr);
 uint32_t hb_publ_get(rsp_hb_publ_frame_t *pRspHbpublFrmPtr);

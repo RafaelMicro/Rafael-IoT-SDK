@@ -1,0 +1,5 @@
+sdk_add_subdirectory_ifdef(CONFIG_MESH_IT_UP_ROUTER ${CMAKE_CURRENT_LIST_DIR}/miu-router/)
+sdk_add_subdirectory_ifdef(CONFIG_MESH_IT_UP_SLEEPY ${CMAKE_CURRENT_LIST_DIR}/miu-sleepy/)
+sdk_add_subdirectory_ifdef(CONFIG_MESH_IT_UP_SNIFFER ${CMAKE_CURRENT_LIST_DIR}/miu-sniffer/)
+sdk_add_subdirectory_ifdef(CONFIG_MESH_IT_UP_BLE_ROUTER ${CMAKE_CURRENT_LIST_DIR}/miu-ble-router/)
+sdk_add_subdirectory_ifdef(CONFIG_MESH_IT_UP_BLE_SLEEPY ${CMAKE_CURRENT_LIST_DIR}/miu-ble-sleepy/)

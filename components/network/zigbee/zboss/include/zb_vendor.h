@@ -26,7 +26,7 @@
 
 #include <FreeRTOS.h>
 #include <task.h>
-
+#include "log.h"
 #define A015  0U
 #define A047  2U
 #define A048  1U

@@ -35,13 +35,13 @@ typedef enum
     MMDL_SCENE_ELEMENT4_UPDATE = 0x04,
 } scene_update_type_t;
 
-typedef struct register_scene_value_s
+typedef struct __attribute__((packed)) register_scene_value_s
 {
     uint16_t                    scene_number;
     uint32_t                    scene_state;
 } register_scene_value_t;
 
-typedef struct scene_state_s
+typedef struct __attribute__((packed)) scene_state_s
 {
     register_scene_value_t  scene_register[RAF_BLE_MESH_SCENE_ENTRY_COUNT];
     uint16_t                current_scene;

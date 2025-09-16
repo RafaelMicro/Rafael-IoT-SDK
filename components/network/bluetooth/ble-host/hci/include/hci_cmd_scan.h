@@ -17,7 +17,6 @@
  *    INCLUDES
  *************************************************************************************************/
 #include <stdint.h>
-#include <stdbool.h>
 #include "ble_hci.h"
 
 #ifdef __cplusplus
@@ -35,9 +34,10 @@ extern "C" {
  * @param p_param : a pointer to the scan parameter.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_set_scan_param_cmd(ble_hci_cmd_set_scan_param_param_t *p_param);
+ble_err_t hci_le_set_scan_param_cmd(ble_hci_cmd_set_scan_param_param_t *p_param);
 
 
 /** LE Set Scan Enable command.
@@ -47,9 +47,37 @@ int8_t hci_le_set_scan_param_cmd(ble_hci_cmd_set_scan_param_param_t *p_param);
  * @param p_param : a pointer to the set scan enable parameter.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_le_set_scan_enable_cmd(ble_hci_cmd_set_scan_enable_param_t *p_param);
+ble_err_t hci_le_set_scan_enable_cmd(ble_hci_cmd_set_scan_enable_param_t *p_param);
+
+
+/** LE Set Extended Scan Parameters command
+ *
+ * @ingroup hci_cmd_scan
+ *
+ * @param p_param : a pointer to the set extended scan parameter.
+ *
+ * @return BLE_ERR_OK   : success.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
+ */
+ble_err_t hci_le_set_extended_scan_param_cmd(ble_hci_cmd_set_extended_scan_param_t *p_param);
+
+
+/** LE Set Extended Scan Enable command
+ *
+ * @ingroup hci_cmd_scan
+ *
+ * @param p_param : a pointer to the set extended scan enable parameter.
+ *
+ * @return BLE_ERR_OK   : success.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
+ */
+ble_err_t hci_le_set_extened_scan_enable_cmd(ble_hci_cmd_set_extended_scan_enable_t *p_param);
+
 
 #ifdef __cplusplus
 }

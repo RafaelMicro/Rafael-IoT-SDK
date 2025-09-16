@@ -28,25 +28,20 @@
 #include "mac_frame.h"
 
 #include "lmac15p4.h"
-#include "project_config.h"
 #include "soft_source_match_table.h"
 #include "util_list.h"
 #include "util_string.h"
-#if OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-#include "subg_ctrl.h"
-#endif
 #include "cli.h"
 #include "log.h"
+#include "lpm.h"
+#include "flashctl.h"
 //=============================================================================
 //                Private Definitions of const value
 //=============================================================================
 #define CCA_THRESHOLD_UNINIT (127)
-#if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
-#define CCA_THRESHOLD_DEFAULT (55) // dBm  - default for 2.4GHz 802.15.4
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-#define CCA_THRESHOLD_DEFAULT (75) // 87
-#endif
-#define RAFAEL_RECEIVE_SENSITIVITY (98)
+#define CCA_THRESHOLD_DEFAULT (85) // dBm  - default for 2.4GHz 802.15.4
+
+#define RAFAEL_RECEIVE_SENSITIVITY (101)
 
 #define RX_CONTROL_FIELD_LENGTH (7)
 #define RX_STATUS_LENGTH        (5)
@@ -57,7 +52,6 @@
 #define RX_LENGTH               (MAX_RF_LEN + RX_HEADER_LENGTH + RX_APPEND_LENGTH)
 #define FCF_LENGTH              (2)
 
-#if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
 #define PHY_PIB_TURNAROUND_TIMER    192
 #define PHY_PIB_CCA_DETECTED_TIME   128 // 8 symbols
 #define PHY_PIB_CCA_DETECT_MODE     0
@@ -70,46 +64,20 @@
 #define MAC_PIB_MAC_MAX_FRAME_RETRIES         4
 #define MAC_PIB_MAC_MAX_CSMACA_BACKOFFS       10
 #define MAC_PIB_MAC_MIN_BE                    5
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-#define PHY_PIB_TURNAROUND_TIMER  1000
-#define PHY_PIB_CCA_DETECTED_TIME 640 // 8 symbols for 50 kbps-data rate
-#define PHY_PIB_CCA_DETECT_MODE   0
-#define PHY_PIB_CCA_THRESHOLD     CCA_THRESHOLD_DEFAULT
-#define MAC_PIB_UNIT_BACKOFF_PERIOD                                            \
-    1640 // PHY_PIB_TURNAROUND_TIMER + PHY_PIB_CCA_DETECTED_TIME
-#define MAC_PIB_MAC_ACK_WAIT_DURATION         2000 // oqpsk neee more then 2000
-#define MAC_PIB_MAC_MAX_BE                    5
-#define MAC_PIB_MAC_MAX_FRAME_TOTAL_WAIT_TIME 82080 // for 50 kbps-data rate
-#define MAC_PIB_MAC_MAX_FRAME_RETRIES         4
-#define MAC_PIB_MAC_MAX_CSMACA_BACKOFFS       4
-#define MAC_PIB_MAC_MIN_BE                    2
-#endif
+
 
 #define MAC_RX_BUFFERS 100
-#if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
 #define FREQ (2405)
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-#define FREQ                                                                   \
-    (920000) // 915 MHZ range is (902~928), but Taiwan range is (920~925)
-#define CHANNEL_SPACING 500
-#endif
 
 extern uint8_t rfb_port_ack_packet_read(uint8_t* rx_data_address);
 static bool hasFramePending(const otRadioFrame* aFrame);
 //=============================================================================
 //                Private ENUM
 //=============================================================================
-#if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
 enum {
     kMinChannel = 11,
     kMaxChannel = 26,
 };
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-enum {
-    kMinChannel = 1,
-    kMaxChannel = 10,
-};
-#endif
 
 enum {
     IEEE802154_MIN_LENGTH = 5,
@@ -172,13 +140,7 @@ static uint16_t sTurnaroundTime = PHY_PIB_TURNAROUND_TIMER;
 static uint8_t sCCAMode = PHY_PIB_CCA_DETECT_MODE;
 static uint8_t sCCAThreshold = PHY_PIB_CCA_THRESHOLD;
 static uint16_t sCCADuration = PHY_PIB_CCA_DETECTED_TIME;
-#if OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-static uint16_t CCADuration_choices[8] = {
-    0, 0, 0, 160, 320, 640, 128, 213}; // use 2.4g parameter for 300k
-static uint32_t FrameTotalWaitTime_choices[8] = {
-    0, 0, 0, 20520, 41040, 82080, 16416, 27360}; // use 2.4g parameter for 300k
-uint32_t sPhyDataRate = SUBG_CTRL_DATA_RATE_300K;
-#endif
+
 
 // static uint8_t sPhyTxPower = TX_POWER_20dBm;
 // static uint8_t sPhyModulation = MOD_1;
@@ -261,9 +223,12 @@ otRadioCaps otPlatRadioGetCaps(otInstance* aInstance) {
     /* clang-format off */
     otRadioCaps capabilities = (OT_RADIO_CAPS_ACK_TIMEOUT |
                                 OT_RADIO_CAPS_TRANSMIT_RETRIES |
+                                OT_RADIO_CAPS_SLEEP_TO_TX |
 #if OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2
                                 OT_RADIO_CAPS_TRANSMIT_SEC      |
+#ifdef CONFIG_OT_DEVICE_TYPE_RCP
                                 OT_RADIO_CAPS_TRANSMIT_TIMING   |
+#endif
 #endif
                                 OT_RADIO_CAPS_CSMA_BACKOFF
                                );
@@ -580,6 +545,8 @@ otError otPlatRadioDisable(otInstance *aInstance)
     {
         otLogDebgPlat("State=OT_RADIO_STATE_DISABLED");
         sState = OT_RADIO_STATE_DISABLED;
+        lmac15p4_auto_state_set(false);
+        sAuto_State_Set = false;
     }
 
     return OT_ERROR_NONE;
@@ -631,7 +598,7 @@ void otPlatRadioEnableSrcMatch(otInstance *aInstance, bool aEnable)
     // set Frame Pending bit for all outgoing ACKs if aEnable is false
     sIsSrcMatchEnabled = aEnable;
 
-    // lmac15p4_src_match_ctrl(0, aEnable);
+    lmac15p4_src_match_ctrl(0, aEnable);
 }
 
 /**
@@ -650,7 +617,7 @@ otError otPlatRadioEnergyScan(otInstance *aInstance, uint8_t aScanChannel, uint1
     OT_UNUSED_VARIABLE(aInstance);
     
 
-    int8_t rssi_value;
+    uint8_t rssi_value;
     //if (aScanChannel != sCurrentChannel)
     {
         sCurrentChannel        = aScanChannel;
@@ -672,7 +639,7 @@ otError otPlatRadioEnergyScan(otInstance *aInstance, uint8_t aScanChannel, uint1
  */
 int8_t otPlatRadioGetRssi(otInstance *aInstance)
 {
-    int8_t   rssi = OT_RADIO_RSSI_INVALID;
+    uint8_t   rssi = OT_RADIO_RSSI_INVALID;
 
     OT_UNUSED_VARIABLE(aInstance);
 
@@ -728,37 +695,22 @@ otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel)
 {
     OT_UNUSED_VARIABLE(aInstance);
 
-    
+
     assert(aInstance != NULL);
+    otError error = OT_ERROR_INVALID_STATE;
 
-    // log_info("%s", __func__);
-
-
-    //if (sState != OT_RADIO_STATE_DISABLED)
+    if (sState != OT_RADIO_STATE_DISABLED)
     {
-        //log_info("state %d", sState);
-        //otLogDebgPlat("State=OT_RADIO_STATE_RECEIVE");
+        error = OT_ERROR_NONE;
         sState = OT_RADIO_STATE_RECEIVE;
-
-        /* Enable RX and leave SLEEP */
-        if (sAuto_State_Set != true)
-        {
-            lmac15p4_auto_state_set(true);
-
-            sAuto_State_Set = true;
-        }
-
-        //if (aChannel != sCurrentChannel)
+        if (aChannel != sCurrentChannel)
         {
             sCurrentChannel = aChannel;
-#if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
             lmac15p4_channel_set((lmac154_channel_t)(sCurrentChannel - kMinChannel));
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-            subg_ctrl_frequency_set(FREQ + (CHANNEL_SPACING * (sCurrentChannel - kMinChannel)));
-#endif    
         }
 
-
+        lmac15p4_auto_state_set(true);
+        sAuto_State_Set = true;
     }
 
     return OT_ERROR_NONE;
@@ -776,12 +728,10 @@ otError otPlatRadioReceive(otInstance *aInstance, uint8_t aChannel)
 otError otPlatRadioSleep(otInstance *aInstance)
 {
     OT_UNUSED_VARIABLE(aInstance);
-    
-    // log_info("%s", __func__);
 
     otError error = OT_ERROR_INVALID_STATE;
 
-    //if (sState == OT_RADIO_STATE_SLEEP || sState == OT_RADIO_STATE_RECEIVE)
+    if (sState == OT_RADIO_STATE_SLEEP || sState == OT_RADIO_STATE_RECEIVE)
     {
         error  = OT_ERROR_NONE;
         sState = OT_RADIO_STATE_SLEEP;
@@ -790,11 +740,24 @@ otError otPlatRadioSleep(otInstance *aInstance)
         {
             lmac15p4_auto_state_set(false);
             sAuto_State_Set = false;
-        }        
+        }
     }
+
     return error;
 }
 #if 1
+
+#if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
+static uint16_t getCslPhase(void)
+{
+    uint32_t curTime       = otPlatAlarmMicroGetNow();//rfb_port_rtc_time_read();
+    uint32_t cslPeriodInUs = sCslPeriod * OT_US_PER_TEN_SYMBOLS;
+    uint32_t diff = ((sCslSampleTime % cslPeriodInUs) - (curTime % cslPeriodInUs) + cslPeriodInUs) % cslPeriodInUs;
+
+    return (uint16_t)(diff / OT_US_PER_TEN_SYMBOLS);
+}
+#endif
+
 static otError radioProcessTransmitSecurity(otRadioFrame *aFrame)
 {
     otError error = OT_ERROR_NONE;
@@ -852,6 +815,7 @@ exit:
     return error;
 }
 #endif
+
 /**
  * @brief                               Begin the transmit sequence on the radio.
  *
@@ -880,7 +844,6 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
     assert(aInstance != NULL);
     assert(aFrame != NULL);
 
-    uint32_t tx_now32Time = 0U;
     static uint32_t tx_timerWraps = 0U, tx_prev32Time = 0U;       
 
     uint8_t tx_control = 0;
@@ -888,24 +851,20 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
 
     otError error = OT_ERROR_INVALID_STATE;
 
-
     if (otRadio_var.pTxFrame == NULL) 
     {
         otRadio_var.pTxFrame = aFrame;
         //if (sCurrentChannel != aFrame->mChannel)
         {
             sCurrentChannel = aFrame->mChannel;
-#if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
             lmac15p4_channel_set((lmac154_channel_t)(sCurrentChannel - kMinChannel));
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-             subg_ctrl_frequency_set(FREQ + (CHANNEL_SPACING * (sCurrentChannel - kMinChannel)));
-#endif    
         }
     }
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
-    if (sCslPeriod > 0 && !sTransmitFrame.mInfo.mTxInfo.mIsHeaderUpdated)
+    if(sCslPeriod > 0 && !aFrame->mInfo.mTxInfo.mIsHeaderUpdated)
     {
-        otMacFrameSetCslIe(&sTransmitFrame, (uint16_t)sCslPeriod, getCslPhase());
+        otMacFrameSetCslIe(aFrame, (uint16_t)sCslPeriod, getCslPhase());
+        aFrame->mInfo.mTxInfo.mCsmaCaEnabled = false;
     }
 #endif
     radioProcessTransmitSecurity(aFrame);
@@ -918,11 +877,6 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
         tx_control = 0x02;
     }
     
-    // if ((otRadio_var.pTxFrame->mPsdu[0] & IEEE802154_FRAME_TYPE_COMMAND))
-    // {
-    //     tx_control ^= (1 << 1);
-    // }
-
     tx_control |= (1 << 2 );
     if (otMacFrameIsSecurityEnabled(aFrame))
     {
@@ -941,32 +895,27 @@ otError otPlatRadioTransmit(otInstance *aInstance, otRadioFrame *aFrame)
     memcpy(temp + 4, otRadio_var.pTxFrame->mPsdu, otRadio_var.pTxFrame->mLength);
     if (otRadio_var.pTxFrame->mInfo.mTxInfo.mTxDelay != 0)
     {
-        log_debug("No CCA");
         tx_control ^= (1 << 1);
-
-        tx_now32Time = otPlatTimeGet();
-        // log_info("tx time %ld", longtime_to_longlong_time(&tx_prev32Time, tx_now32Time, &tx_timerWraps));
     }
-
-    lpm_low_power_mask(LOW_POWER_MASK_BIT_RESERVED4);
-
-    // lmac15p4_auto_state_set(false);
+    if (aFrame->mInfo.mTxInfo.mCsmaCaEnabled == false)
+    {
+        tx_control ^= (1 << 1);
+    }
     if(lmac15p4_tx_data_send(0, temp,
                           otRadio_var.pTxFrame->mLength + 2,
                           tx_control,
                           otMacFrameGetSequence(aFrame)) != 0)
     {
         log_error("Tx failed !");
-        lpm_low_power_unmask(LOW_POWER_MASK_BIT_RESERVED4);
         OT_NOTIFY(OT_SYSTEM_EVENT_RADIO_TX_NO_ACK);
-        // lmac15p4_auto_state_set(true);
     }
-
+    
     otPlatRadioTxStarted(aInstance, aFrame);
     otRadio_var.tstx = otPlatTimeGet()+1;
     error = OT_ERROR_NONE;
     return error;
 }
+
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
 otError otPlatRadioEnableCsl(otInstance         *aInstance,
                              uint32_t            aCslPeriod,
@@ -982,7 +931,11 @@ otError otPlatRadioEnableCsl(otInstance         *aInstance,
     sCslPeriod = aCslPeriod;
     if (sCslPeriod > 0)
     {
-        // spRFBCtrl->csl_receiver_ctrl(1, sCslPeriod);
+        lmac15p4_csl_receiver_ctrl(1, sCslPeriod);
+    }
+    else
+    {
+        lmac15p4_csl_receiver_ctrl(0, 0);
     }
     return error;
 }
@@ -992,9 +945,8 @@ void otPlatRadioUpdateCslSampleTime(otInstance *aInstance, uint32_t aCslSampleTi
     OT_UNUSED_VARIABLE(aInstance);
 
     sCslSampleTime = aCslSampleTime;
-    // spRFBCtrl->csl_sample_time_update(sCslSampleTime);
+    lmac15p4_csl_sample_time_update(sCslSampleTime);
 }
-
 
 
 #endif // OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
@@ -1013,10 +965,11 @@ uint8_t otPlatRadioGetCslUncertainty(otInstance *aInstance)
 #ifdef CONFIG_OT_DEVICE_TYPE_RCP
     return 255;
 #else
-    return 100;
+    return 175;
 #endif
 
 }
+
 #if OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2
 void otPlatRadioSetMacKey(otInstance             *aInstance,
                           uint8_t                 aKeyIdMode,
@@ -1098,17 +1051,6 @@ otError otPlatRadioSetCca(otInstance *aInstance, int8_t aThreshold, uint16_t tur
     lmac15p4_phy_pib_set(sTurnaroundTime, sCCAMode, sCCAThreshold, sCCADuration);
     return OT_ERROR_NONE;
 }
-
-#if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
-static uint16_t getCslPhase(void)
-{
-    uint32_t curTime       = otPlatAlarmMicroGetNow();//rfb_port_rtc_time_read();
-    uint32_t cslPeriodInUs = sCslPeriod * OT_US_PER_TEN_SYMBOLS;
-    uint32_t diff = ((sCslSampleTime % cslPeriodInUs) - (curTime % cslPeriodInUs) + cslPeriodInUs) % cslPeriodInUs;
-
-    return (uint16_t)(diff / OT_US_PER_TEN_SYMBOLS);
-}
-#endif
 
 #if OPENTHREAD_CONFIG_MLE_LINK_METRICS_SUBJECT_ENABLE
 otError otPlatRadioConfigureEnhAckProbing(otInstance          *aInstance,
@@ -1215,17 +1157,18 @@ void ot_radioTask(ot_system_event_t trxEvent)
             if (trxEvent & OT_SYSTEM_EVENT_RADIO_TX_ACKED) 
             {
                 otPlatRadioTxDone(otRadio_var.aInstance, txframe, otRadio_var.pAckFrame, OT_ERROR_NONE);
+                // log_info_hexdump("ack", otRadio_var.pAckFrame->mPsdu, otRadio_var.pAckFrame->mLength);
             }
             if (trxEvent & OT_SYSTEM_EVENT_RADIO_TX_NO_ACK) 
             {
                 otPlatRadioTxDone(otRadio_var.aInstance, txframe, NULL, OT_ERROR_NO_ACK);
-                //log_warn_hexdump("Tx No ACK", txframe->mPsdu, txframe->mLength);
+                // log_warn_hexdump("Tx No ACK", txframe->mPsdu, txframe->mLength);
             }
             if (trxEvent & OT_SYSTEM_EVENT_RADIO_TX_CCA_FAIL) 
             {
                 //otPlatRadioTxDone(otRadio_var.aInstance, txframe, NULL, OT_ERROR_CHANNEL_ACCESS_FAILURE);
-                otPlatRadioTxDone(otRadio_var.aInstance, txframe, NULL, OT_ERROR_NO_ACK);
-                //log_warn_hexdump("Tx CCA Fail", txframe->mPsdu, txframe->mLength);
+                otPlatRadioTxDone(otRadio_var.aInstance, txframe, NULL, OT_ERROR_CHANNEL_ACCESS_FAILURE);
+                // log_warn_hexdump("Tx CCA Fail", txframe->mPsdu, txframe->mLength);
             }
         }
     }
@@ -1285,7 +1228,7 @@ static void _TxDoneEvent(uint32_t tx_status)
     // log_info("tx d");
     // lmac15p4_auto_state_set(true);
     if (otRadio_var.pTxFrame) 
-    {        
+    {      
         txframe = otRadio_var.pTxFrame;
         if (0 == tx_status) 
         {
@@ -1302,13 +1245,14 @@ static void _TxDoneEvent(uint32_t tx_status)
             OT_NOTIFY(OT_SYSTEM_EVENT_RADIO_TX_NO_ACK);
             // otPlatRadioTxDone(otRadio_var.aInstance, txframe, NULL, OT_ERROR_NO_ACK);
         }
-        else if (0x40 == tx_status || 0x80 == tx_status ) 
+        else if (0x40 == tx_status || 0x80 == tx_status) 
         {
-            //ack_now32Time = otPlatAlarmMicroGetNow();
-            otRadio_var.pAckFrame->mLength = lmac15p4_read_ack((uint8_t *)otRadio_var.pAckFrame->mPsdu, (uint8_t *)&ack_now32Time);
-            otRadio_var.pAckFrame->mInfo.mRxInfo.mTimestamp = longtime_to_longlong_time(&ack_prev32Time, ack_now32Time, &ack_timerWraps);;
-            OT_NOTIFY(OT_SYSTEM_EVENT_RADIO_TX_ACKED);
+            otRadio_var.pAckFrame->mLength = lmac15p4_read_ack((uint8_t *)otRadio_var.pAckFrame->mPsdu, (uint8_t *)&ack_now32Time, 0);
+            otRadio_var.pAckFrame->mInfo.mRxInfo.mTimestamp = longtime_to_longlong_time(&ack_prev32Time, ack_now32Time, &ack_timerWraps);
+            otRadio_var.pAckFrame->mInfo.mRxInfo.mTimestamp -= (130 + (otRadio_var.pAckFrame->mLength + 1) * 32);
 
+
+            OT_NOTIFY(OT_SYSTEM_EVENT_RADIO_TX_ACKED);
             // otPlatRadioTxDone(otRadio_var.aInstance, txframe, otRadio_var.pAckFrame, OT_ERROR_NONE);
         }
         lpm_low_power_unmask(LOW_POWER_MASK_BIT_RESERVED4);
@@ -1354,22 +1298,17 @@ static void _RxDoneEvent(uint16_t packet_length, uint8_t *rx_data_address,
             // rx_now32Time = otPlatTimeGet() - (255 *10);
             p->frame.mInfo.mRxInfo.mTimestamp = longtime_to_longlong_time(&rx_prev32Time, rx_now32Time, &rx_timerWraps);
             // log_info("rx time %ld", p->frame.mInfo.mRxInfo.mTimestamp);
-#ifdef CONFIG_OT_DEVICE_TYPE_RCP
-            p->frame.mInfo.mRxInfo.mTimestamp -= (0*10);
-#else
-            p->frame.mInfo.mRxInfo.mTimestamp -= (350*10);
-#endif
-#if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
-            memcpy(p->frame.mPsdu, (rx_data_address + 8), (packet_length-13));
-            p->frame.mLength = (packet_length-13);
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-            memcpy(p->frame.mPsdu, (rx_data_address + 9), (packet_length-14));
-            p->frame.mLength = (packet_length-14);
-#endif            
+            memcpy(p->frame.mPsdu, (rx_data_address + 8), (packet_length-9));
+            p->frame.mLength = (packet_length-9);          
             p->frame.mChannel = sCurrentChannel;
             p->frame.mInfo.mRxInfo.mRssi = -rssi;
             p->frame.mInfo.mRxInfo.mLqi = ((RAFAEL_RECEIVE_SENSITIVITY - rssi) * 0xFF) / RAFAEL_RECEIVE_SENSITIVITY;
 
+#ifdef CONFIG_OT_DEVICE_TYPE_RCP
+            p->frame.mInfo.mRxInfo.mTimestamp -= (2500);
+#else
+            p->frame.mInfo.mRxInfo.mTimestamp -= (50 + (p->frame.mLength + 1) * 32);
+#endif
             p->frame.mInfo.mRxInfo.mAckedWithFramePending = false;
             if( 
 #if OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2                
@@ -1484,20 +1423,7 @@ void ot_radioInit()
     mac_cb.tx_cb = _TxDoneEvent;
     lmac15p4_cb_set(0, &mac_cb);
 
-#if OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-    subg_ctrl_sleep_set(false);
-    subg_ctrl_idle_set();
-    subg_ctrl_modem_config_set(SUBG_CTRL_MODU_FSK, sPhyDataRate, SUBG_CTRL_FSK_MOD_1);
-    subg_ctrl_mac_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_CRC_TYPE_16, SUBG_CTRL_WHITEN_DISABLE);
-    subg_ctrl_preamble_set(SUBG_CTRL_MODU_FSK, 8);
-    subg_ctrl_sfd_set(SUBG_CTRL_MODU_FSK, 0x00007209);
-    subg_ctrl_filter_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_FILTER_TYPE_GFSK);
-#endif
-#if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
-    lmac15p4_channel_set((lmac154_channel_t)(sCurrentChannel - kMinChannel));
-#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-    subg_ctrl_frequency_set(FREQ + (CHANNEL_SPACING * (sCurrentChannel - kMinChannel)));
-#endif    
+    lmac15p4_channel_set((lmac154_channel_t)(sCurrentChannel - kMinChannel));  
     /* Auto ACK */
     lmac15p4_auto_ack_set(true);
     /* Auto State */
@@ -1507,6 +1433,7 @@ void ot_radioInit()
     lmac15p4_src_match_short_entry(0, NULL);
     lmac15p4_src_match_short_entry(0, NULL);
 }
+
 static int _cli_cmd_mac_csma(int argc, char **argv, cb_shell_out_t log_out, void *pExtra)
 {
     uint8_t max_be, min_be, backoffs;

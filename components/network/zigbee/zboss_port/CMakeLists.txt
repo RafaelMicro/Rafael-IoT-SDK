@@ -1,2 +1,0 @@
-sdk_add_static_library(src/zboss_port)
-sdk_add_include_directories(include)

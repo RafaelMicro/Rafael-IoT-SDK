@@ -45,9 +45,8 @@ void app_process_model_msg(mesh_app_mdl_evt_msg_idc_t *pt_msg_idc, ble_mesh_elem
 
 void app_process_element_lightness_model_state(uint16_t element_address, uint16_t state);
 void app_process_element_raf_trsp_sr_model_state(raf_trsp_cb_params_t *p_raf_trsp_cb_params);
-void app_process_element_raf_trsp_cl_model_state(raf_trsp_cb_params_t *p_raf_trsp_cb_params);
 void app_process_element_scene_model_state(uint16_t element_address, uint8_t action, uint32_t *p_scene_state, void **p_extend_model_state_set);
-
+void app_process_element_onoff_model_state(uint16_t element_address, uint16_t state);
 
 extern xQueueHandle app_msg_q;
 

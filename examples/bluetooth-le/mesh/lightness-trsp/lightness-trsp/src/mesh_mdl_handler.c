@@ -21,15 +21,13 @@
 //=============================================================================
 //                Public Global Variables Declaration
 //=============================================================================
-extern void set_duty_cycle(pwm_seq_para_head_t *pwm_para_config, uint16_t current_lv);
 
 //=============================================================================
 //                Public Global Variables
 //=============================================================================
-extern pwm_seq_para_head_t pwm_para_config[3];
 extern ble_mesh_element_param_t g_element_info[];
 extern light_lightness_state_t  el0_light_lightness_state;
-
+extern gen_on_off_state_t       el1_gen_on_off_state;
 //=============================================================================
 //                Private Function
 //=============================================================================
@@ -85,7 +83,6 @@ void mmdl_init(void)
                 p_model->p_publish_info->p_mmdl_publish_func = mmdl_light_lightness_publish_state;
             }
             break;
-
             }
         }
     }
@@ -249,82 +246,87 @@ void app_process_model_msg(mesh_app_mdl_evt_msg_idc_t *pt_msg_idc, ble_mesh_elem
     default:
         printf("unsupport opcode 0x%08x \n", opcode);
         break;
-
     }
 }
+
 void app_process_element_lightness_model_state(uint16_t element_address, uint16_t state)
 {
-    uint8_t element_idx;
+    uint8_t element_idx, duty;
 
     element_idx = element_address - pib_primary_address_get();
-    printf("Set element[%d] act level %d\n", element_idx, state);
 
-    if (state > 0)
+    printf("Set element[%d] act level %d\n", element_idx, state);
+    if (element_idx == 0)
     {
-        //set_duty_cycle(&pwm_para_config[0], state);
-        //set_duty_cycle(&pwm_para_config[1], state);
-        //set_duty_cycle(&pwm_para_config[2], state);
-    }
-    else
-    {
-        //set_duty_cycle(&pwm_para_config[0], 0);
-        //set_duty_cycle(&pwm_para_config[1], 0);
-        //set_duty_cycle(&pwm_para_config[2], 0);
+        duty = 100-((state+1)/655);
+        if ((state > 0) && (duty == 0))
+        {
+            duty = 1;
+            duty = 1;
+        }
+        hosal_pwm_fmt0_duty(ELEMENT0_PWN_ID, duty);
     }
 }
 
 void app_process_element_scene_model_state(uint16_t element_address, uint8_t action, uint32_t *p_scene_state, void **p_extend_model_state_set)
 {
-    uint8_t element_idx = element_address - pib_primary_address_get();
+    uint8_t element_idx;
+
+    element_idx = element_address - pib_primary_address_get();
 
     if (action == SCENE_ACTION_STORE)
     {
-        printf("scene store, element addr 0x%04x\n", element_address);
+        printf("Scene store, element addr 0x%04x\n", element_address);
         //update scene state by current state
         if (element_idx == 0)
         {
             *p_scene_state = el0_light_lightness_state.lightness_actual;
         }
+        else if (element_idx == 1)
+        {
+            *p_scene_state = el1_gen_on_off_state.on_off_state;
+        }
     }
     else if (action == SCENE_ACTION_RECALL)
     {
         //change current state by scene state
-        printf("scene recall, element addr 0x%04x state %d\n", element_address, *p_scene_state);
+        printf("Scene recall, element addr 0x%04x state %d\n", element_address, *p_scene_state);
 
-        if (*p_scene_state > 0)
+        if (element_idx == 0)
         {
-            //set_duty_cycle(&pwm_para_config[0], *p_scene_state);
-            //set_duty_cycle(&pwm_para_config[1], *p_scene_state);
-            //set_duty_cycle(&pwm_para_config[2], *p_scene_state);
-        }
-        else
-        {
-            //set_duty_cycle(&pwm_para_config[0], 0);
-            //set_duty_cycle(&pwm_para_config[1], 0);
-            //set_duty_cycle(&pwm_para_config[2], 0);
-        }
+            hosal_pwm_fmt0_duty(ELEMENT0_PWN_ID, 100-((*p_scene_state+1)/655));
 
-        if (el0_light_lightness_state.lightness_actual != *p_scene_state)
-        {
-            el0_light_lightness_state.lightness_last = el0_light_lightness_state.lightness_actual;
-            el0_light_lightness_state.lightness_actual = *p_scene_state;
+            if (el0_light_lightness_state.lightness_actual != *p_scene_state)
+            {
+                el0_light_lightness_state.lightness_last = el0_light_lightness_state.lightness_actual;
+                el0_light_lightness_state.lightness_actual = *p_scene_state;
+            }
+            *p_extend_model_state_set = mmdl_light_lightness_scene_set; /* the function to set state of extended model */
         }
-        *p_extend_model_state_set = mmdl_light_lightness_scene_set; /* the function to set state of extended model */
+        else if (element_idx == 1)
+        {
+            (*p_scene_state == 1)?hosal_pwm_fmt0_duty(ELEMENT1_PWN_ID, 0):
+                            hosal_pwm_fmt0_duty(ELEMENT1_PWN_ID, 100);
+            
+            if (el1_gen_on_off_state.on_off_state != *p_scene_state)
+            {
+                el1_gen_on_off_state.on_off_state = *p_scene_state;
+            }
+        }
     }
     else if (action == SCENE_ACTION_DELETE)
     {
-        printf("scene delete, element addr 0x%04x state %d\n", element_address, *p_scene_state);
+        printf("Scene delete, element addr 0x%04x state %d\n", element_address, *p_scene_state);
     }
     else
     {
-        printf("invalid scene action %d\n", action);
+        printf("Invalid scene action %d\n", action);
     }
 }
-
 
 void app_process_element_raf_trsp_sr_model_state(raf_trsp_cb_params_t *p_raf_trsp_cb_params)
 {
-    printf("Get Rafael TRSP set from address 0x%04x\n", p_raf_trsp_cb_params->src_addr);
+    printf("Get Rafael TRSP data from address 0x%04x\n", p_raf_trsp_cb_params->src_addr);
 
     for (uint16_t i = 0; i < p_raf_trsp_cb_params->data_len; i++)
     {
@@ -334,17 +336,24 @@ void app_process_element_raf_trsp_sr_model_state(raf_trsp_cb_params_t *p_raf_trs
 
 }
 
-void app_process_element_raf_trsp_cl_model_state(raf_trsp_cb_params_t *p_raf_trsp_cb_params)
+void app_process_element_onoff_model_state(uint16_t element_address, uint16_t state)
 {
-    printf("Get Rafael TRSP status from address 0x%04x\n", p_raf_trsp_cb_params->src_addr);
+    uint8_t element_idx;
 
-    for (uint16_t i = 0; i < p_raf_trsp_cb_params->data_len; i++)
+    element_idx = element_address - pib_primary_address_get();
+
+    if (element_idx == 1)
     {
-        printf("%02x ", p_raf_trsp_cb_params->data[i]);
+        if(state == 1)
+        {
+            hosal_pwm_fmt0_duty(ELEMENT1_PWN_ID, 0);
+            printf("Set element[%d] on\n", element_idx);
+        }
+        else
+        {
+            hosal_pwm_fmt0_duty(ELEMENT1_PWN_ID, 100);
+            printf("Set element[%d] off\n", element_idx);
+        }
     }
-    printf("\n");
-
 }
-
-
 

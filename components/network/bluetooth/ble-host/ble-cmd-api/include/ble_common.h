@@ -44,12 +44,191 @@ extern "C" {
 /** @brief REF_SIZE_LE_HOST_PARA for checking host parameter size in application layer and host layer.
  * @attention Do NOT modify this definition.
  */
-#define REF_SIZE_LE_HOST_PARA             268
+#define REF_SIZE_LE_HOST_PARA             272
 /** @} */
 
-static const uint8_t g_ble_default_public_addr[BLE_ADDR_LEN] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};    /**< Default BLE public address..*/
-static const uint8_t g_le_event_mask[] = {0x7F, 0x0C, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00};              /**< Default event mask is 0x1F.*/
+#define LE_CONNECTION_COMPLETE_EVENT                                0x01
+#define LE_ADVERTISING_REPORT_EVENT                                 0x02
+#define LE_CONNECTION_UPDATE_COMPLETE_EVENT                         0x04
+#define LE_READ_REMOTE_FEATURES_COMPLETE_EVENT                      0x08
+#define LE_LONG_TERM_KEY_REQUEST_EVENT                              0x10
+#define LE_REMOTE_CONNECTION_PARAMETER_REQUEST_EVENT                0x20
+#define LE_DATA_LENGTH_CHANGE_EVENT                                 0x40
+#define LE_READ_LOCAL_P256_PUBLIC_KEY_COMPLETE_EVENT                0x80
 
+#define LE_GENERATE_DHKEY_COMPLETE_EVENT                            0x01
+#define LE_ENHANCED_CONNECTION_COMPLETE_V1_EVENT                    0x02
+#define LE_DIRECTED_ADVERTISING_REPORT_EVENT                        0x04
+#define LE_PHY_UPDATE_COMPLETE_EVENT                                0x08
+#define LE_EXTENDED_ADVERTISING_REPORT_EVENT                        0x10
+#define LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_V1_EVENT           0x20
+#define LE_PERIODIC_ADVERTISING_REPORT_V1_EVENT                     0x40
+#define LE_PERIODIC_ADVERTISING_SYNC_LOST_EVENT                     0x80
+
+#define LE_SCAN_TIMEOUT_EVENT                                       0x01
+#define LE_ADVERTISING_SET_TERMINATED_EVENT                         0x02
+#define LE_SCAN_REQUEST_RECEIVED_EVENT                              0x04
+#define LE_CHANNEL_SELECTION_ALGORITHM_EVENT                        0x08
+#define LE_CONNECTIONLESS_IQ_REPORT_EVENT                           0x10
+#define LE_CONNECTION_IQ_REPORT_EVENT                               0x20
+#define LE_CTE_REQUEST_FAILED_EVENT                                 0x40
+#define LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_V1_EVENT     0x80
+
+#define LE_CIS_ESTABLISHED_EVENT                                    0x01
+#define LE_CIS_REQUEST_EVENT                                        0x02
+#define LE_CREATE_BIG_COMPLETE_EVENT                                0x04
+#define LE_TERMINATE_BIG_COMPLETE_EVENT                             0x08
+#define LE_BIG_SYNC_ESTABLISHED_EVENT                               0x10
+#define LE_BIG_SYNC_LOST_EVENT                                      0x20
+#define LE_REQUEST_PEER_SCA_COMPLETE_EVENT                          0x40
+#define LE_PATH_LOSS_THRESHOLD_EVENT                                0x80
+
+#define LE_TRANSMIT_POWER_REPORTING_EVENT                           0x01
+#define LE_BIGINFO_ADVERTISING_REPORT_EVENT                         0x02
+#define LE_SUBRATE_CHANGE_EVENT                                     0x04
+#define LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_V2_EVENT           0x08
+#define LE_PERIODIC_ADVERTISING_REPORT_V2_EVENT                     0x10
+#define LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_V2_EVENT     0x20
+#define LE_PERIODIC_ADVERTISING_SUBEVENT_DATA_REQUEST_EVENT         0x40
+#define LE_PERIODIC_ADVERTISING_RESPONSE_REPORT_EVENT               0x80
+
+#define LE_ENHANCED_CONNECTION_COMPLETE_V2_EVENT                    0x01
+
+#define PAWR_SELECT_EVENT_MASK                                      BLE_PAWR_SELECT
+
+#if (PAWR_SELECT_EVENT_MASK == 0x01)
+static const uint8_t g_le_event_mask[] =
+{
+    (
+        LE_CONNECTION_COMPLETE_EVENT |
+        LE_ADVERTISING_REPORT_EVENT |
+        LE_CONNECTION_UPDATE_COMPLETE_EVENT |
+        LE_READ_REMOTE_FEATURES_COMPLETE_EVENT |
+        LE_LONG_TERM_KEY_REQUEST_EVENT |
+        LE_REMOTE_CONNECTION_PARAMETER_REQUEST_EVENT |
+        LE_DATA_LENGTH_CHANGE_EVENT |
+        //LE_READ_LOCAL_P256_PUBLIC_KEY_COMPLETE_EVENT |
+        0x00
+    ),
+    (
+        //LE_GENERATE_DHKEY_COMPLETE_EVENT |
+        //LE_ENHANCED_CONNECTION_COMPLETE_V1_EVENT |
+        LE_DIRECTED_ADVERTISING_REPORT_EVENT |
+        LE_PHY_UPDATE_COMPLETE_EVENT |
+        LE_EXTENDED_ADVERTISING_REPORT_EVENT |
+        LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_V1_EVENT |
+        LE_PERIODIC_ADVERTISING_REPORT_V1_EVENT |
+        LE_PERIODIC_ADVERTISING_SYNC_LOST_EVENT |
+        0x00
+    ),
+    (
+        //LE_SCAN_TIMEOUT_EVENT |
+        LE_ADVERTISING_SET_TERMINATED_EVENT |
+        //LE_SCAN_REQUEST_RECEIVED_EVENT |
+        //LE_CHANNEL_SELECTION_ALGORITHM_EVENT |
+        //LE_CONNECTIONLESS_IQ_REPORT_EVENT |
+        //LE_CONNECTION_IQ_REPORT_EVENT |
+        //LE_CTE_REQUEST_FAILED_EVENT |
+        LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_V1_EVENT |
+        0x00
+    ),
+    (
+        //LE_CIS_ESTABLISHED_EVENT |
+        //LE_CIS_REQUEST_EVENT |
+        //LE_CREATE_BIG_COMPLETE_EVENT |
+        //LE_TERMINATE_BIG_COMPLETE_EVENT |
+        //LE_BIG_SYNC_ESTABLISHED_EVENT |
+        //LE_BIG_SYNC_LOST_EVENT |
+        //LE_REQUEST_PEER_SCA_COMPLETE_EVENT |
+        //LE_PATH_LOSS_THRESHOLD_EVENT |
+        0x00
+    ),
+    (
+        //LE_TRANSMIT_POWER_REPORTING_EVENT |
+        //LE_BIGINFO_ADVERTISING_REPORT_EVENT |
+        //LE_SUBRATE_CHANGE_EVENT |
+        LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_V2_EVENT |
+        LE_PERIODIC_ADVERTISING_REPORT_V2_EVENT |
+        LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_V2_EVENT |
+        LE_PERIODIC_ADVERTISING_SUBEVENT_DATA_REQUEST_EVENT |
+        LE_PERIODIC_ADVERTISING_RESPONSE_REPORT_EVENT |
+        0x00
+    ),
+    (
+        LE_ENHANCED_CONNECTION_COMPLETE_V2_EVENT |
+        0x00
+    ),
+    0x00,
+    0x00,
+};
+#else
+static const uint8_t g_le_event_mask[] =
+{
+    (
+        LE_CONNECTION_COMPLETE_EVENT |
+        LE_ADVERTISING_REPORT_EVENT |
+        LE_CONNECTION_UPDATE_COMPLETE_EVENT |
+        LE_READ_REMOTE_FEATURES_COMPLETE_EVENT |
+        LE_LONG_TERM_KEY_REQUEST_EVENT |
+        LE_REMOTE_CONNECTION_PARAMETER_REQUEST_EVENT |
+        LE_DATA_LENGTH_CHANGE_EVENT |
+        //LE_READ_LOCAL_P256_PUBLIC_KEY_COMPLETE_EVENT |
+        0x00
+    ),
+    (
+        //LE_GENERATE_DHKEY_COMPLETE_EVENT |
+        //LE_ENHANCED_CONNECTION_COMPLETE_V1_EVENT |
+        LE_DIRECTED_ADVERTISING_REPORT_EVENT |
+        LE_PHY_UPDATE_COMPLETE_EVENT |
+        //LE_EXTENDED_ADVERTISING_REPORT_EVENT |
+        //LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_V1_EVENT |
+        //LE_PERIODIC_ADVERTISING_REPORT_V1_EVENT |
+        //LE_PERIODIC_ADVERTISING_SYNC_LOST_EVENT |
+        0x00
+    ),
+    (
+        //LE_SCAN_TIMEOUT_EVENT |
+        //LE_ADVERTISING_SET_TERMINATED_EVENT |
+        //LE_SCAN_REQUEST_RECEIVED_EVENT |
+        //LE_CHANNEL_SELECTION_ALGORITHM_EVENT |
+        //LE_CONNECTIONLESS_IQ_REPORT_EVENT |
+        LE_CONNECTION_IQ_REPORT_EVENT |
+        LE_CTE_REQUEST_FAILED_EVENT |
+        //LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_V1_EVENT |
+        0x00
+    ),
+    (
+        //LE_CIS_ESTABLISHED_EVENT |
+        //LE_CIS_REQUEST_EVENT |
+        //LE_CREATE_BIG_COMPLETE_EVENT |
+        //LE_TERMINATE_BIG_COMPLETE_EVENT |
+        //LE_BIG_SYNC_ESTABLISHED_EVENT |
+        //LE_BIG_SYNC_LOST_EVENT |
+        //LE_REQUEST_PEER_SCA_COMPLETE_EVENT |
+        //LE_PATH_LOSS_THRESHOLD_EVENT |
+        0x00
+    ),
+    (
+        //LE_TRANSMIT_POWER_REPORTING_EVENT |
+        //LE_BIGINFO_ADVERTISING_REPORT_EVENT |
+        //LE_SUBRATE_CHANGE_EVENT |
+        //LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_V2_EVENT |
+        //LE_PERIODIC_ADVERTISING_REPORT_V2_EVENT |
+        //LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_V2_EVENT |
+        //LE_PERIODIC_ADVERTISING_SUBEVENT_DATA_REQUEST_EVENT |
+        //LE_PERIODIC_ADVERTISING_RESPONSE_REPORT_EVENT |
+        0x00
+    ),
+    (
+        //LE_ENHANCED_CONNECTION_COMPLETE_V2_EVENT |
+        0x00
+    ),
+    0x00,
+    0x00,
+};
+#endif
+
+static const uint8_t g_ble_default_public_addr[BLE_ADDR_LEN] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};    /**< Default BLE public address..*/
 
 /**************************************************************************************************
  *    TYPEDEFS

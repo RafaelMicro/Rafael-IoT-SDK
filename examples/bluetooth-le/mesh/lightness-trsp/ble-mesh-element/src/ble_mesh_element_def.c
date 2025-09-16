@@ -8,7 +8,6 @@
 #include "ble_mesh_element.h"
 #include "mmdl_common.h"
 #include "pib.h"
-#include "mesh_app.h"
 #include "mesh_mdl_handler.h"
 
 /************************************************************************************************************
@@ -30,7 +29,11 @@ ble_mesh_model_param_t      el0_light_lightness_model =
     &el0_light_lightness_model_publish_entry,           //publish ptr
     el0_light_lightness_subscribe_list,                 //subscript list ptr
     (void *)NULL,                                       //upper callback
-    (void *)app_process_element_lightness_model_state       //call back
+    (void *)app_process_element_lightness_model_state,  //call back
+    {0},
+    0,
+    0,
+    0
 };
 
 ble_mesh_model_param_t      el0_light_lightness_setup_model =
@@ -42,7 +45,11 @@ ble_mesh_model_param_t      el0_light_lightness_setup_model =
     (void *)NULL,                                        //publish ptr
     el0_light_lightness_subscribe_list,                  //subscript list ptr
     (void *)NULL,
-    (void *)NULL
+    (void *)NULL,
+    {0},
+    0,
+    0,
+    0
 };
 
 /* extended models and models variables */
@@ -59,7 +66,11 @@ ble_mesh_model_param_t      el0_gen_level_model =
     &el0_gen_level_model_publish_entry,                 //publish ptr
     el0_gen_level_model_subscribe_list,                 //subscript list ptr
     (void *)mmdl_light_lightness_ex_cb,
-    (void *)NULL
+    (void *)NULL,
+    {0},
+    0,
+    0,
+    0
 };
 
 
@@ -76,7 +87,11 @@ ble_mesh_model_param_t      el0_gen_on_off_model =
     &el0_gen_on_off_model_publish_entry,                 //publish ptr
     el0_gen_on_off_model_subscribe_list,                 //subscript list ptr
     (void *)mmdl_light_lightness_ex_cb,
-    (void *)NULL
+    (void *)NULL,
+    {0},
+    0,
+    0,
+    0
 };
 
 
@@ -91,7 +106,11 @@ ble_mesh_model_param_t     el0_scene_model =
     (void *)NULL,                                       //publish ptr
     el0_scene_subscribe_list,                        //subscript list ptr
     (void *)NULL,
-    (void *)app_process_element_scene_model_state
+    (void *)app_process_element_scene_model_state,
+    {0},
+    0,
+    0,
+    0
 };
 
 ble_mesh_model_param_t     el0_scene_setup_model =
@@ -103,7 +122,11 @@ ble_mesh_model_param_t     el0_scene_setup_model =
     (void *)NULL,                                       //publish ptr
     el0_scene_subscribe_list,                        //subscript list ptr
     (void *)NULL,
-    (void *)app_process_element_scene_model_state
+    (void *)app_process_element_scene_model_state,
+    {0},
+    0,
+    0,
+    0
 };
 
 raf_trsp_state_t            el0_raf_trsp_state;
@@ -117,7 +140,11 @@ ble_mesh_model_param_t      el0_raf_trsp_sr_model =
     (void *)NULL,                                       //publish ptr
     el0_raf_trsp_subscribe_list,                        //subscript list ptr
     (void *)NULL,
-    (void *)app_process_element_raf_trsp_sr_model_state
+    (void *)app_process_element_raf_trsp_sr_model_state,
+    {0},
+    0,
+    0,
+    0
 };
 
 ble_mesh_model_param_t      el0_raf_trsp_cl_model =
@@ -129,7 +156,11 @@ ble_mesh_model_param_t      el0_raf_trsp_cl_model =
     (void *)NULL,                                       //publish ptr
     NULL,                        //subscript list ptr
     (void *)NULL,
-    (void *)app_process_element_raf_trsp_cl_model_state
+    (void *)NULL,
+    {0},
+    0,
+    0,
+    0
 };
 
 
@@ -146,7 +177,78 @@ ble_mesh_model_param_t *el0_light_lightness_element_model_list[] =
     &el0_raf_trsp_cl_model,
 };
 
+/***********************************************************************************************************
+ * Declear the Generic On/Off element example
+ ***********************************************************************************************************/
+
+/***************************** element 4, the On/Off element *********************************************/
+/* Declare the state variable for models */
+gen_on_off_state_t          el1_gen_on_off_state = {0x01, 0x01, 0x01};   /*default state: on*/
+publication_info_t          el1_gen_on_off_model_publish_entry;
+uint16_t                    el1_gen_on_off_subscribe_list[RAF_BLE_MESH_SUBSCRIPTION_LIST_SIZE];
+
+
+ble_mesh_model_param_t      el1_gen_on_off_model =
+{
+    MMDL_GEN_ONOFF_SR_MDL_ID,
+    0,
+    FALSE,
+    &el1_gen_on_off_state,
+    &el1_gen_on_off_model_publish_entry,        //publish ptr
+    el1_gen_on_off_subscribe_list,              //subscript list ptr
+    (void *)NULL,
+    (void *)app_process_element_onoff_model_state,
+    {0},
+    0,
+    0,
+    0
+};
+
+scene_state_t              el1_scene_state;
+uint16_t                   el1_scene_subscribe_list[RAF_BLE_MESH_SUBSCRIPTION_LIST_SIZE];
+ble_mesh_model_param_t     el1_scene_model =
+{
+    MMDL_SCENE_SR_MDL_ID,
+    0,
+    FALSE,
+    &el1_scene_state,
+    (void *)NULL,                                       //publish ptr
+    el1_scene_subscribe_list,                        //subscript list ptr
+    (void *)NULL,
+    (void *)app_process_element_scene_model_state,
+    {0},
+    0,
+    0,
+    0
+};
+
+ble_mesh_model_param_t     el1_scene_setup_model =
+{
+    MMDL_SCENE_SETUP_SR_MDL_ID,
+    0,
+    FALSE,
+    &el1_scene_state,
+    (void *)NULL,                                       //publish ptr
+    el1_scene_subscribe_list,                        //subscript list ptr
+    (void *)NULL,
+    (void *)app_process_element_scene_model_state,
+    {0},
+    0,
+    0,
+    0
+};
+
+/* Declare the model using in element 4 */
+ble_mesh_model_param_t *el1_gen_on_off_element_model_list[] =
+{
+    &el1_gen_on_off_model,
+    &el1_scene_model,
+    &el1_scene_setup_model,
+};
+
+/************************************************************************************************************/
 const uint8_t el0_models_count = (sizeof(el0_light_lightness_element_model_list) / sizeof(el0_light_lightness_element_model_list[0]));
+const uint8_t el1_models_count = (sizeof(el1_gen_on_off_element_model_list) / sizeof(el1_gen_on_off_element_model_list[0]));
 
 /************************************************************************************************************/
 
@@ -159,9 +261,18 @@ ble_mesh_element_param_t g_element_info[] =
         0xFFFF,                                         /*element address*/
         0,                                              /*tx transcation id*/
     },
+    // element 1, onoff element
+    {
+        el1_gen_on_off_element_model_list,         /*model list*/
+        el1_models_count,                                              /*model count*/
+        0xFFFF,                                         /*element address*/
+        0,                                              /*tx transcation id*/
+    },
 
 
 };
+
+
 
 const uint8_t ble_mesh_element_count = (sizeof(g_element_info) / sizeof(g_element_info[0]));
 

@@ -23,28 +23,28 @@
 #include "rf_mcu_chip.h"
 #include "rf_common_init.h"
 #include "ruci.h"
-#if (RF_CAL_TYPE & (RF_CAL_PWR_ON_MODE|RF_CAL_MP_MODE))
+#include "sysctrl.h"
 #include "mp_sector.h"
-#endif
 #include "rf_tx_comp.h"
 #if (RF_CAL_TYPE & RF_CAL_FT_MODE)
 #include "ft_sector.h"
 #endif
 #include "system_mcu.h"
+#include "sysfun.h"
 
 /**************************************************************************************************
 *    GLOBAL PARAMETERS
 *************************************************************************************************/
 #if (RF_MCU_CHIP_BASE == BASE_RAM_TYPE)
-#if (RF_FW_INCLUDE_PCI == TRUE)
+#if (CONFIG_RF_FW_INCLUDE_PCI == TRUE)
 extern const uint32_t firmware_size_ruci;
 extern const uint8_t firmware_program_ruci[];
 #endif
-#if (RF_FW_INCLUDE_BLE == TRUE)
+#if (CONFIG_RF_FW_INCLUDE_BLE == TRUE)
 extern const uint32_t firmware_size_ble;
 extern const uint8_t firmware_program_ble[];
 #endif
-#if (RF_FW_INCLUDE_MULTI_2P4G == TRUE)
+#if (CONFIG_RF_FW_INCLUDE_MULTI_2P4G == TRUE)
 extern const uint32_t firmware_size_multi;
 extern const uint8_t firmware_program_multi[];
 #endif
@@ -53,25 +53,29 @@ extern const uint32_t firmware_size_rfk;
 extern const uint8_t firmware_program_rfk[];
 #endif
 #endif
-#if (RF_FW_INCLUDE_MAC_ACC == TRUE)
+#if (CONFIG_RF_FW_INCLUDE_MAC_ACC == TRUE)
 extern const uint32_t firmware_size_mac_acc;
 extern const uint8_t firmware_program_mac_acc[];
 #endif
-#if (RF_FW_INCLUDE_INTERNAL_TEST == TRUE)
+#if (CONFIG_RF_FW_INCLUDE_INTERNAL_TEST == TRUE)
 extern const uint32_t firmware_size_it;
 extern const uint8_t firmware_program_it[];
+#ifdef RF_MCU_CONST_LOAD_SUPPORTED
+#undef RF_MCU_CONST_LOAD_SUPPORTED
+#define RF_MCU_CONST_LOAD_SUPPORTED (0)
+#endif
 #if (RF_MCU_CONST_LOAD_SUPPORTED)
 extern const uint32_t const_size_it;
 extern const uint8_t firmware_const_it[];
 #endif
 
 #endif
-#if (RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569MP)
+#if ((RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569S) || (RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569MP))
 #if (RF_CAL_TYPE & RF_CAL_PWR_ON_MODE)
 mp_cal_rf_band_support_t    rf_band_info;
 #endif
 #if (RF_CAL_TYPE & (RF_CAL_PWR_ON_MODE|RF_CAL_MP_MODE))
-mp_cal_rf_trim_t            rf_cal_info[RF_BAND_MAX];
+MPK_RF_TRIM_T             rf_cal_info[RF_BAND_MAX];
 #endif
 #elif ((RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569M0) && (RF_MCU_CHIP_VER == RF_MCU_CHIP_VER_B))
 #if (RF_CAL_TYPE & RF_CAL_PWR_ON_MODE)
@@ -122,6 +126,8 @@ RF_MCU_RX_CMDQ_ERROR rf_common_event_get(uint8_t *packet_length, uint8_t *event_
         state = (uint8_t)RfMcu_McuStateRead();
         state = state & RF_MCU_STATE_EVENT_DONE;
     } while (0 != state);
+
+    while (!RfMcu_EvtQueueCheck());
 
     (*packet_length)  = RfMcu_EvtQueueRead(event_address, &rx_confirm_error);
 
@@ -178,7 +184,7 @@ bool ruci_ver_check(void)
 }
 
 
-bool rf_common_pmu_operation_mode(pmu_mode_cfg_t pmu_mode)
+bool rf_common_pmu_operation_mode(pmu_mode_cfg_t pmu_mode, slow_clock_mode_cfg_t slow_clock)
 {
     uint16_t                                        int_enable;
     ruci_para_set_pmu_op_mode_t                     sSetPmuOpMode;
@@ -189,6 +195,8 @@ bool rf_common_pmu_operation_mode(pmu_mode_cfg_t pmu_mode)
     /* Store interrupt setting and disable all interrupt */
     int_enable = RfMcu_InterruptEnGet();
     RfMcu_InterruptEnSet(0x0000);
+
+    pmu_mode |= (slow_clock << 4);
 
     /* Update tx power compensation setting to lower layer HW */
     SET_RUCI_PARA_SET_PMU_OP_MODE(&sSetPmuOpMode, pmu_mode);
@@ -223,10 +231,25 @@ void rf_common_cal_isr_hdlr(uint8_t interrupt_status)
     RfMcu_InterruptClear(interrupt_status);
 }
 
-bool rf_common_cal_enable(RF_BAND band_idx, mp_cal_rf_trim_t *p_rf_cal_info)
+#if(RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569S)
+void Delay(uint16_t times)
+{
+    volatile uint32_t i;
+
+    for (i = 0; i < (32000 * times); i++)
+    {}
+}
+#endif
+
+bool rf_common_cal_enable(RF_BAND band_idx, MPK_RF_TRIM_T *p_rf_cal_info)
 {
     ruci_para_initiate_ble_t sBleInitCmd;
+#if (RF_MCU_CHIP_MODEL != RF_MCU_CHIP_569S)
     ruci_para_initiate_fsk_t sFskInitCmd;
+#else
+    ruci_para_initiate_zwave_t sZwaveInitCmd;
+    ruci_para_set_zwave_modem_t sZwaveModemCmd;
+#endif
     ruci_para_set_calibration_enable_t sRfCalCmd;
     ruci_para_set_calibration_enable_event_t sRfCalCmdEvent;
     ruci_para_cnf_event_t sCnfEvent;
@@ -235,8 +258,10 @@ bool rf_common_cal_enable(RF_BAND band_idx, mp_cal_rf_trim_t *p_rf_cal_info)
     RF_MCU_RX_CMDQ_ERROR event_status = RF_MCU_RX_CMDQ_ERR_INIT;
     uint8_t set_calibration_enable_event_len = 0;
     RF_MCU_RX_CMDQ_ERROR set_calibration_enable_event_status = RF_MCU_RX_CMDQ_ERR_INIT;
+    uint16_t                            int_enable;
 
     /* Send HW initialization command */
+#if (RF_MCU_CHIP_MODEL != RF_MCU_CHIP_569S)
 #if (0)
     if (band_idx == RF_BAND_2P4G)
 #else
@@ -246,11 +271,11 @@ bool rf_common_cal_enable(RF_BAND band_idx, mp_cal_rf_trim_t *p_rf_cal_info)
         SET_RUCI_PARA_INITIATE_BLE(&sBleInitCmd);
         RUCI_ENDIAN_CONVERT((uint8_t *)&sBleInitCmd, RUCI_INITIATE_BLE);
 
-        Enter_Critical_Section();
+        enter_critical_section();
         event_len = 0;
         rf_common_cmd_send((uint8_t *)&sBleInitCmd, RUCI_LEN_INITIATE_BLE);
         event_status = rf_common_event_get(&event_len, (uint8_t *)&sCnfEvent);
-        Leave_Critical_Section();
+        leave_critical_section();
 
         RUCI_ENDIAN_CONVERT((uint8_t *)&sCnfEvent, RUCI_CNF_EVENT);
         if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
@@ -265,11 +290,12 @@ bool rf_common_cal_enable(RF_BAND band_idx, mp_cal_rf_trim_t *p_rf_cal_info)
         SET_RUCI_PARA_INITIATE_FSK(&sFskInitCmd, 0);
         RUCI_ENDIAN_CONVERT((uint8_t *)&sFskInitCmd, RUCI_INITIATE_FSK);
 
-        Enter_Critical_Section();
+        enter_critical_section();
         event_len = 0;
+
         rf_common_cmd_send((uint8_t *)&sFskInitCmd, RUCI_LEN_INITIATE_FSK);
         event_status = rf_common_event_get(&event_len, (uint8_t *)&sCnfEvent);
-        Leave_Critical_Section();
+        leave_critical_section();
 
         RUCI_ENDIAN_CONVERT((uint8_t *)&sCnfEvent, RUCI_CNF_EVENT);
         if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
@@ -279,17 +305,77 @@ bool rf_common_cal_enable(RF_BAND band_idx, mp_cal_rf_trim_t *p_rf_cal_info)
             return false;
         }
     }
+#else
+    /* Store interrupt setting and disable all interrupt */
+    int_enable = RfMcu_InterruptEnGet();
+    RfMcu_InterruptEnSet(0x0000);
+
+    SET_RUCI_PARA_INITIATE_ZWAVE(&sZwaveInitCmd, 0);
+#if (RUCI_ENDIAN_INVERSE)
+    RUCI_ENDIAN_CONVERT((uint8_t *)&sZwaveInitCmd, RUCI_INITIATE_ZWAVE);
+#endif
+    enter_critical_section();
+    event_len = 0;
+
+    rf_common_cmd_send((uint8_t *)&sZwaveInitCmd, RUCI_LEN_INITIATE_ZWAVE);
+    event_status = rf_common_event_get(&event_len, (uint8_t *)&sCnfEvent);
+    leave_critical_section();
+#if (RUCI_ENDIAN_INVERSE)
+    RUCI_ENDIAN_CONVERT((uint8_t *)&sCnfEvent, RUCI_CNF_EVENT);
+#endif
+    if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
+            (sCnfEvent.pci_cmd_subheader != RUCI_CODE_INITIATE_ZWAVE) ||
+            (sCnfEvent.status != 0))
+    {
+        if ((sCnfEvent.status != 1) && (sCnfEvent.status != 5))
+        {
+            return false;
+        }
+        else
+        {
+            RfMcu_InterruptClear(0xFF);
+            RfMcu_InterruptEnSet(int_enable);
+            /* Bypass Calibration if Z-Wave is not supported */
+            return true;
+        }
+    }
+
+
+    SET_RUCI_PARA_SET_ZWAVE_MODEM(&sZwaveModemCmd, 3);
+#if (RUCI_ENDIAN_INVERSE)
+    RUCI_ENDIAN_CONVERT((uint8_t *)&sZwaveModemCmd, RUCI_SET_ZWAVE_MODEM);
+#endif
+    enter_critical_section();
+    rf_common_cmd_send((uint8_t *)&sZwaveModemCmd, RUCI_LEN_SET_ZWAVE_MODEM);
+    event_status = rf_common_event_get(&event_len, (uint8_t *)&sCnfEvent);
+    leave_critical_section();
+#if (RUCI_ENDIAN_INVERSE)
+    RUCI_ENDIAN_CONVERT((uint8_t *)&sCnfEvent, RUCI_CNF_EVENT);
+#endif
+    if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
+            (sCnfEvent.pci_cmd_subheader != RUCI_CODE_SET_ZWAVE_MODEM) ||
+            (sCnfEvent.status != 0))
+    {
+        return false;
+    }
+#endif
 
     /* Send Calibration command */
     SET_RUCI_PARA_SET_CALIBRATION_ENABLE(&sRfCalCmd, 0);
     RUCI_ENDIAN_CONVERT((uint8_t *)&sRfCalCmd, RUCI_SET_CALIBRATION_ENABLE);
 
-    Enter_Critical_Section();
+    enter_critical_section();
     event_len = 0;
     rf_common_cmd_send((uint8_t *)&sRfCalCmd, RUCI_LEN_SET_CALIBRATION_ENABLE);
     event_status = rf_common_event_get(&event_len, (uint8_t *)&sCmnCnfEvent);
     set_calibration_enable_event_status = rf_common_event_get(&set_calibration_enable_event_len, (uint8_t *)&sRfCalCmdEvent);
-    Leave_Critical_Section();
+    leave_critical_section();
+
+#if (RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569S)
+    /* Enable interrupt */
+    RfMcu_InterruptClear(0xFF);
+    RfMcu_InterruptEnSet(int_enable);
+#endif
 
     RUCI_ENDIAN_CONVERT((uint8_t *)&sCmnCnfEvent, RUCI_CMN_CNF_EVENT);
     if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
@@ -309,6 +395,10 @@ bool rf_common_cal_enable(RF_BAND band_idx, mp_cal_rf_trim_t *p_rf_cal_info)
     /* Update calibration results */
     p_rf_cal_info->cal_cfg = sRfCalCmdEvent.status;
     p_rf_cal_info->rx_filter_cap = sRfCalCmdEvent.rx_filter;
+    p_rf_cal_info->rx_tia_dc_i_code = sRfCalCmdEvent.rx_tia_dc[0];
+    p_rf_cal_info->rx_tia_dc_i_path = sRfCalCmdEvent.rx_tia_dc[1];
+    p_rf_cal_info->rx_tia_dc_q_code = sRfCalCmdEvent.rx_tia_dc[2];
+    p_rf_cal_info->rx_tia_dc_q_path = sRfCalCmdEvent.rx_tia_dc[3];
     p_rf_cal_info->tx_dc_offset_i = sRfCalCmdEvent.tx_lo[0];
     p_rf_cal_info->tx_dc_offset_q = sRfCalCmdEvent.tx_lo[1];
     p_rf_cal_info->tx_iqc_a = sRfCalCmdEvent.tx_sb[0];
@@ -324,52 +414,57 @@ bool rf_common_cal_enable(RF_BAND band_idx, mp_cal_rf_trim_t *p_rf_cal_info)
 void rf_common_update_band_info()
 {
     /* Read RF band info from MP sector */
-    //if (MpCalRftrimRead(MP_ID_RF_BAND_SUPPORT, MP_CNT_RF_BAND_SUPPORT, (uint8_t *)(&rf_band_info)) != STATUS_SUCCESS)
+    if (mpcalrftrimread(MP_ID_RF_BAND_SUPPORT, MP_CNT_RF_BAND_SUPPORT, (uint8_t *)(&rf_band_info)) != STATUS_SUCCESS)
     {
+#if (RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569S) && (!(defined(CONFIG_RT584H) || defined(CONFIG_RT584L)))
+        // Force to subGHz RF if MP sector doesn't exist
+        rf_band_info.rf_band = RF_BAND_SUPP(RF_BAND_SUB1G0);
+#else
         // Force to 2.4GHz RF if MP sector doesn't exist
         rf_band_info.rf_band = RF_BAND_SUPP(RF_BAND_2P4G);
+#endif
     }
-    //else if ((rf_band_info.flag != 1) && (rf_band_info.flag != 2))
+    else if ((rf_band_info.flag != 1) && (rf_band_info.flag != 2))
     {
+#if (defined(CONFIG_RT584H) || defined(CONFIG_RT584L))
         // Force to 2.4GHz RF if flag isn't tool k and sw k
-        // rf_band_info.rf_band = RF_BAND_SUPP(RF_BAND_2P4G);
+        rf_band_info.rf_band = RF_BAND_SUPP(RF_BAND_2P4G);
+#else
+        // Force to subGHz RF if flag isn't tool k and sw k
+        rf_band_info.rf_band = RF_BAND_SUPP(RF_BAND_SUB1G0);
+#endif
     }
 }
 #endif
 
-#if (RF_TX_POWER_COMP)
-bool rf_common_cal_init()
+bool rf_common_cal_init(COMM_SUBSYSTEM_ISR_t isr_func)
 {
 #if (RF_CAL_TYPE & (RF_CAL_PWR_ON_MODE|RF_CAL_MP_MODE))
 #if (RF_CAL_TYPE & RF_CAL_PWR_ON_MODE)
     COMM_SUBSYSTEM_ISR_CONFIG   isr_config;
-    bool                        is_start_up, is_fw_loaded;
-    uint32_t                    regValue;
+    bool                        is_fw_loaded;
+    uint8_t                     sadcZone = 0;
+    uint8_t                     mpIdIdx;
 #endif
-    mp_cal_rf_trim_t            *p_rf_cal_info;
+    MPK_RF_TRIM_T               *p_rf_cal_info;
     RF_BAND                     band_idx;
     bool                        retStatus;
-    uint32_t                    mp_id_map[RF_BAND_MAX] = {MP_ID_RFTRIM_2P4G, MP_ID_RFTRIM_SUBG0, MP_ID_RFTRIM_SUBG1, MP_ID_RFTRIM_SUBG2};
+    uint32_t                    mp_id_map[RF_BAND_MAX] = {MP_ID_RF_TRIM_584_2P4G, MP_ID_RF_TRIM_584_SUBG0, MP_ID_RF_TRIM_584_SUBG1, MP_ID_RF_TRIM_584_SUBG2, MP_ID_RF_TRIM_584_SUBG3};
 
     /* Initial setting */
     retStatus = true;
 #if (RF_CAL_TYPE & RF_CAL_PWR_ON_MODE)
-    is_start_up = false;
     is_fw_loaded = false;
 #endif
 
     /* Check if it's start-up or not */
     // Check retention register. If bit 0 = 0 or bit 1 = 0, it means the calibration has been executed at start-up.
 #if (RF_CAL_TYPE & RF_CAL_PWR_ON_MODE)
-    sys_get_retention_reg(7, &regValue);
-    if (((regValue & 0x00000003) != 0x00000003))
-    {
-        is_start_up = true;
-    }
+    sadcZone = 0; /// Read value from related function()
 #endif
 
     /* Set PMU state to LDO mode */
-    //Sys_Pmu_SetMode(PMU_MODE_LDO);
+    sys_pmu_setmode(PMU_MODE_LDO);
 
     /* RF calibration loop */
     for (band_idx = 0; band_idx < RF_BAND_MAX; band_idx++)
@@ -380,12 +475,26 @@ bool rf_common_cal_init()
             continue;
         }
 
-        /* Read from MP sector */
-        p_rf_cal_info = &rf_cal_info[band_idx];
-        if (MpCalRftrimRead(mp_id_map[band_idx], MP_CNT_RFTRIM, (uint8_t *)(p_rf_cal_info)) != STATUS_SUCCESS)
+        if (band_idx == RF_BAND_SUB1G0)
         {
+            mpIdIdx = (sadcZone != 0) ? (band_idx + sadcZone + 1) : band_idx;
+        }
+        else
+        {
+
+        }
+
+        /* Read from MP sector */
+        p_rf_cal_info = &rf_cal_info[mpIdIdx];
+
+        if (mpcalrftrimread(mp_id_map[mpIdIdx], MP_CNT_RFTRIM1, (uint8_t *)(p_rf_cal_info)) != STATUS_SUCCESS)
+        {
+#if (RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569S) && (!(defined(CONFIG_RT584H) || defined(CONFIG_RT584L)))
             // Force to AON mode if MP sector doesn't exist
             p_rf_cal_info->mode = RF_CAL_AON;
+#else
+            continue;
+#endif
         }
         else if ((p_rf_cal_info->flag == 0) || (p_rf_cal_info->flag > 2))
         {
@@ -405,11 +514,11 @@ bool rf_common_cal_init()
             continue;
         }
 
-        /* Bypass calibration if it's not (AON calibration mode) or (start-up) or (empty calibration default setting) */
-        if (!((is_start_up) || (p_rf_cal_info->mode == RF_CAL_AON) ||
+        /* Bypass calibration if it's not (AON calibration mode) or (empty calibration default setting) */
+        if (!((p_rf_cal_info->mode == RF_CAL_AON) ||
                 ((p_rf_cal_info->cal_cfg == 0xFFFF) && (p_rf_cal_info->rx_filter_cap == 0xFFFF) &&
-                 (p_rf_cal_info->tx_dc_offset_i == 0xFFFF) && (p_rf_cal_info->tx_dc_offset_q == 0xFFFF) &&
-                 (p_rf_cal_info->tx_iqc_a == 0xFFFF) && (p_rf_cal_info->tx_iqc_b == 0xFFFF) && (p_rf_cal_info->tx_iqc_c == 0xFFFF))))
+                 (p_rf_cal_info->rx_tia_dc_i_code == 0xFF) && (p_rf_cal_info->rx_tia_dc_i_path == 0xFF) &&
+                 (p_rf_cal_info->rx_tia_dc_q_code == 0xFF) && (p_rf_cal_info->rx_tia_dc_q_path == 0xFF))))
         {
             continue;
         }
@@ -417,7 +526,11 @@ bool rf_common_cal_init()
         /* Download RF calibration FW */
         if (!is_fw_loaded)
         {
+#if (RF_MCU_CHIP_MODEL != RF_MCU_CHIP_569S)
             isr_config.commsubsystem_isr = rf_common_cal_isr_hdlr;
+#else
+            isr_config.commsubsystem_isr = isr_func;
+#endif
             isr_config.content = 0;
             if (RfMcu_SysInit(true, firmware_program_rfk, firmware_size_rfk, isr_config, RF_MCU_INIT_NO_ERROR) != RF_MCU_INIT_NO_ERROR)
             {
@@ -428,7 +541,7 @@ bool rf_common_cal_init()
         }
 
         /* RF calibration */
-        if (rf_common_cal_enable(band_idx, p_rf_cal_info) == false)
+        if (rf_common_cal_enable(mpIdIdx, p_rf_cal_info) == false)
         {
             retStatus = false;
             break;
@@ -437,41 +550,37 @@ bool rf_common_cal_init()
         /* Store calibration results if RF calibration is in STARTUP mode */
         if (p_rf_cal_info->mode == RF_CAL_STARTUP)
         {
-            MpCalRftrimWrite(mp_id_map[band_idx], p_rf_cal_info);
+            mpcalrftrimwrite(mp_id_map[mpIdIdx], p_rf_cal_info);
         }
 #endif
     }
 
-    /* Update retention register */
-#if (RF_CAL_TYPE & RF_CAL_PWR_ON_MODE)
-    if (retStatus == true)
-    {
-        sys_set_retention_reg(7, regValue | 0x00000003);    // Raise bit 0 and bit 1
-    }
-#endif
-
     /* Reset PMU state */
-    //Sys_Pmu_SetMode(PMU_MODE_DCDC);
+    sys_pmu_setmode(PMU_MODE_DCDC);
 
     return retStatus;
 #else
     return true;
 #endif
 }
-#endif
 
 bool rf_common_cal_set()
 {
 #if (RF_CAL_TYPE & (RF_CAL_PWR_ON_MODE|RF_CAL_MP_MODE))
-    mp_cal_rf_trim_t                    *p_rf_cal_info;
-    uint16_t                            int_enable;
-    ruci_para_set_calibration_setting_t sRfCalSettingCmd;
-    ruci_para_cmn_cnf_event_t           sCmnCnfEvent;
-    uint8_t                             event_len = 0;
-    RF_MCU_RX_CMDQ_ERROR                event_status = RF_MCU_RX_CMDQ_ERR_INIT;
-    RF_BAND                             band_idx;
-    bool                                retStatus = true;
-    // uint32_t                            mp_id_map[RF_BAND_MAX] = {MP_ID_RFTRIM_2P4G, MP_ID_RFTRIM_SUBG0, MP_ID_RFTRIM_SUBG1, MP_ID_RFTRIM_SUBG2};
+    MPK_RF_TRIM_T                           *p_rf_cal_info;
+    uint16_t                                int_enable;
+    ruci_para_set_calibration_setting_s_t   sRfCalSettingCmd;
+    ruci_para_cmn_cnf_event_t               sCmnCnfEvent;
+    uint8_t                                 event_len = 0;
+    RF_MCU_RX_CMDQ_ERROR                    event_status = RF_MCU_RX_CMDQ_ERR_INIT;
+    RF_BAND                                 band_idx;
+    bool                                    retStatus = true;
+    uint8_t                                 sadcZone = 0;
+    uint8_t                                 mpIdIdx;
+
+#if (RF_CAL_TYPE & RF_CAL_PWR_ON_MODE)
+    sadcZone = 0; /// Read value from related function()
+#endif
 
     /* Using polling mode. Store interrupt setting and disable all interrupt */
     int_enable = RfMcu_InterruptEnGet();
@@ -486,8 +595,17 @@ bool rf_common_cal_set()
             continue;
         }
 
+        if (band_idx == RF_BAND_SUB1G0)
+        {
+            mpIdIdx = (sadcZone != 0) ? (band_idx + sadcZone + 1) : band_idx;
+        }
+        else
+        {
+
+        }
+
         /* Read setting from MP sector */
-        p_rf_cal_info = &rf_cal_info[band_idx];
+        p_rf_cal_info = &rf_cal_info[mpIdIdx];
         if ((p_rf_cal_info->flag == 0) || (p_rf_cal_info->flag > 2))
         {
             // Bypass mode
@@ -502,20 +620,24 @@ bool rf_common_cal_set()
 #endif
 
         /* Update calibration setting to lower layer HW */
-        SET_RUCI_PARA_SET_CALIBRATION_SETTING(&sRfCalSettingCmd, band_idx, (uint8_t)(p_rf_cal_info->cal_cfg),
-                                              (uint8_t)(p_rf_cal_info->rx_filter_cap), (uint8_t)(p_rf_cal_info->tx_dc_offset_i), (uint8_t)(p_rf_cal_info->tx_dc_offset_q),
-                                              (uint8_t)(p_rf_cal_info->tx_iqc_a), (uint8_t)(p_rf_cal_info->tx_iqc_b), (uint8_t)(p_rf_cal_info->tx_iqc_c), 0, 0, 0, 0);
-        RUCI_ENDIAN_CONVERT((uint8_t *)&sRfCalSettingCmd, RUCI_SET_CALIBRATION_SETTING);
+        SET_RUCI_PARA_SET_CALIBRATION_SETTING_S(&sRfCalSettingCmd, band_idx, (uint8_t)(p_rf_cal_info->cal_cfg),
+                                                (uint8_t)(p_rf_cal_info->rx_filter_cap),
+                                                (uint8_t)(p_rf_cal_info->tx_dc_offset_i), (uint8_t)(p_rf_cal_info->tx_dc_offset_q),
+                                                (uint8_t)(p_rf_cal_info->tx_iqc_a), (uint8_t)(p_rf_cal_info->tx_iqc_b), (uint8_t)(p_rf_cal_info->tx_iqc_c),
+                                                (uint8_t)(p_rf_cal_info->rx_tia_dc_i_code), (uint8_t)(p_rf_cal_info->rx_tia_dc_i_path), (uint8_t)(p_rf_cal_info->rx_tia_dc_q_code), (uint8_t)(p_rf_cal_info->rx_tia_dc_q_path),
+                                                (uint8_t)(p_rf_cal_info->rx_iq_gain), (uint8_t)(p_rf_cal_info->rx_iq_gain_sel), (uint8_t)(p_rf_cal_info->rx_iq_phase), (uint8_t)(p_rf_cal_info->rx_iq_phase_sel),
+                                                (uint8_t)(p_rf_cal_info->tx_hd3_lpf_pw), (uint8_t)(p_rf_cal_info->tx_hd3_mixer_gain), (uint8_t)(p_rf_cal_info->tx_hd3_mixer_lovcm), (uint8_t)(p_rf_cal_info->tx_hd3_txlo_pw), (uint8_t)(p_rf_cal_info->tx_hd3_poly_gain));
+        RUCI_ENDIAN_CONVERT((uint8_t *)&sRfCalSettingCmd, RUCI_SET_CALIBRATION_SETTING_S);
 
-        Enter_Critical_Section();
+        enter_critical_section();
         event_len = 0;
-        rf_common_cmd_send((uint8_t *)&sRfCalSettingCmd, RUCI_LEN_SET_CALIBRATION_SETTING);
+        rf_common_cmd_send((uint8_t *)&sRfCalSettingCmd, RUCI_LEN_SET_CALIBRATION_SETTING_S);
         event_status = rf_common_event_get(&event_len, (uint8_t *)&sCmnCnfEvent);
-        Leave_Critical_Section();
+        leave_critical_section();
 
         RUCI_ENDIAN_CONVERT((uint8_t *)&sCmnCnfEvent, RUCI_CMN_CNF_EVENT);
         if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
-                (sCmnCnfEvent.cmn_cmd_subheader != RUCI_CODE_SET_CALIBRATION_SETTING) ||
+                (sCmnCnfEvent.cmn_cmd_subheader != RUCI_CODE_SET_CALIBRATION_SETTING_S) ||
                 (sCmnCnfEvent.status != 0))
         {
             retStatus = false;
@@ -533,13 +655,13 @@ bool rf_common_cal_set()
 #endif
 }
 
+#define TEST_SUBG_1M_2M (FALSE)
+
 bool rf_common_tx_pwr_set()
 {
-#if 1
-    bool                                retStatus = true;
-#else
+#if (RF_CAL_TYPE & (RF_CAL_PWR_ON_MODE|RF_CAL_MP_MODE))
     mp_tx_power_trim_t                  sTx_power_trim;
-    mp_tx_power_oqpsk_trim_t            sTx_power_oqpsk_trim;
+    mp_tx_power_trim_2_t                sTx_power_oqpsk_trim;
     uint16_t                            int_enable;
     ruci_para_set_tx_power_t            sSetTxPower;
     ruci_para_set_tx_power_oqpsk_t      sSetTxPower_oqpsk;
@@ -549,8 +671,32 @@ bool rf_common_tx_pwr_set()
     RF_BAND                             band_idx;
     bool                                retStatus = true;
 
+#if (TEST_SUBG_1M_2M)
+    /* Store interrupt setting and disable all interrupt */
+    int_enable = RfMcu_InterruptEnGet();
+    RfMcu_InterruptEnSet(0x0000);
+
+    /* Update tx power setting to lower layer HW */
+    SET_RUCI_PARA_SET_TX_POWER(&sSetTxPower, RF_BAND_SUB1G0, sys_txpower_getdefault())
+    RUCI_ENDIAN_CONVERT((uint8_t *)&sSetTxPower, RUCI_SET_TX_POWER);
+
+    enter_critical_section();
+    event_len = 0;
+    rf_common_cmd_send((uint8_t *)&sSetTxPower, RUCI_LEN_SET_TX_POWER);
+    event_status = rf_common_event_get(&event_len, (uint8_t *)&sCmnCnfEvent);
+    leave_critical_section();
+
+    RUCI_ENDIAN_CONVERT((uint8_t *)&sCmnCnfEvent, RUCI_CMN_CNF_EVENT);
+    if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
+            (sCmnCnfEvent.cmn_cmd_subheader != RUCI_CODE_SET_TX_POWER) ||
+            (sCmnCnfEvent.status != 0))
+    {
+        retStatus = false;
+    }
+
+#else
     /* Read TX power setting from MP sector */
-    if (MpCalRftrimRead(MP_ID_TX_POWER_TRIM, MP_CNT_TX_POWER_TRIM, (uint8_t *)(&sTx_power_trim)) != STATUS_SUCCESS)
+    if (mpcalrftrimread(MP_ID_TX_POWER_TRIM, MP_CNT_TX_POWER_TRIM, (uint8_t *)(&sTx_power_trim)) != STATUS_SUCCESS)
     {
         // No MP sector. Bypass procedure.
         return true;
@@ -574,14 +720,14 @@ bool rf_common_tx_pwr_set()
         }
 
         /* Update tx power setting to lower layer HW */
-        SET_RUCI_PARA_SET_TX_POWER(&sSetTxPower, band_idx, (*(&(sTx_power_trim.tx_gain_idx_2g) + band_idx)))
+        SET_RUCI_PARA_SET_TX_POWER(&sSetTxPower, band_idx, (*(&(sTx_power_trim.tx_gain_idx_2g_fsk) + band_idx)))
         RUCI_ENDIAN_CONVERT((uint8_t *)&sSetTxPower, RUCI_SET_TX_POWER);
 
-        Enter_Critical_Section();
+        enter_critical_section();
         event_len = 0;
         rf_common_cmd_send((uint8_t *)&sSetTxPower, RUCI_LEN_SET_TX_POWER);
         event_status = rf_common_event_get(&event_len, (uint8_t *)&sCmnCnfEvent);
-        Leave_Critical_Section();
+        leave_critical_section();
 
         RUCI_ENDIAN_CONVERT((uint8_t *)&sCmnCnfEvent, RUCI_CMN_CNF_EVENT);
         if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
@@ -593,7 +739,7 @@ bool rf_common_tx_pwr_set()
         }
     }
 
-    if (MpCalRftrimRead(MP_ID_TX_POWER_OQPSK_TRIM, MP_CNT_TX_POWER_OQPSK_TRIM, (uint8_t *)(&sTx_power_oqpsk_trim)) == STATUS_SUCCESS)
+    if (mpcalrftrimread(MP_ID_TX_POWER_TRIM_2, MP_CNT_TX_POWER_TRIM_2, (uint8_t *)(&sTx_power_oqpsk_trim)) == STATUS_SUCCESS)
     {
         if ((sTx_power_oqpsk_trim.flag == 1) || (sTx_power_oqpsk_trim.flag == 2))
         {
@@ -606,14 +752,14 @@ bool rf_common_tx_pwr_set()
                 }
 
                 /* Update tx power setting to lower layer HW */
-                SET_RUCI_PARA_SET_TX_POWER_OQPSK(&sSetTxPower_oqpsk, band_idx, (*(&(sTx_power_oqpsk_trim.tx_gain_idx_2g) + band_idx)))
+                SET_RUCI_PARA_SET_TX_POWER_OQPSK(&sSetTxPower_oqpsk, band_idx, (*(&(sTx_power_oqpsk_trim.tx_gain_idx_2g_oqpsk) + band_idx)))
                 RUCI_ENDIAN_CONVERT((uint8_t *)&sSetTxPower_oqpsk, RUCI_SET_TX_POWER_OQPSK);
 
-                Enter_Critical_Section();
+                enter_critical_section();
                 event_len = 0;
                 rf_common_cmd_send((uint8_t *)&sSetTxPower_oqpsk, RUCI_LEN_SET_TX_POWER_OQPSK);
                 event_status = rf_common_event_get(&event_len, (uint8_t *)&sCmnCnfEvent);
-                Leave_Critical_Section();
+                leave_critical_section();
 
                 RUCI_ENDIAN_CONVERT((uint8_t *)&sCmnCnfEvent, RUCI_CMN_CNF_EVENT);
                 if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
@@ -626,13 +772,15 @@ bool rf_common_tx_pwr_set()
             }
         }
     }
-
+#endif
     /* Enable interrupt */
     RfMcu_InterruptClear(0xFF);
     RfMcu_InterruptEnSet(int_enable);
-#endif
-    return retStatus;
 
+    return retStatus;
+#else
+    return true;
+#endif
 }
 
 bool rf_common_rssi_offset_set()
@@ -650,7 +798,7 @@ bool rf_common_rssi_offset_set()
     bool                                retStatus = true;
 
     /* Read RSSI setting from MP sector */
-    if (MpCalRftrimRead(MP_ID_RSSI_TRIM, MP_CNT_RSSI_TRIM, (uint8_t *)(&sRssi_trim)) != STATUS_SUCCESS)
+    if (mpcalrftrimread(MP_ID_RSSI_TRIM, MP_CNT_RSSI_TRIM, (uint8_t *)(&sRssi_trim)) != STATUS_SUCCESS)
     {
         // No MP sector. Bypass procedure.
         return true;
@@ -677,11 +825,11 @@ bool rf_common_rssi_offset_set()
         SET_RUCI_PARA_SET_RSSI_OFFSET(&sSetRssiOffset, band_idx, (*(&(sRssi_trim.offset_2g) + band_idx)))
         RUCI_ENDIAN_CONVERT((uint8_t *)&sSetRssiOffset, RUCI_SET_RSSI_OFFSET);
 
-        Enter_Critical_Section();
+        enter_critical_section();
         event_len = 0;
         rf_common_cmd_send((uint8_t *)&sSetRssiOffset, RUCI_LEN_SET_RSSI_OFFSET);
         event_status = rf_common_event_get(&event_len, (uint8_t *)&sCmnCnfEvent);
-        Leave_Critical_Section();
+        leave_critical_section();
 
         RUCI_ENDIAN_CONVERT((uint8_t *)&sCmnCnfEvent, RUCI_CMN_CNF_EVENT);
         if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
@@ -763,7 +911,7 @@ bool rf_common_update_from_ft_info(void)
 }
 
 #if (RF_CAL_TYPE & RF_CAL_PWR_ON_MODE)
-bool rf_common_cal_enable(RF_BAND band_idx, mp_cal_rf_trim_t *p_rf_cal_info)
+bool rf_common_cal_enable(RF_BAND band_idx, MPK_RF_TRIM_T *p_rf_cal_info)
 {
     ruci_para_initiate_ble_t sBleInitCmd;
     ruci_para_set_calibration_enable_t sRfCalCmd;
@@ -929,11 +1077,11 @@ bool rf_common_tx_pwr_comp_set(
     SET_RUCI_PARA_SET_TX_POWER_COMPENSATION(&sSetTxPwrComp, (uint8_t)(offset), poly_gain, pa_pw_pre, modemType);
     RUCI_ENDIAN_CONVERT((uint8_t *)&sSetTxPwrComp, RUCI_SET_TX_POWER_COMPENSATION);
 
-    Enter_Critical_Section();
+    enter_critical_section();
     event_len = 0;
     rf_common_cmd_send((uint8_t *)&sSetTxPwrComp, RUCI_LEN_SET_TX_POWER_COMPENSATION);
     event_status = rf_common_event_get(&event_len, (uint8_t *)&sCmnCnfEvent);
-    Leave_Critical_Section();
+    leave_critical_section();
 
     RUCI_ENDIAN_CONVERT((uint8_t *)&sCmnCnfEvent, RUCI_CMN_CNF_EVENT);
     if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
@@ -950,9 +1098,9 @@ bool rf_common_tx_pwr_comp_set(
     SET_RUCI_PARA_SET_TX_POWER_COMPENSATION(&sSetTxPwrComp, (uint8_t)(offset), poly_gain, pa_pw_pre, modemType);
     RUCI_ENDIAN_CONVERT((uint8_t *)&sSetTxPwrComp, RUCI_SET_TX_POWER_COMPENSATION);
 
-    //Enter_Critical_Section();
+    //enter_critical_section();
     rf_common_cmd_send((uint8_t *)&sSetTxPwrComp, RUCI_LEN_SET_TX_POWER_COMPENSATION);
-    //Leave_Critical_Section();
+    //leave_critical_section();
 #endif
 #endif
 
@@ -995,6 +1143,41 @@ bool rf_common_tx_pwr_ch_comp_set(
     return true;
 }
 
+bool rf_common_tx_pwr_ch_seg_set(
+    int8_t  segA,
+    int8_t  segB,
+    int8_t  segC,
+    int8_t  modemType
+)
+{
+#if ((RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569S) || (RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569MP))
+    ruci_para_set_tx_power_channel_segment_t        sSetTxPwrChSeg;
+    ruci_para_cmn_cnf_event_t                       sCmnCnfEvent;
+    uint8_t                                         event_len = 0;
+    RF_MCU_RX_CMDQ_ERROR                            event_status = RF_MCU_RX_CMDQ_ERR_INIT;
+
+    /* Update tx power segment setting to lower layer HW */
+    SET_RUCI_PARA_SET_TX_POWER_CHANNEL_SEGMENT(&sSetTxPwrChSeg, (uint8_t)(segA), (uint8_t)(segB), (uint8_t)(segC), (uint8_t)(modemType));
+    RUCI_ENDIAN_CONVERT((uint8_t *)&sSetTxPwrChSeg, RUCI_SET_TX_POWER_CHANNEL_SEGMENT);
+
+    enter_critical_section();
+    event_len = 0;
+    rf_common_cmd_send((uint8_t *)&sSetTxPwrChSeg, RUCI_LEN_SET_TX_POWER_CHANNEL_SEGMENT);
+    event_status = rf_common_event_get(&event_len, (uint8_t *)&sCmnCnfEvent);
+    leave_critical_section();
+
+    RUCI_ENDIAN_CONVERT((uint8_t *)&sCmnCnfEvent, RUCI_CMN_CNF_EVENT);
+    if ((event_status != RF_MCU_RX_CMDQ_GET_SUCCESS) ||
+            (sCmnCnfEvent.cmn_cmd_subheader != RUCI_CODE_SET_TX_POWER_CHANNEL_SEGMENT) ||
+            (sCmnCnfEvent.status != 0))
+    {
+        return false;
+    }
+#endif
+
+    return true;
+}
+
 /* RF Common initialization with different FW */
 bool rf_common_init_by_fw(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_func)
 {
@@ -1015,7 +1198,7 @@ bool rf_common_init_by_fw(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_
 #if (RF_MCU_CHIP_BASE == BASE_RAM_TYPE)
     if (fw_select == RF_FW_LOAD_SELECT_RUCI_CMD)
     {
-#if (RF_FW_INCLUDE_PCI == TRUE)
+#if (CONFIG_RF_FW_INCLUDE_PCI == TRUE)
         /* Pure MAC FW */
         fw_load = firmware_program_ruci;
         firmware_size = firmware_size_ruci;
@@ -1025,7 +1208,7 @@ bool rf_common_init_by_fw(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_
     }
     else if (fw_select == RF_FW_LOAD_SELECT_BLE_CONTROLLER)
     {
-#if (RF_FW_INCLUDE_BLE == TRUE)
+#if (CONFIG_RF_FW_INCLUDE_BLE == TRUE)
         /* Pure BLE FW */
         fw_load = firmware_program_ble;
         firmware_size = firmware_size_ble;
@@ -1035,7 +1218,7 @@ bool rf_common_init_by_fw(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_
     }
     else if (fw_select == RF_FW_LOAD_SELECT_MULTI_PROTCOL_2P4G)
     {
-#if (RF_FW_INCLUDE_MULTI_2P4G == TRUE)
+#if (CONFIG_RF_FW_INCLUDE_MULTI_2P4G == TRUE)
         /* Multi protocol FW for 2.4G */
         fw_load = firmware_program_multi;
         firmware_size = firmware_size_multi;
@@ -1068,7 +1251,7 @@ bool rf_common_init_by_fw(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_
 
     if (fw_select == RF_FW_LOAD_SELECT_INTERNAL_TEST)
     {
-#if (RF_FW_INCLUDE_INTERNAL_TEST == TRUE)
+#if (CONFIG_RF_FW_INCLUDE_INTERNAL_TEST == TRUE)
         /* Internal Test FW */
         fw_load = firmware_program_it;
         firmware_size = firmware_size_it;
@@ -1083,7 +1266,7 @@ bool rf_common_init_by_fw(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_
 
     if (fw_select == RF_FW_LOAD_SELECT_MX_MAC_ACCELARATOR)
     {
-#if ((RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569M0) && (RF_FW_INCLUDE_MAC_ACC == TRUE))
+#if ((RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569M0) && (CONFIG_RF_FW_INCLUDE_MAC_ACC == TRUE))
         /* Internal Test FW */
         fw_load = firmware_program_mac_acc;
         firmware_size = firmware_size_mac_acc;
@@ -1179,21 +1362,21 @@ bool rf_common_init_by_fw(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_
     }
 #endif
 #if ((RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569S) || (RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569MP))
-#if 0
-    if (rf_common_pmu_operation_mode(Sys_Pmu_GetMode()) == false)
-    {
-        return false;
-    }
-#endif
 
-    /* Set calibration setting */
-    if (rf_common_cal_set() == false)
+
+    if (rf_common_pmu_operation_mode(sys_pmu_getmode(), sys_slow_clk_mode()) == false)
     {
         return false;
     }
 
     /* Set TX power setting */
     if (rf_common_tx_pwr_set() == false)
+    {
+        return false;
+    }
+
+    /* Set calibration setting */
+    if (rf_common_cal_set() == false)
     {
         return false;
     }
@@ -1206,9 +1389,9 @@ bool rf_common_init_by_fw(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_
 
     /* Enable TX power compensation */
 #if (RF_TX_POWER_COMP)
-    Sadc_Config_Enable(SADC_RES_12BIT, SADC_OVERSAMPLE_256, Tx_Power_Sadc_Int_Callback_Handler);
-    Sadc_Disable();
-    Sadc_Compensation_Init(13);
+    sadc_config_enable(SADC_RES_12BIT, SADC_OVERSAMPLE_256, Tx_Power_Compensation_Sadc_Int_Handler);
+    sadc_disable();
+    // Sadc_Compensation_Init(13);
     Tx_Power_Compensation_Init(10);
 #endif
 #elif ((RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569M0) && (RF_MCU_CHIP_VER == RF_MCU_CHIP_VER_B))
@@ -1223,6 +1406,46 @@ bool rf_common_init_by_fw(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_
 
     /* RF calibration */
     if (rf_common_cal_init() == false)
+    {
+        return false;
+    }
+#endif
+
+    return true;
+}
+
+
+bool rf_common_init_fw_preload(RF_FW_LOAD_SELECT fw_select, COMM_SUBSYSTEM_ISR_t isr_func)
+{
+    const uint8_t *fw_load;
+    uint32_t firmware_size;
+    COMM_SUBSYSTEM_ISR_CONFIG isr_config;
+
+    isr_config.commsubsystem_isr = isr_func;
+    isr_config.content = 0;
+
+#if (RF_MCU_CHIP_BASE == BASE_RAM_TYPE)
+    if (fw_select == RF_FW_LOAD_SELECT_RUCI_CMD)
+    {
+#if (CONFIG_RF_FW_INCLUDE_PCI == TRUE)
+        /* Pure MAC FW */
+        fw_load = firmware_program_ruci;
+        firmware_size = firmware_size_ruci;
+#else
+        return false;
+#endif
+    }
+    else
+    {
+        return false;
+    }
+
+    if ((firmware_size == 0) && (fw_select != RF_FW_LOAD_SELECT_NONE))
+    {
+        return false;
+    }
+
+    if (RfMcu_SysInitFw(true, fw_load, firmware_size, isr_config, RF_MCU_INIT_NO_ERROR) != RF_MCU_INIT_NO_ERROR)
     {
         return false;
     }

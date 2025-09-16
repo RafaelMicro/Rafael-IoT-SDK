@@ -6,7 +6,7 @@
 #include "cfg_mdl_data.h"
 #include "cfg_mdl_cl.h"
 #include "cfg_mdl_sr.h"
-//#include "cfg_mdl_mib.h"
+#include "cfg_mdl_mib.h"
 //#include "cfg_mdl_messages.h"
 
 #ifndef __CFG_MDL_H__

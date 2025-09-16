@@ -20,7 +20,7 @@
 #include "rf_common_init.h"
 #include "rf_mcu.h"
 #include "rf_tx_comp.h"
-//#include "rfb_sf.h"
+#include "rfb_sf.h"
 #include "uart_bridge.h"
 #include "ruci.h"
 
@@ -1046,7 +1046,7 @@ void uasb_sf_hdlr(void)
     uint16_t cmdOutLen = 0;
 
     /* Command parsing */
-    //cmdOutLen = rfb_sf_hdlr(gUasbUart2SpiBuff, gUasbUartTxBuff, UASB_MAX_UART_LEN); //TBD: rfb_sf.h
+    cmdOutLen = rfb_sf_hdlr(gUasbUart2SpiBuff, gUasbUartTxBuff, UASB_MAX_UART_LEN); 
 
     /* Command response */
     if (cmdOutLen)
@@ -1868,7 +1868,7 @@ bool usab_relocate_tx_pwr_comp_cfg(rf_ub_hci_vsc_tx_pwr_comp_cfg_t *hdr)
         relay_head.length           = hdr->para_len;
         relay_head.interval         = hdr->interval;
 
-        //rfb_sf_hdlr((uint8_t *)&relay_head, gUasbUartTxBuff, UASB_MAX_UART_LEN); //TBD: rfb_sf.h
+        rfb_sf_hdlr((uint8_t *)&relay_head, gUasbUartTxBuff, UASB_MAX_UART_LEN); //TBD: rfb_sf.h
         usab_vsc_evt_gen(hdr->opcode, 1, &ret_para);
         return TRUE;
     }

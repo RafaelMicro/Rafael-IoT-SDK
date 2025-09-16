@@ -1,0 +1,17 @@
+
+menu "PROJECT CONFIG"
+
+if RT581 ||RT582 || RT583 
+
+config SLEEP1_TEST_ENABLE
+    bool "SLEEP1_TEST_ENABLE"
+    default 1
+
+config SLEEP2_TEST_ENABLE
+    bool "SLEEP2_TEST_ENABLE"
+    default 1    
+
+endif
+
+endmenu
+

@@ -104,6 +104,8 @@ typedef uint8_t ble_gap_ad_type_t;
 #define GAP_AD_TYPE_RANDOM_TARGET_ADDRESS                                       0x18  /**< Random target address. */
 #define GAP_AD_TYPE_APPEARANCE                                                  0x19  /**< Appearance. */
 #define GAP_AD_TYPE_ADVERTISING_INTERVAL                                        0x1A  /**< Advertising interval. */
+#define GAP_AD_TYPE_ENCRYPTED_ADVERTISING_DATA                                  0x31  /**< Encrypted Advertising Data. */
+#define GAP_AD_TYPE_ELECTRONIC_SHELF_LABEL                                      0x34  /**< Electronic Shelf Label. */
 #define GAP_AD_TYPE_3D_INFORMATION_DATA                                         0x3D  /**< 3D information data. */
 #define GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA                                  0xFF  /**< Manufacturer specific data. */
 /** @} */
@@ -350,6 +352,43 @@ typedef struct ble_gap_create_conn_param_s
 
 } ble_gap_create_conn_param_t;
 
+typedef struct ble_gap_extend_create_conn_v2_param_s
+{
+    /**< Host id. */
+
+    uint8_t   host_id;
+
+    uint8_t   adv_handle;                       /**< advertising handle. */
+
+    uint8_t   subevent;                         /**< subevent. */
+
+    /**
+     * @ref ble_addr_type_t "BLE Address Type"
+     */
+    ble_addr_type_t   own_addr_type;
+
+    /** Scan interval.
+    *  @note Scan interval = value * 0.625ms \n
+    *        Scan interval range = @ref SCAN_INTERVAL_MIN ~ @ref SCAN_INTERVAL_MAX
+    */
+    uint16_t  scan_interval;
+
+    /** Scan window.
+     *  @note Scan window = value * 0.625ms \n
+     *        Scan window range = @ref SCAN_WINDOW_MIN  ~ @ref SCAN_WINDOW_MAX
+     */
+    uint16_t  scan_window;
+
+    /** @ref ble_gap_init_filter "BLE initiator filter policy" */
+    ble_initiator_filter_t     init_filter_policy;
+
+    /** @ref ble_gap_peer_addr_t Peer address type and address. */
+    ble_gap_peer_addr_t        peer_addr;
+
+    /** @ref ble_gap_conn_param_t Connection parameters. */
+    ble_gap_conn_param_t       conn_param;
+
+} ble_gap_extend_create_conn_v2_param_t;
 
 /** @brief BLE set terminate parameter.
  * @ingroup ble_gap
@@ -698,6 +737,8 @@ ble_err_t ble_cmd_device_addr_set(ble_gap_addr_t *p_addr);
  */
 ble_err_t ble_cmd_conn_create(ble_gap_create_conn_param_t *p_param);
 
+
+ble_err_t ble_cmd_extend_conn_create_v2(ble_gap_extend_create_conn_v2_param_t *p_param);
 
 /** @brief BLE cancel create connection process command.
  *

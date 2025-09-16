@@ -1,8 +1,15 @@
-/** @file
- *
- * @brief BLE HRS peripheral role demo.
- *
- */
+/**************************************************************************************************
+ * @file main.c
+ * @brief Main application code for the BLE HRS (P) demo.
+ * @version 1.0
+ * @date 2023-08-15
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ * @details This file includes the necessary includes, macros, constants, and function declarations
+ *          for the BLE HRS (P) demo. It also contains the implementation of the main application
+ *          task, BLE event handlers, and other local functions.
+ *************************************************************************************************/
 
 /**************************************************************************************************
  *    INCLUDES
@@ -22,6 +29,13 @@
 #include "hosal_rf.h"
 #include "ble_api.h"
 #include "ble_host_cmd.h"
+#include "ble_l2cap.h"
+#include "hosal_gpio.h"
+#include "hosal_lpm.h"
+#include "hosal_sysctrl.h"
+#include "app_hooks.h"
+#include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 /**************************************************************************************************
  *    MACROS
@@ -44,7 +58,7 @@
 #define DEFAULT_MTU                     BLE_GATT_ATT_MTU_MIN
 
 // Advertising device name
-#define DEVICE_NAME                     'H', 'R', 'S', '_', 'D', 'E', 'M', 'O'
+#define DEVICE_NAME                     "HRS_DEMO"
 
 // Advertising parameters
 #define APP_ADV_INTERVAL_MIN            160U      // 160*0.625ms=100ms
@@ -58,6 +72,7 @@ static const ble_gap_addr_t  DEVICE_ADDR = {.addr_type = RANDOM_STATIC_ADDR,
                                             .addr = {0x11, 0x12, 0x13, 0x14, 0x15, 0xC6 }
                                            };
 
+#define GPIO_WAKE_UP_PIN                0
 /**************************************************************************************************
  *    LOCAL VARIABLES
  *************************************************************************************************/
@@ -79,14 +94,35 @@ static void svcs_gatts_data_init(ble_svcs_gatts_data_t *p_data);
 static void svcs_hrs_data_init(ble_svcs_hrs_data_t *p_data);
 static ble_err_t adv_init(void);
 static ble_err_t adv_enable(uint8_t host_id);
-static bool app_request_set(uint8_t host_id, app_request_t request, bool from_isr);
+static bool ble_app_request_set(uint8_t host_id, app_request_t request, bool from_isr);
 static bool hrs_sw_timer_start(void);
 static bool hrs_sw_timer_stop(void);
 
 /**************************************************************************************************
  *    LOCAL FUNCTIONS
  *************************************************************************************************/
-static void hrs_timer_handler( TimerHandle_t timer)
+/**
+ * @brief GPIO interrupt handler.
+ *
+ * This function is called when a GPIO interrupt occurs. It masks the low power mode.
+ *
+ * @param pin The GPIO pin number that triggered the interrupt.
+ * @param isr_param Additional parameters for the ISR (Interrupt Service Routine).
+ */
+static void app_gpio_handler(uint32_t pin, void *isr_param)
+{
+    hosal_lpm_ioctrl(HOSAL_LPM_MASK, HOSAL_LOW_POWER_MASK_BIT_TASK_BLE_APP);
+}
+
+/**
+ * @brief HRS timer handler.
+ *
+ * This function is called when the HRS timer expires. It sends a notification to the connected client.
+ *
+ * @param timer The timer handle.
+ * @return void This function does not return a value.
+ */
+static void hrs_timer_handler(TimerHandle_t timer)
 {
     /* Optionally do something if the pxTimer parameter is NULL. */
     configASSERT( timer );
@@ -95,14 +131,22 @@ static void hrs_timer_handler( TimerHandle_t timer)
     if (ble_app_link_info[APP_HRS_P_HOST_ID].state == STATE_CONNECTED)
     {
         // send HRS data
-        if (app_request_set(APP_HRS_P_HOST_ID, APP_REQUEST_HRS_NTF, false) == false)
+        if (ble_app_request_set(APP_HRS_P_HOST_ID, APP_REQUEST_HRS_NTF, false) == false)
         {
             //No Application queue buffer. Error.
         }
     }
 }
 
-
+/**
+ * @brief BLE HRS event handler.
+ *
+ * This function handles events related to the Heart Rate Service (HRS). It processes
+ * client requests and manages notifications for heart rate measurements.
+ *
+ * @param p_param Pointer to the BLE event parameters.
+ * @return void This function does not return a value.
+ */
 static void ble_svcs_hrs_evt_handler(ble_evt_att_param_t *p_param)
 {
     ble_info_link0_t *p_profile_info = (ble_info_link0_t *)ble_app_link_info[p_param->host_id].profile_info;
@@ -141,7 +185,7 @@ static void ble_svcs_hrs_evt_handler(ble_evt_att_param_t *p_param)
             gatt_data_param.length = 1;
             gatt_data_param.p_data = &p_profile_info->svcs_info_hrs.server_info.data.body_sensor_location;
 
-            status = ble_svcs_data_send(TYPE_BLE_GATT_READ_RSP, &gatt_data_param);;
+            status = ble_svcs_data_send(TYPE_BLE_GATT_READ_RSP, &gatt_data_param);
             if (status != BLE_ERR_OK)
             {
                 printf("ble_gatt_read_rsp status: %d\n", status);
@@ -155,7 +199,18 @@ static void ble_svcs_hrs_evt_handler(ble_evt_att_param_t *p_param)
     }
 }
 
-// HRS Peripheral
+/**
+ * @brief Handles peripheral role events.
+ *
+ * This function processes events related to the peripheral role, such as connection and disconnection events.
+ *
+ * @param p_param Pointer to the event parameters.
+ *                - host_id: The ID of the host that triggered the event.
+ *                - app_req: The type of request (e.g., start advertising, send data).
+ *                - other fields: Additional fields related to the event.
+ *
+ * @return void This function does not return a value.
+ */
 static void app_peripheral_handler(app_req_param_t *p_param)
 {
     ble_err_t status;
@@ -235,149 +290,228 @@ static void app_peripheral_handler(app_req_param_t *p_param)
     }
 }
 
+/**
+ * @brief Handles the advertising set enable event.
+ *
+ * This function processes the event when advertising is enabled or disabled.
+ *
+ * @param p_adv_enable Pointer to the advertising enable event parameters.
+ * @return void This function does not return a value.
+ */
+static void handle_adv_set_enable(ble_evt_adv_set_adv_enable_t *p_adv_enable)
+{
+    if (p_adv_enable->status == BLE_HCI_ERR_CODE_SUCCESS)
+    {
+        if (p_adv_enable->adv_enabled == true)
+        {
+            if (g_advertising_host_id != BLE_HOSTID_RESERVED)
+            {
+                ble_app_link_info[g_advertising_host_id].state = STATE_ADVERTISING;
+            }
+            printf("Advertising...\n");
+        }
+        else
+        {
+            if (g_advertising_host_id != BLE_HOSTID_RESERVED)
+            {
+                ble_app_link_info[g_advertising_host_id].state = STATE_STANDBY;
+            }
+            printf("Idle.\n");
+        }
+    }
+    else
+    {
+        printf("Advertising enable failed.\n");
+    }
+}
+
+/**
+ * @brief Handles the connection complete event.
+ *
+ * This function processes the event when a connection is established or failed.
+ *
+ * @param p_conn_param Pointer to the connection complete event parameters.
+ */
+static void handle_conn_complete(ble_evt_gap_conn_complete_t *p_conn_param)
+{
+    if (p_conn_param->status != BLE_HCI_ERR_CODE_SUCCESS)
+    {
+        printf("Connect failed, error code = 0x%02x\n", p_conn_param->status);
+    }
+    else
+    {
+        ble_app_link_info[p_conn_param->host_id].state = STATE_CONNECTED;
+        printf("Connected, ID=%d, Connected to %02x:%02x:%02x:%02x:%02x:%02x\n",
+                   p_conn_param->host_id,
+                   p_conn_param->peer_addr.addr[5],
+                   p_conn_param->peer_addr.addr[4],
+                   p_conn_param->peer_addr.addr[3],
+                   p_conn_param->peer_addr.addr[2],
+                   p_conn_param->peer_addr.addr[1],
+                   p_conn_param->peer_addr.addr[0]);
+    }
+}
+
+/**
+ * @brief Handles the connection parameter update event.
+ *
+ * This function processes the event when a connection parameter update is successful or failed.
+ *
+ * @param p_conn_param Pointer to the connection parameter update event parameters.
+ * @return void This function does not return a value.
+ */
+static void handle_conn_param_update(ble_evt_gap_conn_param_update_t *p_conn_param)
+{
+    if (p_conn_param->status != BLE_HCI_ERR_CODE_SUCCESS)
+    {
+        printf("Connection update failed, error code = 0x%02x\n", p_conn_param->status);
+    }
+    else
+    {
+        printf("Connection updated\n");
+        printf("ID: %d, ", p_conn_param->host_id);
+        printf("Interval: %d, ", p_conn_param->conn_interval);
+        printf("Latency: %d, ", p_conn_param->periph_latency);
+        printf("Supervision Timeout: %d\n", p_conn_param->supv_timeout);
+    }
+}
+
+/**
+ * @brief Handles the PHY update event.
+ *
+ * This function processes the event when the PHY is updated or read.
+ *
+ * @param p_phy_param Pointer to the PHY event parameters.
+ * @return void This function does not return a value.
+ */
+static void handle_phy_update(ble_evt_gap_phy_t *p_phy_param)
+{
+    if (p_phy_param->status != BLE_HCI_ERR_CODE_SUCCESS)
+    {
+        printf("PHY update/read failed, error code = 0x%02x\n", p_phy_param->status);
+    }
+    else
+    {
+        printf("PHY updated/read, ID: %d, TX PHY: %d, RX PHY: %d\n", p_phy_param->host_id, p_phy_param->tx_phy, p_phy_param->rx_phy);
+    }
+}
+
+/**
+ * @brief Handles the MTU exchange event.
+ *
+ * This function processes the event when the MTU is exchanged.
+ *
+ * @param p_mtu_param Pointer to the MTU exchange event parameters.
+ * @return void This function does not return a value.
+ */
+static void handle_mtu_exchange(ble_evt_mtu_t *p_mtu_param)
+{
+    printf("MTU Exchanged, ID:%d, size: %d\n", p_mtu_param->host_id, p_mtu_param->mtu);
+}
+
+/**
+ * @brief Handles the write suggested default data length event.
+ *
+ * This function processes the event when the default data length is written.
+ *
+ * @param p_data_len_param Pointer to the write suggested default data length event parameters.
+ *                         - status: The status of the write operation.
+ *                         - other fields: Additional fields related to the event.
+ * @return void This function does not return a value.
+ */
+static void handle_write_suggested_default_data_length(ble_evt_suggest_data_length_set_t *p_data_len_param)
+{
+    printf("Write default data length, status: %d\n", p_data_len_param->status);
+}
+
+/**
+ * @brief Handles the data length change event.
+ *
+ * This function processes the event when the data length is changed.
+ *
+ * @param p_data_len_param Pointer to the data length change event parameters, which includes the new data length values.
+ * @return void This function does not return a value.
+ */
+static void handle_data_length_change(ble_evt_data_length_change_t *p_data_len_param)
+{
+    printf("Data length changed, ID: %d\n", p_data_len_param->host_id);
+    printf("MaxTxOctets: %d  MaxTxTime:%d\n", p_data_len_param->max_tx_octets, p_data_len_param->max_tx_time);
+    printf("MaxRxOctets: %d  MaxRxTime:%d\n", p_data_len_param->max_rx_octets, p_data_len_param->max_rx_time);
+}
+
+/**
+ * @brief Handles the disconnection complete event.
+ *
+ * This function processes the event when a disconnection is complete.
+ * The STATE_STANDBY state indicates that the device is not connected and is ready to start advertising again.
+ *
+ * @param p_disconnect_param Pointer to the disconnection complete event parameters.
+ * @return void This function does not return a value.
+ */
+static void handle_disconn_complete(ble_evt_gap_disconn_complete_t *p_disconnect_param)
+{
+    if (p_disconnect_param->status != BLE_HCI_ERR_CODE_SUCCESS)
+    {
+        printf("Disconnect failed, error code = 0x%02x\n", p_disconnect_param->status);
+    }
+    else
+    {
+        ble_app_link_info[p_disconnect_param->host_id].state = STATE_STANDBY;
+
+        // re-start adv
+        if (ble_app_request_set(p_disconnect_param->host_id, APP_REQUEST_ADV_START, false) == false)
+        {
+            // No Application queue buffer. Error.
+        }
+
+        printf("Disconnect, ID:%d, Reason:0x%02x\n", p_disconnect_param->host_id, p_disconnect_param->reason);
+    }
+}
+
+/**
+ * @brief BLE event handler.
+ *
+ * This function handles various BLE events such as advertising, connection, and data length changes.
+ *
+ * @param p_param Pointer to the BLE event parameters.
+ * @return void This function does not return a value.
+ */
 static void ble_evt_handler(ble_evt_param_t *p_param)
 {
     switch (p_param->event)
     {
     case BLE_ADV_EVT_SET_ENABLE:
-    {
-        ble_evt_adv_set_adv_enable_t *p_adv_enable = (ble_evt_adv_set_adv_enable_t *)&p_param->event_param.ble_evt_adv.param.evt_set_adv_enable;
-
-        if (p_adv_enable->status == BLE_HCI_ERR_CODE_SUCCESS)
-        {
-            if (p_adv_enable->adv_enabled == true)
-            {
-                if (g_advertising_host_id != BLE_HOSTID_RESERVED)
-                {
-                    ble_app_link_info[g_advertising_host_id].state = STATE_ADVERTISING;
-                }
-                printf("Advertising...\n");
-            }
-            else
-            {
-                if (g_advertising_host_id != BLE_HOSTID_RESERVED)
-                {
-                    ble_app_link_info[g_advertising_host_id].state = STATE_STANDBY;
-                }
-                printf("Idle.\n");
-            }
-        }
-        else
-        {
-            printf("Advertising enable failed.\n");
-        }
-    }
-    break;
+        handle_adv_set_enable((ble_evt_adv_set_adv_enable_t *)&p_param->event_param.ble_evt_adv.param.evt_set_adv_enable);
+        break;
 
     case BLE_GAP_EVT_CONN_COMPLETE:
-    {
-        ble_evt_gap_conn_complete_t *p_conn_param = (ble_evt_gap_conn_complete_t *)&p_param->event_param.ble_evt_gap.param.evt_conn_complete;
-
-        if (p_conn_param->status != BLE_HCI_ERR_CODE_SUCCESS)
-        {
-            printf("Connect failed, error code = 0x%02x\n", p_conn_param->status);
-        }
-        else
-        {
-            ble_app_link_info[p_conn_param->host_id].state = STATE_CONNECTED;
-            printf("Connected, ID=%d, Connected to %02x:%02x:%02x:%02x:%02x:%02x\n",
-                       p_conn_param->host_id,
-                       p_conn_param->peer_addr.addr[5],
-                       p_conn_param->peer_addr.addr[4],
-                       p_conn_param->peer_addr.addr[3],
-                       p_conn_param->peer_addr.addr[2],
-                       p_conn_param->peer_addr.addr[1],
-                       p_conn_param->peer_addr.addr[0]);
-        }
-    }
-    break;
+        handle_conn_complete((ble_evt_gap_conn_complete_t *)&p_param->event_param.ble_evt_gap.param.evt_conn_complete);
+        break;
 
     case BLE_GAP_EVT_CONN_PARAM_UPDATE:
-    {
-        ble_evt_gap_conn_param_update_t *p_conn_param = (ble_evt_gap_conn_param_update_t *)&p_param->event_param.ble_evt_gap.param.evt_conn_param_update;
-
-        if (p_conn_param->status != BLE_HCI_ERR_CODE_SUCCESS)
-        {
-            printf("Connection update failed, error code = 0x%02x\n", p_conn_param->status);
-        }
-        else
-        {
-            printf("Connection updated\n");
-            printf("ID: %d, ", p_conn_param->host_id);
-            printf("Interval: %d, ", p_conn_param->conn_interval);
-            printf("Latency: %d, ", p_conn_param->periph_latency);
-            printf("Supervision Timeout: %d\n", p_conn_param->supv_timeout);
-        }
-    }
-    break;
+        handle_conn_param_update((ble_evt_gap_conn_param_update_t *)&p_param->event_param.ble_evt_gap.param.evt_conn_param_update);
+        break;
 
     case BLE_GAP_EVT_PHY_READ:
     case BLE_GAP_EVT_PHY_UPDATE:
-    {
-        ble_evt_gap_phy_t *p_phy_param = (ble_evt_gap_phy_t *)&p_param->event_param.ble_evt_gap.param.evt_phy;
-        if (p_phy_param->status != BLE_HCI_ERR_CODE_SUCCESS)
-        {
-            printf("PHY update/read failed, error code = 0x%02x\n", p_phy_param->status);
-        }
-        else
-        {
-            printf("PHY updated/read, ID: %d, TX PHY: %d, RX PHY: %d\n", p_phy_param->host_id, p_phy_param->tx_phy, p_phy_param->rx_phy);
-        }
-    }
-    break;
+        handle_phy_update((ble_evt_gap_phy_t *)&p_param->event_param.ble_evt_gap.param.evt_phy);
+        break;
 
     case BLE_ATT_GATT_EVT_MTU_EXCHANGE:
-    {
-        ble_evt_mtu_t *p_mtu_param = (ble_evt_mtu_t *)&p_param->event_param.ble_evt_att_gatt.param.ble_evt_mtu;
-        printf("MTU Exchanged, ID:%d, size: %d\n", p_mtu_param->host_id, p_mtu_param->mtu);
-    }
-    break;
+        handle_mtu_exchange((ble_evt_mtu_t *)&p_param->event_param.ble_evt_att_gatt.param.ble_evt_mtu);
+        break;
 
     case BLE_ATT_GATT_EVT_WRITE_SUGGESTED_DEFAULT_DATA_LENGTH:
-    {
-        ble_evt_suggest_data_length_set_t *p_data_len_param = (ble_evt_suggest_data_length_set_t *)&p_param->event_param.ble_evt_att_gatt.param.ble_evt_suggest_data_length_set;
-
-        if (p_data_len_param->status == BLE_HCI_ERR_CODE_SUCCESS)
-        {
-            printf("Write default data length, status: %d\n", p_data_len_param->status);
-        }
-        else
-        {
-            printf("Write default data length, status: %d\n", p_data_len_param->status);
-        }
-    }
-    break;
+        handle_write_suggested_default_data_length((ble_evt_suggest_data_length_set_t *)&p_param->event_param.ble_evt_att_gatt.param.ble_evt_suggest_data_length_set);
+        break;
 
     case BLE_ATT_GATT_EVT_DATA_LENGTH_CHANGE:
-    {
-        ble_evt_data_length_change_t *p_data_len_param = (ble_evt_data_length_change_t *)&p_param->event_param.ble_evt_att_gatt.param.ble_evt_data_length_change;
-        printf("Data length changed, ID: %d\n", p_data_len_param->host_id);
-        printf("MaxTxOctets: %d  MaxTxTime:%d\n", p_data_len_param->max_tx_octets, p_data_len_param->max_tx_time);
-        printf("MaxRxOctets: %d  MaxRxTime:%d\n", p_data_len_param->max_rx_octets, p_data_len_param->max_rx_time);
-    }
-    break;
+        handle_data_length_change((ble_evt_data_length_change_t *)&p_param->event_param.ble_evt_att_gatt.param.ble_evt_data_length_change);
+        break;
 
     case BLE_GAP_EVT_DISCONN_COMPLETE:
-    {
-        ble_evt_gap_disconn_complete_t *p_disconn_param = (ble_evt_gap_disconn_complete_t *)&p_param->event_param.ble_evt_gap.param.evt_disconn_complete;
-        if (p_disconn_param->status != BLE_HCI_ERR_CODE_SUCCESS)
-        {
-            printf("Disconnect failed, error code = 0x%02x\n", p_disconn_param->status);
-        }
-        else
-        {
-            ble_app_link_info[p_disconn_param->host_id].state = STATE_STANDBY;
-
-            // re-start adv
-            if (app_request_set(p_disconn_param->host_id, APP_REQUEST_ADV_START, false) == false)
-            {
-                // No Application queue buffer. Error.
-            }
-
-            printf("Disconnect, ID:%d, Reason:0x%02x\n", p_disconn_param->host_id, p_disconn_param->reason);
-        }
-    }
-    break;
+        handle_disconn_complete((ble_evt_gap_disconn_complete_t *)&p_param->event_param.ble_evt_gap.param.evt_disconn_complete);
+        break;
 
     default:
         break;
@@ -388,9 +522,18 @@ static void ble_evt_handler(ble_evt_param_t *p_param)
  *  Methods
  * ------------------------------
  */
+
+/**
+ * @brief Starts the HRS software timer.
+ *
+ * This function starts the Heart Rate Service (HRS) software timer if it is not already active.
+ * The timer is used to periodically send heart rate measurements to the connected client.
+ *
+ * @return true if the timer was successfully started or is already active, false otherwise.
+ */
 static bool hrs_sw_timer_start(void)
 {
-    if ( xTimerIsTimerActive( g_hrs_timer ) == pdFALSE )
+    if ( g_hrs_timer != NULL && xTimerIsTimerActive( g_hrs_timer ) == pdFALSE )
     {
         if ( xTimerStart( g_hrs_timer, 0 ) != pdTRUE )
         {
@@ -401,6 +544,14 @@ static bool hrs_sw_timer_start(void)
     return true;
 }
 
+/**
+ * @brief Stops the HRS software timer.
+ *
+ * This function stops the Heart Rate Service (HRS) software timer if it is currently active.
+ * The timer is used to periodically send heart rate measurements to the connected client.
+ *
+ * @return true if the timer was successfully stopped or is already inactive, false otherwise.
+ */
 static bool hrs_sw_timer_stop(void)
 {
     if ( xTimerIsTimerActive( g_hrs_timer ) != pdFALSE )
@@ -413,6 +564,15 @@ static bool hrs_sw_timer_stop(void)
     return true;
 }
 
+/**
+ * @brief Initializes the advertising parameters and data.
+ *
+ * This function sets up the advertising parameters and data for BLE advertising.
+ * It configures the advertising type, interval, channel map, and filter policy.
+ * It also sets the advertising data and scan response data.
+ *
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t adv_init(void)
 {
     ble_err_t status;
@@ -420,7 +580,7 @@ static ble_err_t adv_init(void)
     ble_adv_data_param_t adv_data_param;
     ble_adv_data_param_t adv_scan_data_param;
     ble_gap_addr_t addr_param;
-    const uint8_t   SCANRSP_ADLENGTH  = (1) + sizeof(DEVICE_NAME_STR); //  1 byte data type
+    const uint8_t   SCANRSP_ADLENGTH  = (1) + strlen(DEVICE_NAME_STR); //  1 byte data type
 
     //Adv data
     uint8_t adv_data[] =
@@ -431,16 +591,20 @@ static ble_err_t adv_init(void)
     };
 
     //Scan response data
-    uint8_t adv_scan_rsp_data[] =
-    {
-        SCANRSP_ADLENGTH,                   // AD length
-        GAP_AD_TYPE_LOCAL_NAME_COMPLETE,    // AD data type
-        DEVICE_NAME,                        // the name is shown on scan list
-    };
+    uint8_t adv_scan_rsp_data[2 + strlen(DEVICE_NAME_STR)];
+    adv_scan_rsp_data[0] = SCANRSP_ADLENGTH;                      // AD length
+    adv_scan_rsp_data[1] = GAP_AD_TYPE_LOCAL_NAME_COMPLETE;       // AD data type
+    memcpy(&adv_scan_rsp_data[2], DEVICE_NAME_STR, strlen(DEVICE_NAME_STR)); // Copy the name
 
-    ble_cmd_device_addr_get(&addr_param);
     do
     {
+        status = ble_cmd_device_addr_get(&addr_param);
+        if (status != BLE_ERR_OK)
+        {
+            printf("ble_cmd_device_addr_get() status = %d\n", status);
+            break;
+        }
+
         adv_param.adv_type = ADV_TYPE_ADV_IND;
         adv_param.own_addr_type = addr_param.addr_type;
         adv_param.adv_interval_min = APP_ADV_INTERVAL_MIN;
@@ -458,7 +622,7 @@ static ble_err_t adv_init(void)
 
         // set adv data
         adv_data_param.length = sizeof(adv_data);
-        memcpy(&adv_data_param.data, &adv_data, sizeof(adv_data));
+        memcpy(adv_data_param.data, adv_data, adv_data_param.length);
         status = ble_cmd_adv_data_set(&adv_data_param);
         if (status != BLE_ERR_OK)
         {
@@ -468,7 +632,7 @@ static ble_err_t adv_init(void)
 
         // set scan rsp data
         adv_scan_data_param.length = sizeof(adv_scan_rsp_data);
-        memcpy(&adv_scan_data_param.data, &adv_scan_rsp_data, sizeof(adv_scan_rsp_data));
+        memcpy(adv_scan_data_param.data, adv_scan_rsp_data, adv_scan_data_param.length);
         status = ble_cmd_adv_scan_rsp_set(&adv_scan_data_param);
         if (status != BLE_ERR_OK)
         {
@@ -480,6 +644,14 @@ static ble_err_t adv_init(void)
     return status;
 }
 
+/**
+ * @brief Enables advertising for the specified host ID.
+ *
+ * This function enables BLE advertising for the given host ID.
+ *
+ * @param host_id The ID of the host for which advertising is to be enabled.
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t adv_enable(uint8_t host_id)
 {
     ble_err_t status;
@@ -493,7 +665,19 @@ static ble_err_t adv_enable(uint8_t host_id)
     return status;
 }
 
-static bool app_request_set(uint8_t host_id, app_request_t request, bool from_isr)
+/**
+ * @brief Sets a BLE application request.
+ *
+ * This function sets a request for the BLE application, either from an ISR or a normal context.
+ * It prepares a queue item with the request details and sends it to the application message queue.
+ * If the request is from an ISR, it uses the appropriate FreeRTOS ISR-safe functions.
+ *
+ * @param host_id The ID of the BLE host.
+ * @param request The application request to be set.
+ * @param from_isr Indicates if the request is from an ISR (true) or not (false).
+ * @return true if the request was successfully set, false otherwise.
+ */
+static bool ble_app_request_set(uint8_t host_id, app_request_t request, bool from_isr)
 {
     app_queue_t p_app_q;
 
@@ -546,6 +730,14 @@ static bool app_request_set(uint8_t host_id, app_request_t request, bool from_is
  *  Application Task
  * ------------------------------
  */
+/**
+ * @brief Callback function for BLE application events.
+ *
+ * This function handles general BLE application events and queues them for processing.
+ *
+ * @param p_param Pointer to the event parameters.
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t ble_app_event_cb(void *p_param)
 {
     ble_err_t status;
@@ -553,21 +745,15 @@ static ble_err_t ble_app_event_cb(void *p_param)
     ble_tlv_t *p_tlv;
 
     status = BLE_ERR_OK;
-    do {
-        if (xSemaphoreTake(semaphore_cb, 0) == pdTRUE)
+    if (xSemaphoreTake(semaphore_cb, 0) == pdTRUE)
+    {
+        p_tlv = pvPortMalloc(sizeof(ble_tlv_t) + sizeof(ble_evt_param_t) + ((ble_evt_param_t *)p_param)->extended_length);
+        if (p_tlv != NULL)
         {
-            p_tlv = pvPortMalloc(sizeof(ble_tlv_t) + sizeof(ble_evt_param_t));
-            if (p_tlv == NULL)
-            {
-                status = BLE_ERR_DATA_MALLOC_FAIL;
-                xSemaphoreGive(semaphore_cb);
-                break;
-            }
-
             p_app_q.param_type = QUEUE_TYPE_OTHERS;
             p_app_q.param.pt_tlv = p_tlv;
             p_app_q.param.pt_tlv->type = APP_GENERAL_EVENT;
-            memcpy(p_tlv->value, p_param, sizeof(ble_evt_param_t));
+            memcpy(p_tlv->value, p_param, sizeof(ble_evt_param_t) + ((ble_evt_param_t *)p_param)->extended_length);
 
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
@@ -577,33 +763,40 @@ static ble_err_t ble_app_event_cb(void *p_param)
         }
         else
         {
-            status = BLE_BUSY;
+            status = BLE_ERR_DATA_MALLOC_FAIL;
+            xSemaphoreGive(semaphore_cb);
         }
-    } while (0);
+    }
+    else
+    {
+        status = BLE_BUSY;
+    }
 
     return status;
 }
 
+/**
+ * @brief Callback function for BLE service data events.
+ *
+ * This function handles BLE service data events and queues them for processing.
+ *
+ * @param p_param Pointer to the event parameters.
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t ble_service_data_cb(void *p_param)
 {
     ble_err_t status;
     app_queue_t p_app_q;
     ble_tlv_t *p_tlv;
-    ble_evt_att_param_t *p_evt_att;
 
     status = BLE_ERR_OK;
-    do {
-        if (xSemaphoreTake(semaphore_cb, 0) == pdTRUE)
-        {
-            p_evt_att = p_param;
-            p_tlv = pvPortMalloc(sizeof(ble_tlv_t) + sizeof(ble_evt_att_param_t) + p_evt_att->length);
-            if (p_tlv == NULL)
-            {
-                status = BLE_ERR_DATA_MALLOC_FAIL;
-                xSemaphoreGive(semaphore_cb);
-                break;
-            }
+    if (xSemaphoreTake(semaphore_cb, 0) == pdTRUE)
+    {
+        ble_evt_att_param_t *p_evt_att = p_param;
+        p_tlv = pvPortMalloc(sizeof(ble_tlv_t) + sizeof(ble_evt_att_param_t) + p_evt_att->length);
 
+        if (p_tlv != NULL)
+        {
             p_app_q.param_type = QUEUE_TYPE_OTHERS;
             p_app_q.param.pt_tlv = p_tlv;
             p_app_q.param.pt_tlv->type = APP_SERVICE_EVENT;
@@ -617,13 +810,72 @@ static ble_err_t ble_service_data_cb(void *p_param)
         }
         else
         {
-            status = BLE_BUSY;
+            status = BLE_ERR_DATA_MALLOC_FAIL;
+            xSemaphoreGive(semaphore_cb);
         }
-    } while (0);
+    }
+    else
+    {
+        status = BLE_BUSY;
+    }
 
     return status;
 }
 
+/**
+ * @brief Callback function for BLE L2CAP data events.
+ *
+ * This function handles L2CAP data events and queues them for processing.
+ *
+ * @param p_param Pointer to the L2CAP event parameters.
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
+static ble_err_t ble_l2cap_data_cb(void *p_param)
+{
+    ble_err_t status;
+    app_queue_t p_app_q;
+    ble_tlv_t *p_tlv;
+    ble_l2cap_evt_param_t *p_evt_l2cap;
+
+    status = BLE_ERR_OK;
+    if (xSemaphoreTake(semaphore_cb, 0) == pdTRUE)
+    {
+        p_evt_l2cap = p_param;
+        p_tlv = pvPortMalloc(sizeof(ble_tlv_t) + sizeof(ble_l2cap_evt_param_t) + p_evt_l2cap->length);
+        if (p_tlv != NULL)
+        {
+            p_app_q.param_type = QUEUE_TYPE_OTHERS;
+            p_app_q.param.pt_tlv = p_tlv;
+            p_app_q.param.pt_tlv->type = APP_L2CAP_DATA_EVENT;
+            memcpy(p_tlv->value, p_param, sizeof(ble_l2cap_evt_param_t) + p_evt_l2cap->length);
+
+            if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
+            {
+                status = BLE_BUSY;
+                xSemaphoreGive(semaphore_cb);
+            }
+        }
+        else
+        {
+            status = BLE_ERR_DATA_MALLOC_FAIL;
+            xSemaphoreGive(semaphore_cb);
+        }
+    }
+    else
+    {
+        status = BLE_BUSY;
+    }
+
+    return status;
+}
+
+/**
+ * @brief Main task for the BLE application.
+ *
+ * This function initializes the BLE stack and profiles, and processes BLE events.
+ *
+ * @return void This function does not return a value.
+ */
 static void app_main_task(void)
 {
     ble_err_t status;
@@ -640,7 +892,7 @@ static void app_main_task(void)
     }
 
     // start adv
-    if (app_request_set(APP_HRS_P_HOST_ID, APP_REQUEST_ADV_START, false) == false)
+    if (ble_app_request_set(APP_HRS_P_HOST_ID, APP_REQUEST_ADV_START, false) == false)
     {
         // No Application queue buffer. Error.
     }
@@ -695,6 +947,9 @@ static void app_main_task(void)
                     }
                     break;
 
+                    case APP_L2CAP_DATA_EVENT:
+                        break;
+
                     default:
                         break;
                     }
@@ -713,6 +968,14 @@ static void app_main_task(void)
     }
 }
 
+/**
+ * @brief Main application handler for BLE requests.
+ *
+ * This function handles various BLE requests for the peripheral role.
+ * It processes requests such as starting advertising and sending data.
+ *
+ * @param p_param Pointer to the request parameters.
+ */
 static void ble_app_main(app_req_param_t *p_param)
 {
     // Link - Peripheral
@@ -723,11 +986,27 @@ static void ble_app_main(app_req_param_t *p_param)
  *  Application Initializations
  * ------------------------------
  */
+/**
+ * @brief Initializes the GATT service data.
+ *
+ * This function initializes the GATT service data by setting the service changed CCCD to 0.
+ *
+ * @param p_data Pointer to the GATT service data structure to be initialized.
+ * @return void This function does not return a value.
+ */
 static void svcs_gatts_data_init(ble_svcs_gatts_data_t *p_data)
 {
     p_data->service_changed_cccd = 0;
 }
 
+/**
+ * @brief Initializes the HRS service data.
+ *
+ * This function sets the initial values for the Heart Rate Service (HRS) data, including setting the CCCD to 0.
+ *
+ * @param p_data Pointer to the HRS service data structure to be initialized.
+ * @return void This function does not return a value.
+ */
 static void svcs_hrs_data_init(ble_svcs_hrs_data_t *p_data)
 {
     p_data->body_sensor_location = 0x02;
@@ -740,6 +1019,14 @@ static void svcs_hrs_data_init(ble_svcs_hrs_data_t *p_data)
     p_data->heart_rate_measurement[3] = 0;    // Heart Rate RR-Interval
 }
 
+/**
+ * @brief Initializes the BLE profile for the server role.
+ *
+ * This function initializes the BLE profile for the server role, including the GAP, GATT, DIS, and HRS services.
+ *
+ * @param host_id The ID of the host for which the profile is to be initialized.
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t server_profile_init(uint8_t host_id)
 {
     ble_err_t status = BLE_ERR_OK;
@@ -759,7 +1046,7 @@ static ble_err_t server_profile_init(uint8_t host_id)
         }
 
         // set GAP device name
-        status = ble_svcs_gaps_device_name_set((uint8_t *)DEVICE_NAME_STR, sizeof(DEVICE_NAME_STR));
+        status = ble_svcs_gaps_device_name_set((uint8_t *)DEVICE_NAME_STR, strlen(DEVICE_NAME_STR));
         if (status != BLE_ERR_OK)
         {
             break;
@@ -793,7 +1080,14 @@ static ble_err_t server_profile_init(uint8_t host_id)
     return status;
 }
 
-
+/**
+ * @brief Initializes the BLE stack and sets up callbacks.
+ *
+ * This function initializes the BLE stack, sets up necessary callbacks, and configures the device address.
+ * It also initializes the PHY controller and sets the suggested data length.
+ *
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t ble_init(void)
 {
     ble_err_t status;
@@ -810,6 +1104,12 @@ static ble_err_t ble_init(void)
         }
 
         status = ble_host_callback_set(APP_SERVICE_EVENT, ble_service_data_cb);
+        if (status != BLE_ERR_OK)
+        {
+            break;
+        }
+
+        status = ble_host_callback_set(APP_L2CAP_DATA_EVENT, ble_l2cap_data_cb);
         if (status != BLE_ERR_OK)
         {
             break;
@@ -870,9 +1170,18 @@ static ble_err_t ble_init(void)
     return status;
 }
 
+/**
+ * @brief Initializes the application.
+ *
+ * This function sets up the application by initializing the BLE stack and GPIO.
+ * It also creates the necessary queues and semaphores for handling BLE events and requests.
+ *
+ * @return void This function does not return a value.
+ */
 static void app_init(void)
 {
     ble_task_priority_t ble_task_level;
+    hosal_gpio_input_config_t input_cfg;
 
     // banner
     printf("------------------------------------------\n");
@@ -897,18 +1206,85 @@ static void app_init(void)
 
     // application SW timer, tick = 1s
     g_hrs_timer = xTimerCreate("HRS_Timer", pdMS_TO_TICKS(1000), pdTRUE, ( void * ) 0, hrs_timer_handler);
+
+    // wake up pin
+    input_cfg.pin_int_mode = HOSAL_GPIO_PIN_INT_EDGE_FALLING;
+    input_cfg.usr_cb = app_gpio_handler;
+    input_cfg.param = NULL;
+    hosal_gpio_cfg_input(GPIO_WAKE_UP_PIN, input_cfg);
+    hosal_gpio_debounce_enable(GPIO_WAKE_UP_PIN);
+    hosal_gpio_int_enable(GPIO_WAKE_UP_PIN);
 }
 
-/**************************************************************************************************
- *    GLOBAL FUNCTIONS
- *************************************************************************************************/
-int main(void)
+/**
+ * @brief Initializes the pin multiplexing.
+ *
+ * This function sets all GPIO pins to GPIO mode, except for GPIO16 and GPIO17,
+ * which are reserved for specific functions.
+ *
+ * @return void This function does not return a value.
+ */
+static void pin_mux_init(void) 
 {
+    /*set all pin to gpio, except GPIO16, GPIO17 */
+    for (int i = 0; i < 32; i++) {
+        if (i == 16 || i == 17) {
+            continue; // Skip GPIO16 and GPIO17
+        }
+        hosal_pin_set_mode(i, HOSAL_MODE_GPIO);
+    }
+}
+
+/**
+ * @brief Main entry point for the application.
+ *
+ * This function initializes the RF module, starts the application initialization,
+ * and enters an infinite loop to keep the application running.
+ *
+ * @param pvParameters Pointer to parameters passed to the task (not used).
+ * @return void This function does not return a value.
+ */
+static void app_main_entry(void* pvParameters)
+{
+    hosal_lpm_init();
     hosal_rf_init(HOSAL_RF_MODE_BLE_CONTROLLER);
+
     /* application init */
     app_init();
     app_main_task();
 
     while (1) {
     }
+}
+
+/**************************************************************************************************
+ *    GLOBAL FUNCTIONS
+ *************************************************************************************************/
+/**
+ * @brief Main function.
+ *
+ * This is the entry point of the application. It initializes the RF module,
+ * application, and starts the main application task.
+ *
+ * @return int This function does not return a value.
+ */
+ int main(void)
+{
+    pin_mux_init();
+    uart_stdio_init();
+    vHeapRegionsInt();
+    _dump_boot_info();
+
+    if (xTaskCreate(app_main_entry, (char*)"main",
+                    CONFIG_HOSAL_SOC_MAIN_ENTRY_TASK_SIZE, NULL,
+                    E_TASK_PRIORITY_APP, NULL)
+        != pdPASS) {
+        puts("Task create fail....\r\n");
+    }
+    puts("[OS] Starting OS Scheduler...\r\n");
+    puts("\r\n");
+    vTaskStartScheduler();
+    while (1) {};
+
+    return 0;
 }

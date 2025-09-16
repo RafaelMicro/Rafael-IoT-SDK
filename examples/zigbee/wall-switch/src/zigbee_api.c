@@ -1,0 +1,271 @@
+/**
+ * @file zigbee_api.c
+ * @author 
+ * @brief 
+ * @version 0.1
+ * @date 
+ * 
+ * @copyright Copyright (c) 2025
+ * 
+ */
+//=============================================================================
+//                Include
+//=============================================================================
+#include "mcu.h"
+
+#include "FreeRTOS.h"
+#include "queue.h"
+#include "timers.h"
+
+#include "zb_common.h"
+#include "zb_mac_globals.h"
+#include "zboss_api.h"
+
+#include "log.h"
+#include "zigbee_api.h"
+#include "device_api.h"
+#include "zigbee_platform.h"
+#include "zigbee_zcl_msg_handler.h"
+#include "hosal_gpio.h"
+#include "hosal_sysctrl.h"
+
+//=============================================================================
+//                Global variables
+//=============================================================================
+#define ZB_TRACE_FILE_ID 294
+#ifdef ZB_USE_SLEEP
+#define APP_KEEP_ALIVE_TIMEOUT  1000
+#endif
+/*! Active scan duration, valid range 0 ~ 14, (15.36ms * (2^SD +1)) ms in one channel.  */
+uint8_t ZB_RAF_SCAN_DURATION = 3;
+static TimerHandle_t tmr_identify;
+
+static TaskHandle_t zb_app_taskHandle;
+
+//=============================================================================
+//                Function
+//=============================================================================
+static void zb_app_ota_status_chk(void)
+{
+    fota_information_t t_bootloader_ota_info = {0};
+    memcpy(&t_bootloader_ota_info, (uint8_t *)FOTA_UPDATE_BANK_INFO_ADDRESS, sizeof(t_bootloader_ota_info));
+
+    if (t_bootloader_ota_info.fotabank_ready == FOTA_IMAGE_READY
+        && t_bootloader_ota_info.fota_result == FOTA_RESULT_SUCCESS) {
+        log_info("OTA success", t_bootloader_ota_info.reserved[0]);
+        while (flash_check_busy());
+        flash_erase(FLASH_ERASE_SECTOR, FOTA_UPDATE_BANK_INFO_ADDRESS);
+    }
+    log_info("ver : %08X", z_get_file_version());
+}
+void zb_app_signal(void) {
+    if (xPortIsInsideInterrupt()) {
+        BaseType_t pxHigherPriorityTaskWoken = pdTRUE;
+        vTaskNotifyGiveFromISR(zb_app_taskHandle, &pxHigherPriorityTaskWoken);
+    } else {
+        xTaskNotifyGive(zb_app_taskHandle);
+    }
+}
+
+void zigbee_app_read_otp_mac_addr(uint8_t* addr) {
+    uint8_t temp[0x100];
+    flash_read_sec_register((uint32_t)temp, 0x1100);
+    memcpy(addr, temp + 8, 8);
+}
+
+void zigbee_app_nwk_start(uint32_t channel_mask, uint32_t max_child,
+                                 uint32_t reset) {
+    uint8_t ieee_addr_invalid[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    uint8_t ieee_addr[8];
+    static uint8_t zb_started = 0;
+
+    if(zb_started)
+    {
+        log_error("zb already started");
+        return;
+    }
+
+    zb_started = 1;
+    zigbee_app_read_otp_mac_addr(ieee_addr);
+
+    if (memcmp(ieee_addr, ieee_addr_invalid, 8) == 0) {
+        flash_get_unique_id((uint32_t)ieee_addr, 8);
+    }
+
+    log_info("15p4 MAC Address : %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+             ieee_addr[7], ieee_addr[6], ieee_addr[5], ieee_addr[4], ieee_addr[3],
+             ieee_addr[2], ieee_addr[1], ieee_addr[0]);
+
+    ZB_THREAD_SAFE(zb_set_long_address(ieee_addr);
+
+                    zb_set_nvram_erase_at_start(reset);
+#ifdef ZB_USE_SLEEP
+                    zb_set_network_ed_role(channel_mask);
+                    zb_set_ed_timeout(ED_AGING_TIMEOUT_64MIN);
+                    zb_set_rx_on_when_idle(0);
+                    zb_set_keepalive_timeout(ZB_MILLISECONDS_TO_BEACON_INTERVAL(APP_KEEP_ALIVE_TIMEOUT));
+#else
+                    zb_set_network_router_role(channel_mask);
+                    zb_set_max_children(max_child);
+#endif
+                    zb_zdo_set_aps_unsecure_join(ZB_TRUE););
+                    //zb_bdb_set_legacy_device_support(ZB_TRUE););
+    zbStartRun();
+}
+
+static void tmr_identify_cb(TimerHandle_t t_timer)
+{
+    static uint8_t identify_onoff = 0;
+    uint16_t remaining_time;
+
+    remaining_time = get_identify_time();
+    if(remaining_time != 0) {
+        if (identify_onoff == 0)
+        {
+            set_led_onoff(LED_BLUE,1);
+            identify_onoff = 1;
+        }
+        else
+        {
+            set_led_onoff(LED_BLUE,0);
+            identify_onoff = 0;
+        }
+        xTimerStart(tmr_identify, 0);
+    }
+    else if (remaining_time == 0)
+    {
+        identify_onoff = 0;
+        set_led_onoff(LED_BLUE,0);
+        log_info("Identify complete");
+    }
+}
+
+void zigbee_start_identify(void) {
+    if (!tmr_identify) {
+        tmr_identify = xTimerCreate("t_id", pdMS_TO_TICKS(200), pdFALSE, (void *)0, tmr_identify_cb);
+    }
+    if (!xTimerIsTimerActive(tmr_identify)) {
+        xTimerStart(tmr_identify, 0);
+    }
+}
+
+void zigbee_zcl_set_attrubute(uint8_t ep, uint16_t cluster, uint8_t role, uint16_t attr_id, uint8_t* val) {
+    ZB_ZCL_SET_ATTRIBUTE(ep, cluster, role, attr_id, val, ZB_FALSE);
+}
+
+void zigbee_app_send_toggle_command(void) {
+
+    zcl_data_req_t *pt_data_req;
+
+    ZIGBEE_ZCL_DATA_REQ(pt_data_req, 0, ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT, 0, WALL_SWITCH_EP, ZB_ZCL_CLUSTER_ID_ON_OFF,
+                        ZB_ZCL_CMD_ON_OFF_TOGGLE_ID, TRUE, TRUE, ZCL_FRAME_CLIENT_SERVER_DIR, 0, 0)
+
+    if (pt_data_req)
+    {
+        zigbee_app_zcl_send_command(pt_data_req);
+        vPortFree(pt_data_req);
+    }
+}
+void zigbee_app_send_level_up_command(void) {
+
+    zcl_data_req_t *pt_data_req;
+    ZIGBEE_ZCL_DATA_REQ(pt_data_req, 0, ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT, 0, WALL_SWITCH_EP, ZB_ZCL_CLUSTER_ID_LEVEL_CONTROL,
+                        ZB_ZCL_CMD_LEVEL_CONTROL_STEP_WITH_ON_OFF, TRUE, TRUE, ZCL_FRAME_CLIENT_SERVER_DIR, 0, 4)
+
+    if (pt_data_req)
+    {
+        pt_data_req->cmdFormat[0] = ZB_ZCL_LEVEL_CONTROL_MOVE_MODE_UP;
+        pt_data_req->cmdFormat[1] = 50;
+        pt_data_req->cmdFormat[2] = 5;
+        pt_data_req->cmdFormat[3] = 0;
+        zigbee_app_zcl_send_command(pt_data_req);
+        vPortFree(pt_data_req);
+    }
+}
+void zigbee_app_send_level_down_command(void) {
+
+    zcl_data_req_t *pt_data_req;
+
+    ZIGBEE_ZCL_DATA_REQ(pt_data_req, 0, ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT, 0, WALL_SWITCH_EP, ZB_ZCL_CLUSTER_ID_LEVEL_CONTROL,
+                        ZB_ZCL_CMD_LEVEL_CONTROL_STEP_WITH_ON_OFF, TRUE, TRUE, ZCL_FRAME_CLIENT_SERVER_DIR, 0, 4)
+
+    if (pt_data_req)
+    {
+        pt_data_req->cmdFormat[0] = ZB_ZCL_LEVEL_CONTROL_MOVE_MODE_DOWN;
+        pt_data_req->cmdFormat[1] = 50;
+        pt_data_req->cmdFormat[2] = 5;
+        pt_data_req->cmdFormat[3] = 0;
+        zigbee_app_zcl_send_command(pt_data_req);
+        vPortFree(pt_data_req);
+    }
+}
+
+void zboss_signal_handler(zb_uint8_t param) {
+    zb_zdo_app_signal_hdr_t* sg_p = NULL;
+    zb_zdo_app_signal_t sig = zb_get_app_signal(param, &sg_p);
+    zb_ret_t z_ret = ZB_GET_APP_SIGNAL_STATUS(param);
+    zb_zdo_signal_device_annce_params_t* dev_annce_params;
+
+    //log_info(">>zdo_signal_handler: status %d signal %d", z_ret, sig);
+    do {
+        switch (sig) {
+            case ZB_ZDO_SIGNAL_SKIP_STARTUP: zboss_start_continue(); break;
+
+            case ZB_BDB_SIGNAL_DEVICE_FIRST_START:
+            case ZB_BDB_SIGNAL_STEERING:
+            case ZB_BDB_SIGNAL_DEVICE_REBOOT:
+                if (z_ret != 0) {
+                    ZIGBEE_APP_NOTIFY(ZB_APP_EVENT_NOT_JOINED);
+                } else if (z_ret == 0) {
+                    ZIGBEE_APP_NOTIFY(ZB_APP_EVENT_JOINED);
+                    ZB_SCHEDULE_APP_ALARM(zb_zcl_ota_upgrade_init_client, param, ZB_MILLISECONDS_TO_BEACON_INTERVAL(2*1000));
+                    param = 0;
+                }
+                break;
+            case ZB_COMMON_SIGNAL_CAN_SLEEP: {
+                #ifdef ZB_USE_SLEEP
+                    zb_sleep_now();
+                #endif
+            } break;
+
+            case ZB_NLME_STATUS_INDICATION: {
+
+            } break;
+            case ZB_ZDO_SIGNAL_PERMIT_JOIN: {
+            } break;
+            case ZB_ZDO_SIGNAL_LEAVE: {
+                /* Notifies the application that the device itself has left the network.*/
+                zb_zdo_signal_leave_params_t *leave_params = ZB_ZDO_SIGNAL_GET_PARAMS(sg_p, zb_zdo_signal_leave_params_t);
+                if(leave_params->leave_type == ZB_NWK_LEAVE_TYPE_RESET) {
+                    log_info("Device do factory reset");
+                    flash_erase(FLASH_ERASE_SECTOR, FOTA_UPDATE_BANK_INFO_ADDRESS);
+                    while (flash_check_busy());
+                    delay_ms(300);
+                    sys_software_reset();
+                }
+            } break;
+
+            default: break;
+        }
+    } while (0);
+
+    if (param) {
+        zb_buf_free(param);
+    }
+}
+
+
+void zigbee_app_init(void) {
+    BaseType_t xReturned;
+    hosal_gpio_cfg_output(LED_BLUE);
+    set_led_onoff(LED_BLUE,0);
+    zb_app_ota_status_chk();
+    xReturned = xTaskCreate(app_main_loop, "app-zigbee", 512, NULL,
+                            E_TASK_PRIORITY_LOWEST, &zb_app_taskHandle);
+    if (xReturned != pdPASS) {
+        log_error("ZigBee APP task create fail");
+    }
+
+    // zb_app_handle = xQueueCreate(16, sizeof(_zb_app_data_t*));
+    button_init();
+}

@@ -260,7 +260,7 @@ static inline uint8_t cpc_hdlc_create_control_data(uint8_t seq, uint8_t ack,
  *
  * @return HDLC header control value.
  ******************************************************************************/
-inline uint8_t
+static inline uint8_t
 cpc_hdlc_create_control_supervisory(uint8_t ack, uint8_t supervisory_function) {
     uint8_t control = CPC_HDLC_FRAME_TYPE_SUPERVISORY
                       << CPC_HDLC_CONTROL_FRAME_TYPE_SHIFT;

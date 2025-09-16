@@ -15,7 +15,6 @@
  *    INCLUDES
  *************************************************************************************************/
 #include <stdint.h>
-#include <stdbool.h>
 #include "ble_hci.h"
 
 #ifdef __cplusplus
@@ -30,24 +29,26 @@ extern "C" {
  *
  * @ingroup hci_cmd_vendor
  *
- * @param p_param : a pointer to the ventdor controller information parameter.
+ * @param p_param : a pointer to the vendor controller information parameter.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_vendor_set_controller_info_cmd(ble_hci_vcmd_cntlr_info_param_t *p_param);
+ble_err_t hci_vendor_set_controller_info_cmd(ble_hci_vcmd_cntlr_info_param_t *p_param);
 
 
 /** Set scan report vendor command.
  *
  * @ingroup hci_cmd_vendor
  *
- * @param p_param : a pointer to the ventdor scan request report parameter.
+ * @param p_param : a pointer to the vendor scan request report parameter.
  *
  * @return BLE_ERR_OK   : success.
- * @return ERR_MEM  : failed to send HCI command.
+ * @return BLE_ERR_DATA_MALLOC_FAIL  : failed to malloc memory.
+ * @return BLE_ERR_HCI_TX_CMD_QUEUE_FULL : failed to tx data queue full.
  */
-int8_t hci_vendor_set_scan_request_report_cmd(ble_hci_vcmd_scan_req_rpt_param_t *p_param);
+ble_err_t hci_vendor_set_scan_request_report_cmd(ble_hci_vcmd_scan_req_rpt_param_t *p_param);
 
 #ifdef __cplusplus
 }

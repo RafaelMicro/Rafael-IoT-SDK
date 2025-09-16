@@ -669,6 +669,8 @@ typedef enum zb_zcl_device_callback_id_e
   ZB_ZCL_OTA_UPGRADE_SRV_QUERY_IMAGE_CB_ID,
   /** @b Server. Inform user about the first Image block request */
   ZB_ZCL_OTA_UPGRADE_SRV_UPGRADE_STARTED_CB_ID,
+  /** @b Server. Inform user about the Image block request */
+  ZB_ZCL_OTA_UPGRADE_SRV_IMAGE_BLOCK_CB_ID,
   /** @b Server. Inform user about the aborted Image block request  */
   ZB_ZCL_OTA_UPGRADE_SRV_UPGRADE_ABORTED_CB_ID,
   /** @b Server. Inform user about finished OTA upgrade */
@@ -1796,6 +1798,7 @@ typedef struct zb_zcl_device_callback_param_s
 #if defined ZB_HA_ENABLE_OTA_UPGRADE_SERVER
    zb_zcl_ota_upgrade_srv_query_img_param_t       ota_upgrade_srv_query_img_param;
    zb_zcl_ota_upgrade_srv_upgrade_started_param_t ota_upgrade_srv_upgrade_started_param;
+   zb_zcl_ota_upgrade_srv_image_block_param_t     ota_upgrade_srv_image_block_param;
    zb_zcl_ota_upgrade_srv_upgrade_aborted_param_t ota_upgrade_srv_upgrade_aborted_param;
    zb_zcl_ota_upgrade_srv_upgrade_end_param_t     ota_upgrade_srv_upgrade_end_param;
 #endif

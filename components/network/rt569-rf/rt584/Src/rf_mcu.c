@@ -17,7 +17,7 @@
 #error "CFG_RF_MCU_CTRL_TYPE not supported!"
 #endif
 #if (RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569S)
-#include "rt569mp_init.h"
+#include "rt569s_init.h"
 #elif (RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569M0)
 #if (RF_MCU_CHIP_VER == RF_MCU_CHIP_VER_A)
 #include "rt569mxa_init.h"
@@ -50,6 +50,11 @@ const patch_cfg_ctrl_t PATCH_CFG_LIST[] =
 const uint8_t *pRfMcuConstAddr = NULL;
 uint32_t uiRfMcuConstLength = 0;
 #endif
+
+bool bFwLoaded = false;
+bool bFwInitialized = false;
+uint32_t vCurrentFw = (uint32_t)NULL;
+
 
 #if (CFG_RF_MCU_CTRL_TYPE == RF_MCU_CTRL_BY_AHB)
 
@@ -595,9 +600,13 @@ uint32_t RfMcu_RegGet(uint16_t reg_address)
 
 void RfMcu_SysInitNotify(void)
 {
-    while (RfMcu_McuStateRead() != RF_MCU_STATE_INIT_SUCCEED);
-    RfMcu_HostCmdSet(RF_MCU_STATE_INIT_SUCCEED);
-    while (RfMcu_McuStateRead() == RF_MCU_STATE_INIT_SUCCEED);
+    if (!bFwInitialized)
+    {
+        while (RfMcu_McuStateRead() != RF_MCU_STATE_INIT_SUCCEED);
+        RfMcu_HostCmdSet(RF_MCU_STATE_INIT_SUCCEED);
+        while (RfMcu_McuStateRead() == RF_MCU_STATE_INIT_SUCCEED);
+        bFwInitialized = true;
+    }
 }
 
 
@@ -829,6 +838,176 @@ void RfMcu_PatchDisableM0(void)
 }
 #endif
 
+#if (RF_MCU_FW_PRELOAD_SUPPORTED)
+RF_MCU_INIT_STATUS RfMcu_SysInitFw(
+    bool load_image,
+    const uint8_t *p_sys_image,
+    uint32_t image_size,
+    COMM_SUBSYSTEM_ISR_CONFIG rf_mcu_isr_cfg,
+    RF_MCU_INIT_STATUS rf_mcu_init_state
+)
+{
+    RF_MCU_INIT_STATUS error = RF_MCU_INIT_NO_ERROR;
+    bool bIsHostMode = FALSE;
+    bool bFwChanged = false;
+
+#if (RF_MCU_ICE_SUPPORTED)
+    load_image = FALSE;
+#endif
+
+    if ((bFwLoaded) &&
+            (image_size) &&
+            (vCurrentFw != (uint32_t)p_sys_image))
+    {
+        bFwChanged = true;
+    }
+    else
+    {
+        bFwChanged = false;
+    }
+
+    RfMcu_ChipIdCheck();
+
+    if (bFwChanged)
+    {
+        RfMcu_HostModeEnable();
+
+        if (rf_mcu_init_state != RF_MCU_INIT_WITHOUT_RESET)
+        {
+            RfMcu_HostResetMcu();
+        }
+
+        RfMcu_SysRdySignalWait();
+    }
+    else
+    {
+        RfMcu_SysRdySignalWait();
+    }
+
+    if ((!bFwLoaded) || (bFwChanged))
+    {
+        bIsHostMode = true;
+        bFwInitialized = false;
+    }
+
+#if (CFG_RF_MCU_CTRL_TYPE == RF_MCU_CTRL_BY_SPI)
+    RfMcu_InterruptDisableAll();
+#endif
+#if (CFG_RF_MCU_CTRL_TYPE == RF_MCU_CTRL_BY_AHB)
+    if (!bFwLoaded)
+    {
+        RfMcu_DmaInit();
+    }
+#endif
+
+#if (CFG_RF_MCU_CTRL_TYPE == RF_MCU_CTRL_BY_SPI)
+#if (RF_MCU_CHIP_TYPE == RF_MCU_TYPE_ASIC)
+    RfMcu_IceModeCtrl(false);
+#else
+    if (load_image == true)
+    {
+        RfMcu_IceModeCtrl(false);
+    }
+    else
+    {
+        RfMcu_IceModeCtrl(true);
+    }
+#endif
+#endif
+
+    if (!bFwLoaded || bFwChanged)
+    {
+        if ((load_image == true) && (image_size))
+        {
+#if (RF_MCU_CONST_LOAD_SUPPORTED)
+            if (pRfMcuConstAddr && uiRfMcuConstLength)
+            {
+                RfMcu_ConstLoad(pRfMcuConstAddr, uiRfMcuConstLength);
+            }
+#endif
+#if ((RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569M0) && (RF_MCU_CHIP_BASE == BASE_ROM_TYPE))
+            RfMcu_ImageLoadM0(p_sys_image, image_size);
+#else
+            RfMcu_ImageLoad(p_sys_image, image_size);
+#endif
+#if (CFG_RF_MCU_CTRL_TYPE == RF_MCU_CTRL_BY_SPI)
+            error = RfMcu_CheckFw(p_sys_image, image_size);
+#endif
+
+#if (RF_MCU_PATCH_SUPPORTED)
+            RfMcu_HostModeDisable();
+            RfMcu_SysInitNotify();
+            RfMcu_HostModeEnable();
+#endif
+            vCurrentFw = (uint32_t)p_sys_image;
+            bFwLoaded = true;
+        }
+    }
+
+    RFMcu_LoadExtMemInit();
+
+#if (RF_MCU_PATCH_SUPPORTED)
+    if (pPatchAddr && uiPatchLength)
+    {
+        error = vPatchEntry(pPatchAddr, uiPatchLength);
+
+        if (error != RF_MCU_INIT_NO_ERROR)
+        {
+            return error;
+        }
+    }
+#elif (RF_MCU_CHIP_MODEL == RF_MCU_CHIP_569M0)
+#if (RF_MCU_CHIP_BASE == BASE_ROM_TYPE)
+    if (load_image == false)
+#endif
+    {
+        RfMcu_PatchDisableM0();
+    }
+#endif
+
+    RfMcu_IsrInit(rf_mcu_isr_cfg.commsubsystem_isr, rf_mcu_isr_cfg.content);
+    RfMcu_InterruptEnableAll();
+    if (bIsHostMode)
+    {
+        RfMcu_HostModeDisable();
+    }
+
+    return error;
+}
+
+RF_MCU_INIT_STATUS RfMcu_SysInit(
+    bool load_image,
+    const uint8_t *p_sys_image,
+    uint32_t image_size,
+    COMM_SUBSYSTEM_ISR_CONFIG rf_mcu_isr_cfg,
+    RF_MCU_INIT_STATUS rf_mcu_init_state
+)
+{
+    RF_MCU_INIT_STATUS error;
+
+    error = RfMcu_SysInitFw(load_image, p_sys_image, image_size,
+                            rf_mcu_isr_cfg, rf_mcu_init_state);
+
+    RfMcu_SysInitNotify();
+
+    return error;
+}
+#else
+RF_MCU_INIT_STATUS RfMcu_SysInitFw(
+    bool load_image,
+    const uint8_t *p_sys_image,
+    uint32_t image_size,
+    COMM_SUBSYSTEM_ISR_CONFIG rf_mcu_isr_cfg,
+    RF_MCU_INIT_STATUS rf_mcu_init_state
+)
+{
+    UNUSED(load_image);
+    UNUSED(p_sys_image);
+    UNUSED(image_size);
+    UNUSED(rf_mcu_isr_cfg);
+    UNUSED(rf_mcu_init_state);
+    return RF_MCU_INIT_NO_ERROR;
+}
 
 RF_MCU_INIT_STATUS RfMcu_SysInit(
     bool load_image,
@@ -928,6 +1107,8 @@ RF_MCU_INIT_STATUS RfMcu_SysInit(
 
     return error;
 }
+
+#endif
 
 
 #if (RF_MCU_PATCH_SUPPORTED)

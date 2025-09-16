@@ -1,0 +1,2 @@
+sdk_add_static_library(subg_ctrl)
+sdk_add_include_directories(Inc)

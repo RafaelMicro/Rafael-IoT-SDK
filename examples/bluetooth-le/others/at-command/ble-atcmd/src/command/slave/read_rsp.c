@@ -1,6 +1,4 @@
 #include "atcmd_command_list.h"
-#include "project_config.h"
-
 
 // PRIVATE FUNCTION DECLARE
 static void read_response_cmd_init(cmd_info_t *this);

@@ -1,0 +1,387 @@
+name: component release
+
+on:
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}-${{ 
+    (github.event_name == 'merge_group' && github.event.merge_group.head_sha) || 
+    (github.event_name == 'workflow_dispatch' && github.run_id) || 
+    github.sha }}
+  cancel-in-progress: true
+  
+env:
+  CHIP_NO_LOG_TIMESTAMPS: true
+  UPLOAD_FOLDER: tmp
+  BIN_FOLDER: bin_files
+  LIB_FOLDER: lib_files
+  LIB_PATH: tmp/lib_files
+  CPC_LIB_PATH: cpc
+  LIBC_LIB_PATH: libc
+  ZB_LIB_PATH: network/zigbee/zboss
+  ZB_PORT_LIB_PATH: network/zigbee/zboss_port
+  BLE_LIB_PATH: network/bluetooth/ble-host
+  BLE_MESH_LIB_PATH: network/bluetooth/ble-mesh
+  L15P4_LIB_PATH: network/lmac15p4
+  RT569_LIB_PATH: network/rt569-rf/rt582
+  RF_LAB_TEST_PATH: Rafael-SDK-QA/examples/rf-labtest-tool
+  CONFIG_FILE: ./.github/config/lib.json
+  REPO_ORG: RafaelMicro
+  REPO_NAME_DEV : Rafael-IoT-SDK-Internal
+  REPO_NAME_QA : Rafael-SDK-QA
+  REPO_NAME_COMP : components_dev
+  SAFE_FOLDER_NAME: /__w/Rafael-IoT-SDK-Internal/Rafael-IoT-SDK-Internal
+
+jobs:  
+  check-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 檢查分支資訊
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/release/v* ]]; then
+            echo "分支名稱不符合規則（需要以 release/v 開頭）"
+            exit 1
+          else
+            echo "分支名稱符合規則：$GITHUB_REF"
+          fi
+        continue-on-error: false
+
+  trigger-on-RT58x-branch:
+    needs: check-branch-name
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/release/')
+    steps:
+      - name: 輸出分支名稱
+        run: |
+          echo "branch name: ${{ github.ref_name }}"
+        
+  Update-component:  
+    name: component update
+    needs: check-branch-name  # 依賴 check-branch-name，失敗不會運行
+    runs-on: ubuntu-latest
+    if: github.actor != 'restyled-io[bot]'
+    container:
+      image: resghst/rafael_sdk_image_test:latest
+
+    steps:
+      - name: 📂 切換到 Repository
+        uses: actions/checkout@v4
+        
+      - name: 🔧 安裝 rsync 與 zip 工具
+        run: |
+          apt-get update
+          apt-get install -y zip rsync file
+          
+      - name: 🗂️ 建立與設定 Repository 資料夾
+        run: |
+          mkdir -p $UPLOAD_FOLDER/$BIN_FOLDER
+          mkdir -p $UPLOAD_FOLDER/$LIB_FOLDER
+          git config --global --add safe.directory ${SAFE_FOLDER_NAME}
+          echo "SAFE_DIRECTORY=$(git config --global --get safe.directory)" >> $GITHUB_ENV
+
+      - name: 🧾 取得 Git 版本資訊
+        run: echo "GIT_VERSION=$(git describe --dirty=-QA --always --tags --long --match 'release/*')" >> $GITHUB_ENV
+
+      - name: CMake 工具鏈交換（in ➜ 正式）
+        run: |
+          echo "🔁 將 cmake/toolchain.cmake.in 改名為 toolchain.cmake"
+          if [ -f cmake/toolchain.cmake ]; then
+            mv cmake/toolchain.cmake cmake/toolchain.cmake.bak
+          fi
+          mv cmake/toolchain.cmake.in cmake/toolchain.cmake
+
+      - name: 編譯專案與上傳Library
+        uses: ./.github/actions/build_manger
+        with:
+          json_file: ${{ env.CONFIG_FILE }}
+          script_name: docker_build.sh
+          upload_folder: ${{ env.UPLOAD_FOLDER }}
+          bin_folder: ${{ env.BIN_FOLDER }}
+          lib_folder: ${{ env.LIB_FOLDER }}
+          git_version: ${{ env.GIT_VERSION }}
+          repo_org : ${{ env.REPO_ORG }}
+          safe_folder_name : ${{ env.SAFE_FOLDER_NAME }}
+
+      - name: 產生日期
+        id: date
+        run: echo "TODAY=$(date +'%Y/%m/%d')" >> "$GITHUB_ENV"
+
+      - name: 使用日期與其他環境變量
+        env:
+          CREATE_DATE: ${{ steps.date.outputs.today }}
+        run: |
+          echo "Bin Folder: $BIN_FOLDER"
+          echo "Lib Folder: $LIB_FOLDER"
+          echo "Config: $CONFIG_FILE"
+          echo "Branch: $BRANCH_NAME"
+          echo "Repo Org: $REPO_ORG"
+          echo "Create Date: $TODAY"
+          echo "safe_folder_name: $SAFE_FOLDER_NAME"
+          
+      - name: 🧪 分析並解析分支版本資訊
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          # 取前綴（例如 release）
+          PREFIX="${BRANCH_NAME%%/*}"
+          # 取得尾端名稱（v2.0.0_beta_20250612）
+          FULL_VERSION="${BRANCH_NAME##*/}"
+          # 取版本號（例如 v2.0.0）
+          # 從尾端名稱中分離版本號（v2.0.0）
+          VERSION="${FULL_VERSION%%_*}"
+          # 從尾端名稱中分離後綴（beta_20250612）
+          SUFFIX="${FULL_VERSION#*_}"
+          echo "PREFIX=$PREFIX" >> $GITHUB_ENV
+          echo "TAG_NAME=$FULL_VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "SUFFIX=$SUFFIX" >> $GITHUB_ENV
+          echo "BRNAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "SHORT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "Bin Folder: $BIN_FOLDER"
+          echo "Lib Folder: $LIB_FOLDER"
+          echo "Config: $CONFIG_FILE"
+          echo "Branch: $BRANCH_NAME"
+          echo "Repo Org: $REPO_ORG"
+          echo "Create Date: $CREATE_DATE"
+          echo "safe_folder_name: $SAFE_FOLDER_NAME" 
+          echo "branch_name: $BRANCH_NAME" 
+          echo "version: $VERSION" 
+          echo "tag_name: $TAG_NAME"
+
+
+      - name: ⚙️ 設定 Git 使用者資訊
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          # ls -la
+          echo ${{ github.workspace }}
+          
+      - name: 複製 Component repository 與設定 repository as safe
+        run: |
+          echo "🔍 嘗試 clone ${REPO_NAME_COMP} repo..."
+          git clone https://${{ secrets.RAFAEL_PRIV_TOKEN }}@github.com/${REPO_ORG}/${REPO_NAME_COMP}.git ${REPO_NAME_COMP}
+          # 檢查 clone 是否成功
+          if [ ! -d "${REPO_NAME_COMP}" ]; then
+            echo "❌ 錯誤：clone 後資料夾不存在，可能是權限問題或 repo 不存在"
+            exit 1
+          fi
+
+          echo "✅ clone 成功，顯示內容："
+          ls -la ${REPO_NAME_COMP}
+
+          echo "🔒 設定 safe.directory"
+          git config --global --add safe.directory ${SAFE_FOLDER_NAME}/${REPO_NAME_COMP}            
+
+      - name: 🔄 同步 Component 與除錯
+        run: |
+          echo "🧹 清除 component-release 中除了 .git 的所有內容..."
+          find ${REPO_NAME_COMP} -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
+
+          echo "🔄 同步前 component-release 資料夾內容："
+          ls -la ./${REPO_NAME_COMP}/
+      
+          rsync -av --ignore-missing-args \
+                --exclude=".git" \
+                --exclude="${REPO_NAME_COMP}" \
+                --exclude-from=./docs/SDK_Release/Release_sqc_component_ignore_files.txt \
+                --delete ./components/ ${REPO_NAME_COMP}/
+      
+          echo "🔄 同步後 component-release 資料夾內容："
+          # Step 1: 輸出 component-release 檔案列表
+          ls -la ./${REPO_NAME_COMP}/
+          # Step 1: 輸出 ./tmp/lib_files/ 檔案列表
+          ls -la ./tmp/lib_files/
+          
+      - name: 🗜️壓縮 Library 和 複製 library
+        shell: bash
+        run: |
+          echo "tmp/lib_files 資料夾內容："
+          pwd
+          ls -la ${LIB_PATH}/
+          # Step : 輸出 .component-release/tmp/lib_files/ 檔案列表
+          #cp ${LIB_PATH}/libcpc.a ${REPO_NAME_COMP}/${CPC_LIB_PATH}/libcpc.a
+          #cp ${LIB_PATH}/liblibc.a ${REPO_NAME_COMP}/${LIBC_LIB_PATH}/liblibc.a
+          cp ${LIB_PATH}/liblmac15p4.a ${REPO_NAME_COMP}/${L15P4_LIB_PATH}/liblmac15p4.a
+          cp ${LIB_PATH}/libzboss_aps_ffd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_aps_ffd.a
+          cp ${LIB_PATH}/libzboss_aps_rfd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_aps_rfd.a
+          cp ${LIB_PATH}/libzboss_mac_ffd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_mac_ffd.a
+          cp ${LIB_PATH}/libzboss_mac_rfd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_mac_rfd.a
+          cp ${LIB_PATH}/libzboss_nwk_ffd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_nwk_ffd.a
+          cp ${LIB_PATH}/libzboss_nwk_rfd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_nwk_rfd.a
+          cp ${LIB_PATH}/libzboss_zcl_ffd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_zcl_ffd.a
+          cp ${LIB_PATH}/libzboss_zcl_rfd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_zcl_rfd.a
+          cp ${LIB_PATH}/libzboss_zdo_ffd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_zdo_ffd.a
+          cp ${LIB_PATH}/libzboss_zdo_rfd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_zdo_rfd.a
+          cp ${LIB_PATH}/libzboss_zgp_ffd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_zgp_ffd.a
+          cp ${LIB_PATH}/libzboss_zgp_rfd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_zgp_rfd.a
+          cp ${LIB_PATH}/libzboss_zse_ffd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_zse_ffd.a
+          cp ${LIB_PATH}/libzboss_zse_rfd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_zse_rfd.a
+          cp ${LIB_PATH}/libzboss_port_ffd.a ${REPO_NAME_COMP}/${ZB_PORT_LIB_PATH}/libzboss_port_ffd.a
+          cp ${LIB_PATH}/libzboss_port_rfd.a ${REPO_NAME_COMP}/${ZB_PORT_LIB_PATH}/libzboss_port_rfd.a
+          cp ${LIB_PATH}/libzboss_secure_ffd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_secure_ffd.a
+          cp ${LIB_PATH}/libzboss_secure_rfd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_secure_rfd.a
+          cp ${LIB_PATH}/libzboss_common_ffd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_common_ffd.a
+          cp ${LIB_PATH}/libzboss_common_rfd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_common_rfd.a
+          cp ${LIB_PATH}/libzboss_commissioning_ffd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_commissioning_ffd.a
+          cp ${LIB_PATH}/libzboss_commissioning_rfd.a ${REPO_NAME_COMP}/${ZB_LIB_PATH}/libzboss_commissioning_rfd.a
+          cp ${LIB_PATH}/libble_host.a ${REPO_NAME_COMP}/${BLE_LIB_PATH}/libble_host.a
+          cp ${LIB_PATH}/libble_mesh_server.a ${REPO_NAME_COMP}/${BLE_MESH_LIB_PATH}/libble_mesh_server.a
+          cp ${LIB_PATH}/libble_mesh_client.a ${REPO_NAME_COMP}/${BLE_MESH_LIB_PATH}/libble_mesh_client.a
+
+             
+      - name: 處理.in 檔案
+        shell: bash
+        env:
+          CREATE_DATE: ${{ steps.date.outputs.today }}
+        run: |
+            pwd
+            ls -la
+            pwd
+            echo " ls -la ./${REPO_NAME_COMP}"
+            ls -la ./${REPO_NAME_COMP}
+
+            TARGET_DIRS=(
+              "${REPO_NAME_COMP}/cpc"
+              "${REPO_NAME_COMP}/libc"
+              "${REPO_NAME_COMP}/network/bluetooth/ble-host"
+              "${REPO_NAME_COMP}/network/bluetooth/ble-mesh"
+              "${REPO_NAME_COMP}/network/bluetooth/hci_bridge"
+              "${REPO_NAME_COMP}/network/lmac15p4"
+              "${REPO_NAME_COMP}/network/ruci"
+              "${REPO_NAME_COMP}/network/zigbee/zboss"
+              "${REPO_NAME_COMP}/network/zigbee/zboss_port"
+            )
+            
+            for dir in "${TARGET_DIRS[@]}"; do
+              in_file="$dir/CMakeLists.txt.in"
+              txt_file="$dir/CMakeLists.txt"
+            
+              if [ -f "$in_file" ]; then
+                echo "處理: $in_file"
+            
+                [ -f "$txt_file" ] && echo " 刪除已存在的 $txt_file" && rm "$txt_file"
+            
+                echo "重命名 $in_file → $txt_file"
+                mv "$in_file" "$txt_file"
+              else
+                echo "⏭跳過：$in_file 不存在"
+              fi
+            done
+            ls -la ./components/network/bluetooth/ble-host
+
+            # 刪除 ulity 特定目錄中的 *.in 檔案
+            TARGET_UTILITY_DIRS=(
+              "${REPO_NAME_COMP}/utility/LzmaDec"
+              "${REPO_NAME_COMP}/utility/Version_Information"
+              "${REPO_NAME_COMP}/utility/cli"
+              "${REPO_NAME_COMP}/utility/log"
+            )
+            
+            for dir in "${TARGET_UTILITY_DIRS[@]}"; do
+              echo " 處理: $dir 中的 *.in 檔案"
+            
+              find "$dir" -type f -name "*.in" | while read -r file; do
+                echo "刪除: $file"
+                rm -f "$file"
+              done
+            done         
+
+      - name: 還原 CMake 工具鏈（toolchain ➜ in）
+        run: |
+          ls -la cmake/
+          echo "🔁 將 cmake/toolchain.cmake 還原成 toolchain.cmake.in"
+          if [ -f cmake/toolchain.cmake ]; then
+            mv cmake/toolchain.cmake cmake/toolchain.cmake.in
+          fi
+          if [ -f cmake/toolchain.cmake.bak ]; then
+            mv cmake/toolchain.cmake.bak cmake/toolchain.cmake
+          fi
+          ls -la cmake/
+          
+      - name: 移除除了 components 資料夾以外的內容並推送
+        shell: bash
+        run: |
+          pwd
+          echo "檢查目前有哪些資料夾："
+          ls -la
+          echo "切換到 components_dev 資料夾"
+          cd "${REPO_NAME_COMP}"
+          pwd
+          echo "🔍 ls -la"
+          ls -la
+          
+          echo "🔍 Git remote 設定："
+          git remote -v
+
+          rm -rf ./tmp
+          rm -rf ./make_scripts
+          rm -rf ./bluetooth-le
+          rm -rf ./zigbee
+
+          echo "✅ 剩餘內容如下（應該只有 components/）："
+          ls -la
+          pwd
+
+      - name: Show git log (main repo)
+        run: |
+          pwd
+          ls -la
+          git --no-pager log --oneline --graph --decorate -n 5
+
+      - name: Show git log (components_kc)
+        run: |
+          pwd
+          ls -la
+          cd "${REPO_NAME_COMP}"
+          pwd
+          ls -la
+          git --no-pager log --oneline --graph --decorate -n 5
+
+          echo "📦 Git commit 並推送到 components_dev"
+          git add -A
+          git commit -m "${TODAY} ${PREFIX} ${VERSION}" || echo "⚠️ 無檔案變更，跳過 commit"
+
+          echo "🔍 目前所在路徑：$(pwd)"
+          echo "🔍 Git branch：$(git branch)"
+          echo "🔍 Git remote 設定："
+          git remote -v
+
+          echo "🔍 Git 狀態："
+          git status
+
+          # 嘗試推送 main 分支
+          echo "📦 推送 main"
+          git branch -M main
+          git push origin main || { echo "❌ push main 失敗"; exit 1; }
+
+          # 推送分支
+          echo "📦 建立並推送分支 ${BRNAME}"
+          git push origin main
+
+      - name: 📝 建立 Release Note（components repo）
+        env:
+          GH_TOKEN: ${{ secrets.RAFAEL_PRIV_TOKEN }}  # 使用 GitHub 提供的 token 來執行動作
+        run: |
+          pwd
+          cd ${REPO_NAME_COMP}
+          pwd
+          cat <<EOF > component.md
+          ![Date](https://img.shields.io/badge/Date-${TODAY}-green) 
+          ![Release](https://img.shields.io/badge/Release-${TAG_NAME}-blue) 
+          ![commit](https://img.shields.io/badge/Track_commit_hash-${SHORT_HASH}-yellow)
+          EOF
+
+      - name: 🚀 發布 Release 到 GitHub
+        env:
+          GH_TOKEN: ${{ secrets.RAFAEL_PRIV_TOKEN }}  # 使用 GitHub 提供的 token 來執行動作
+        run: |
+            pwd
+            cd ${REPO_NAME_COMP}
+            pwd
+            git remote set-url origin https://${{ secrets.RAFAEL_PRIV_TOKEN }}@github.com/${REPO_ORG}/${REPO_NAME_COMP}.git
+            gh release create "$TAG_NAME" \
+              --repo "${REPO_ORG}/${REPO_NAME_COMP}" \
+              --title "$TAG_NAME" \
+              --notes-file "./component.md"
+
+

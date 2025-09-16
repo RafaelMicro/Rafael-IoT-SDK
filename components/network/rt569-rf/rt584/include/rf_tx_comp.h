@@ -82,6 +82,14 @@ void Tx_Power_Compensation_Deinit(void);
  *
  */
 void Tx_Power_Sadc_Int_Callback_Handler(sadc_cb_t *p_cb);
+
+/**
+ * @brief Tx Power Compensation Sadc Int Handler
+ * @param None
+ * @return None
+ *
+ */
+void Tx_Power_Compensation_Sadc_Int_Handler(sadc_cb_t *p_cb);
 #endif /* end of __COMPENSATE_H__ */
 
 /** @} */ /* End of Peripheral Group */

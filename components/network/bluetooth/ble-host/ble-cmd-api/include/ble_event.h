@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include "ble_common.h"
 #include "ble_advertising.h"
+#include "ble_extended_advertising.h"
 #include "ble_scan.h"
 #include "ble_gap.h"
 #include "ble_att_gatt.h"
@@ -101,7 +102,37 @@ typedef uint8_t ble_module_evt_t;
 #define BLE_SM_EVT_IRK_RESOLVING_FAIL                           (BLE_SM_EVT_BASE + 0x03)        /**< Security module event: resolving private address status event. */
 #define BLE_SM_EVT_NUMERIC_COMPARISON                           (BLE_SM_EVT_BASE + 0x04)        /**< Security module event: numeric comparison event. */
 
-#define BLE_VENDOR_EVT_BASE                                     0x80                            /**< vendor event.*/
+#define BLE_PADV_EVT_BASE                                       0x70                            /**< Periodic Advertising module event.*/
+#define BLE_EADV_EVT_BASE                                       0x80                            /**< Extended Advertising module event.*/
+#define BLE_PADV_EVT_SET_PADV_RECEIVE_ENABLE                    (BLE_PADV_EVT_BASE + 0x00)      /**<  */
+#define BLE_PADV_EVT_SET_PADV_SYNC_TRANSFER                     (BLE_PADV_EVT_BASE + 0x01)      /**<  */
+#define BLE_PADV_EVT_SET_PADV_SYNC_SET_INFO_TRANSFER_PARAM      (BLE_PADV_EVT_BASE + 0x02)      /**<  */
+#define BLE_PADV_EVT_SET_PADV_SYNC_TRANSFER_PARAM               (BLE_PADV_EVT_BASE + 0x03)      /**<  */
+#define BLE_PADV_EVT_SET_PADV_SUBEVENT_DATA                     (BLE_PADV_EVT_BASE + 0x04)      /**<  */
+#define BLE_PADV_EVT_SET_DEFAULT_PADV_SYNC_TRANSFER_PARAM       (BLE_PADV_EVT_BASE + 0x05)      /**<  */
+#define BLE_PADV_EVT_SET_PADV_RESPONSE_DATA_PARAM               (BLE_PADV_EVT_BASE + 0x06)      /**<  */
+#define BLE_PADV_EVT_PADV_SYNC_TRANSFER_RECEIVED                (BLE_PADV_EVT_BASE + 0x07)      /**<  */
+#define BLE_PADV_EVT_PADV_SYNC_TRANSFER_RECEIVED_V2             (BLE_PADV_EVT_BASE + 0x08)      /**<  */
+#define BLE_PADV_EVT_PADV_SYNC_ESTABLISHED                      (BLE_PADV_EVT_BASE + 0x09)
+#define BLE_PADV_EVT_PADV_SYNC_ESTABLISHED_V2                   (BLE_PADV_EVT_BASE + 0x0A)
+#define BLE_PADV_EVT_PADV_SUBEVENT_DATA_REQ                     (BLE_PADV_EVT_BASE + 0x0B)
+#define BLE_PADV_EVT_PADV_RESPONSE_REPORT                       (BLE_PADV_EVT_BASE + 0x0C)
+#define BLE_PADV_EVT_SET_PSYNC_SUBEVENT                         (BLE_PADV_EVT_BASE + 0x0D)
+#define BLE_PADV_EVT_PADV_REPORT                                (BLE_PADV_EVT_BASE + 0x0E)
+#define BLE_PADV_EVT_PADV_REPORT_V2                             (BLE_PADV_EVT_BASE + 0x0F)
+#define BLE_PADV_EVT_PADV_SYNC_LOST                             (BLE_PADV_EVT_BASE + 0x10)
+#define BLE_PADV_EVT_SET_PADV_PARAM                             (BLE_PADV_EVT_BASE + 0x11)
+#define BLE_PADV_EVT_SET_PADV_DATA                              (BLE_PADV_EVT_BASE + 0x12)
+#define BLE_PADV_EVT_ENABLE_PADV                                (BLE_PADV_EVT_BASE + 0x13)
+#define BLE_EADV_EVT_ENABLE_ADV                                 (BLE_PADV_EVT_BASE + 0x14)
+#define BLE_EADV_EVT_SET_EXTENDED_ADV_PARAM                     (BLE_PADV_EVT_BASE + 0x15)
+#define BLE_EADV_EVT_SET_EXTENDED_ADV_DATA                      (BLE_PADV_EVT_BASE + 0x16)
+#define BLE_EADV_EVT_SET_ADV_SET_RANDOM_ADDR                    (BLE_PADV_EVT_BASE + 0x17)
+#define BLE_EADV_EVT_ADV_SET_TERMINATED                         (BLE_PADV_EVT_BASE + 0x18)
+#define BLE_PADV_EVT_SET_PADV_SET_INFO_TRANSFER                 (BLE_PADV_EVT_BASE + 0x19)
+#define BLE_PADV_EVT_PADV_SYNC_TERMINATE                        (BLE_PADV_EVT_BASE + 0x1A)
+
+#define BLE_VENDOR_EVT_BASE                                     0x90                            /**< vendor event.*/
 #define BLE_VENDOR_EVT_SCAN_REQ_REPORT                          (BLE_VENDOR_EVT_BASE + 0x00)    /**< vendor event: scan request report event. */
 /** @} */
 
@@ -112,7 +143,8 @@ typedef uint8_t ble_module_evt_t;
  */
 typedef struct ble_evt_param_s
 {
-    ble_module_evt_t         event;    /**< BLE event @ref ble_evt_type "ble_module_evt_t". */
+    ble_module_evt_t        event;                  /**< BLE event @ref ble_evt_type "ble_module_evt_t". */
+    uint8_t                 extended_length;        /**< Extended length flag, 1 means the event parameters is extended length. */
     union
     {
         ble_evt_common_t        ble_evt_common;     /**< BLE common related event parameters. */
@@ -122,6 +154,7 @@ typedef struct ble_evt_param_s
         ble_evt_att_gatt_t      ble_evt_att_gatt;   /**< BLE ATT/GATT related event parameters. */
         ble_evt_sm_t            ble_evt_sm;         /**< BLE security manager related event parameters. */
         ble_evt_cte_t           ble_evt_cte;        /**< BLE connection CTE event parameters. */
+        ble_evt_periodic_adv_t  ble_evt_padv;       /**< BLE advertising related event parameters. */
     } event_param;                                  /**< Event parameters. */
 } ble_evt_param_t;
 
