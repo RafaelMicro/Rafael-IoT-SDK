@@ -1,7 +1,6 @@
-.vscode\settings.json
-.vscode
 .repo
 .cache
+build
 .clangd
 cscope*
 compile_commands.*

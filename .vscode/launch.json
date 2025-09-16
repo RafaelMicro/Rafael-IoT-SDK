@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/door-lock_RT582.elf",
+            "name": "Debug with OpenOCD",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "configFiles": [
+                "${workspaceFolder}/Tools/Debugger/OpenOCD/script/interface/cmsis-dap.cfg",
+                "${workspaceFolder}/Tools/Debugger/OpenOCD/script/target/rt58x.cfg"
+            ],
+            "searchDir": [
+                "${workspaceFolder}/Tools/Debugger/OpenOCD/script",
+                "${workspaceFolder}/Tools/Debugger/OpenOCD/target"
+            ],
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "none",
+            "svdFile": "${workspaceRoot}/Tools/Debugger/rt58x.svd"
+        }
+    ]
+}
