@@ -23,7 +23,7 @@ The following provides installation instructions, recommended versions, and lice
 
 | Tool              | Recommended Version | Notes                                    |
 | ----------------- | ------------------- | ---------------------------------------- |
-| ARM GNU Toolchain | 14.2 or later       | Official precompiled binaries            |
+| ARM GNU Toolchain | 14.2                | Official precompiled binaries            |
 | CMake             | 3.24 or later       | Requires support for `Presets` and Ninja |
 | Ninja             | 1.11 or later       | Typically used with CMake                |
 
@@ -110,10 +110,4 @@ The following provides installation instructions, recommended versions, and lice
     setx PATH "%PATH%;%CD%\toolchain\ninja\Windows"
     ```
 ---
-## License Overview
 
-| Tool              | License                                 |
-| ----------------- | --------------------------------------- |
-| ARM GNU Toolchain | GPL / LGPL / Other Open-Source Licenses |
-| CMake             | BSD 3-Clause                            |
-| Ninja             | Apache 2.0                              |

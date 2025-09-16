@@ -4,7 +4,7 @@
 ## Recommended Versions
 | Tool              | Version       | Notes                                           |
 | ----------------- | ------------- | ----------------------------------------------- |
-| ARM GNU Toolchain | 14.2 or later | Official precompiled binaries                   |
+| ARM GNU Toolchain | 14.2          | Official precompiled binaries                   |
 | CMake             | 3.24 or later | Requires support for `Presets` and Ninja        |
 | Ninja             | 1.11 or later | Typically used with CMake                       |
 | Git               | 2.39 or later | Git LFS recommended                             |
@@ -201,7 +201,6 @@ Please modify the paths according to your actual J-Link installation directory.
 
 
 {
-    "cortex-debug.JLinkPath": "C:/Program Files/SEGGER/JLink/JLink.exe",
     "cortex-debug.JLinkGDBServerPath": "C:/Program Files/SEGGER/JLink/JLinkGDBServerCL.exe"
 }
 ```
