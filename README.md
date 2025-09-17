@@ -43,7 +43,12 @@
 
 **Developer Tools**  
 - Example applications included  
-- Supports external debug tools (CMSIS-DAPLink, SEGGER J-Link ICE)  
+- Supports external debug tools (Rafael CMSIS-DAPLink, SEGGER J-Link ICE)  
+  - **Rafael CMSIS-DAP**  
+  ![image](/docs/SDK_Overview/picture/rafael-cmsis-dap.jpg)    
+  - **SEGGER J-Link Debugger**  
+  - J-Link Debugger Website: :[https://www.segger.com/products/debug-probes/j-link/](https://www.segger.com/products/debug-probes/j-link/)
+
 - Supports firmware flashing, debugging, and real-time trace  
 
 ---
@@ -129,7 +134,7 @@ The RT58x EVK provides a standard 20-pin SWD connector:
 | **ARM Toolchain**                 | [![Download ARM Toolchain](https://img.shields.io/badge/Download-ARM--GCC-blue?logo=arm&style=for-the-badge)](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm) |
 | **CMake**                         | [![Download CMake](https://img.shields.io/badge/Download-CMake-orange?logo=cmake&style=for-the-badge)](https://cmake.org/download/)                                                                                   |
 | **Git**                           | [![Download Git](https://img.shields.io/badge/Download-Git-red?logo=git&style=for-the-badge)](https://git-scm.com/downloads)                                                                                          |
-| **SEGGER J-Link**                 | [![Download J-Link](https://img.shields.io/badge/Download-J--Link-blue?logo=segger&style=for-the-badge)](https://www.segger.com/downloads/jlink)                                                                      |
+| **SEGGER J-Link Software**        | [![Download J-Link](https://img.shields.io/badge/Download-J--Link-blue?logo=segger&style=for-the-badge)](https://www.segger.com/downloads/jlink)                                                                      |
 | **ARM CMSIS**                     | [![Download CMSIS](https://img.shields.io/badge/Download-CMSIS-lightgrey?logo=arm&style=for-the-badge)](https://www.arm.com/why-arm/technologies/cmsis)                                                               |
 | **Ninja**                         | [![Download Ninja](https://img.shields.io/badge/Download-Ninja-green?logo=ninja&style=for-the-badge)](https://ninja-build.org/)                                                                                       |
 | **Python**                        | [![Download Python](https://img.shields.io/badge/Download-Python-yellow?logo=python&style=for-the-badge)](https://www.python.org/downloads/)                                                                          |
