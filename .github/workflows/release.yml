@@ -22,9 +22,9 @@ jobs:
 
       - name: 建立 GitHub Release 並上傳打包檔案
         env:
-          GH_TOKEN: ${{ secrets.RAFAEL_PRIV_TOKEN }}  # 使用 GitHub 提供的 token 來執行動作
+          GH_TOKEN: ${{ secrets.RAFAEL_PRIV_TOKEN }}
         run: |
           gh release create "V2.0.0" \
             --title "Rafael-SDK-V2.0.0" \
             --notes "Rafael-SDK-V2.0.0" \
-            Rafael-SDK-V2.0.0
+            Rafael-SDK-V2.0.0.zip
