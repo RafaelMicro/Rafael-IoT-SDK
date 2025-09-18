@@ -126,7 +126,7 @@ The RT58x EVK provides a standard 20-pin SWD connector:
 
 ---  
  
-## 🔗 Resources
+## 🔗 Likes
 | Resources                         | Download Link                                                                                                                                                                                                         |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Rafael Micro Official Website** | [![Visit Rafael Micro](https://img.shields.io/badge/Rafael--Micro-Website-blue?style=for-the-badge)](https://www.rafaelmicro.com)                                                                                     |
