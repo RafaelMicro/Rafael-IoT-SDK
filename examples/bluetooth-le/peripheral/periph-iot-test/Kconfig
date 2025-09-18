@@ -1,9 +1,0 @@
-menu "PROJECT CONFIG"
-
-config APPLICATION_VERSION
-    string "Application version"
-	def_string "1.0.0"
-    help
-        Application version
-
-endmenu
