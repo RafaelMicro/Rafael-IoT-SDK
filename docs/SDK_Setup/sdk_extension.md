@@ -1,12 +1,17 @@
 # Rafael Extension 
 
+<div style="display: flex; align-items: center; gap: 20px;">
+  <div style="text-align: center;">
+    <p><strong>Choose the Rafael Extension Icon</strong></p>
+    <img src="../SDK_Setup/picture/rf_ext/rafael_extension_button.jpg" alt="drawing" style="width:200px  height=200"/>
+  </div>
+  <div style="text-align: center;">
+    <p><strong>Open Rafael Extension</strong></p>
+     <img src="../SDK_Setup/picture/rf_ext/rafael_ext_feature.jpg" alt="drawing" style="width:200px  height=200"/>
+  </div>
+</div>
 
-## Rafael Extension Icon
-**Choose the Rafael Extension Icon**  
-  <img src="../SDK_Setup/picture/rf_ext/rafael_extension_button.jpg" alt="drawing" style="width:200px  height=200"/>  
 
-**Open Rafael Extension**   
-  <img src="../SDK_Setup/picture/rf_ext/rafael_ext_feature.jpg" alt="drawing" style="width:200px  height=200"/>
 
 
 ## Rafael Extension: Left-Hand Panel Overview
@@ -30,6 +35,11 @@ The Install Package panel allows you to install the required software packages f
 - **Install Extension Package Button** – Install the VS Code extension package required for SDK development.
 
 <img src="../SDK_Setup/picture/rf_ext/extension_install.jpg" alt="drawing" style="width:200px  height=200"/>
+
+-  Using Rafael Extension in VS Code:
+   - Install Python and VS Code extensions Finish
+    <img src="../SDK_Setup/picture/rf_ext/extension_install_finish.jpg" alt="drawing" style="width:200px  height=200"/>  
+    <img src="../SDK_Setup/picture/rf_ext/python_install_finish.jpg" alt="drawing" style="width:200px  height=200"/>  
 
 ## Build Project Image
 

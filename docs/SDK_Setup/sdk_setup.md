@@ -234,23 +234,27 @@ Click **Install** to start the installation.
 
 Open your SDK folder, locate `.vscode/settings.json`, and add the following settings.
 
+```bash
+{
+    "cortex-debug.JLinkGDBServerPath": "C:/Program Files/SEGGER/JLink/JLinkGDBServerCL.exe"
+}
+```
+
 Please modify the paths according to your actual J-Link installation directory.
 
 ```bash
   Windows (64-bit)  - C:\Program Files\SEGGER\JLink\
   Windows (32-bit)  - C:\Program Files (x86)\SEGGER\JLink\
-  
-
-
-{
-    "cortex-debug.JLinkPath": "C:/Program Files/SEGGER/JLink/JLink.exe",
-    "cortex-debug.JLinkGDBServerPath": "C:/Program Files/SEGGER/JLink/JLinkGDBServerCL.exe"
-}
 ```
+
+## 4. Toolchain Install Reference Documents  
+- [Toolcahin Setup](../../toolchain/README.md) 
+---
 
 ---
 
-## 4. Install Rafael Extension
+## 5. Install Rafael Extension Reference Documents  
+- [Rafael Extension](../../docs/sdk_extension.md) 
 -  Open SDK folder using VS Code
   1. Open the command tool:
       - **Windows** → Command Prompt
@@ -260,13 +264,10 @@ Please modify the paths according to your actual J-Link installation directory.
       code --install-extension tools/rafael_extension/rafael-extension-0.0.1.vsix
       ```
       <img src="../SDK_Setup/picture/rf_ext/rafael_extension_finish.jpg" alt="drawing" style="width:200px  height=200"/>   
--  Using Rafael Extension in VS Code:
-   - Press Install Python and VS Code extensions button
-    <img src="../SDK_Setup/picture/rf_ext/extension_install.jpg" alt="drawing" style="width:200px  height=200"/>  
-   - Install Python and VS Code extensions Finish
-    <img src="../SDK_Setup/picture/rf_ext/extension_install_finish.jpg" alt="drawing" style="width:200px  height=200"/>  
-    <img src="../SDK_Setup/picture/rf_ext/python_install_finish.jpg" alt="drawing" style="width:200px  height=200"/>  
-## 5. Check Toolchain, CMake, and Python Environment Variables
+---
+
+---
+## 6. Check Toolchain, CMake, and Python Environment Variables
 - Ensure `PATH` variable includes the Toolchain `bin\`directory
 - Add `TOOLCHAIN_PATH` environment variable pointing to the GCC Toolchain directory
 - Check Python paths:
