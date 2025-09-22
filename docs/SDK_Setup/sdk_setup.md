@@ -4,7 +4,7 @@
 ## Recommended Versions
 | Tool              | Version       | Notes                                           |
 | ----------------- | ------------- | ----------------------------------------------- |
-| ARM GNU Toolchain | 14.2          | Official precompiled binaries                   |
+| ARM GNU Toolchain | 14.2 or later | Official precompiled binaries                   |
 | CMake             | 3.24 or later | Requires support for `Presets` and Ninja        |
 | Ninja             | 1.11 or later | Typically used with CMake                       |
 | Git               | 2.39 or later | Git LFS recommended                             |
@@ -108,7 +108,7 @@ Click **Install** to start the installation.
     - **Linux** → Terminal
 2. Type the command:
     ```bash
-    JLink.exe
+    JLinkExe
     ```
    Expected output:
     ```
@@ -122,7 +122,6 @@ Click **Install** to start the installation.
     Windows (64-bit)  - C:\Program Files\SEGGER\JLink\JLinkDevices.xml
     Windows (32-bit)  - C:\Program Files (x86)\SEGGER\JLink\JLinkDevices.xml
   ```
-
 
 > **Note**
 >
@@ -188,6 +187,42 @@ Click **Install** to start the installation.
 >                    LoaderType="FLASH_ALGO_TYPE_CMSIS"  
 >                    AlwaysPresent="1" />  
 > </Device>
+> <Device>
+>     <ChipInfo Vendor="Rafael" Name="RT584H_L_BOOT"  
+>               Core="JLINK_CORE_CORTEX_M3"   
+>               WorkRAMAddr="0x30000000"   
+>               WorkRAMSize="0x30000" />  
+>     <FlashBankInfo Name="Internal Flash"  
+>                    BaseAddr="0x10000000"
+>                    MaxSize="0x00010000"
+>                    Loader=".\RT584_Secure_2M.FLM"  
+>                    LoaderType="FLASH_ALGO_TYPE_CMSIS"  
+>                    AlwaysPresent="1" />  
+> </Device>
+> <Device>
+>     <ChipInfo Vendor="Rafael" Name="RT584H"  
+>               Core="JLINK_CORE_CORTEX_M3"   
+>               WorkRAMAddr="0x30000000"   
+>               WorkRAMSize="0x30000" />  
+>     <FlashBankInfo Name="Internal Flash"  
+>                    BaseAddr="0x10010000"
+>                    MaxSize="0x001FE000"
+>                    Loader=".\RT584_Secure_2M.FLM"  
+>                    LoaderType="FLASH_ALGO_TYPE_CMSIS"  
+>                    AlwaysPresent="1" />  
+> </Device>
+> <Device>
+>     <ChipInfo Vendor="Rafael" Name="RT584L"  
+>               Core="JLINK_CORE_CORTEX_M3"   
+>               WorkRAMAddr="0x30000000"   
+>               WorkRAMSize="0x30000" />  
+>     <FlashBankInfo Name="Internal Flash"  
+>                    BaseAddr="0x10010000"
+>                    MaxSize="0x001FE000"
+>                    Loader=".\RT584_Secure_2M.FLM"  
+>                    LoaderType="FLASH_ALGO_TYPE_CMSIS"  
+>                    AlwaysPresent="1" />  
+> </Device>
 > ```
 
  ### Reference the picture below:                
@@ -208,6 +243,7 @@ Please modify the paths according to your actual J-Link installation directory.
 
 
 {
+    "cortex-debug.JLinkPath": "C:/Program Files/SEGGER/JLink/JLink.exe",
     "cortex-debug.JLinkGDBServerPath": "C:/Program Files/SEGGER/JLink/JLinkGDBServerCL.exe"
 }
 ```
