@@ -1,24 +1,68 @@
 {
-    "version": "0.2.0",
-    "configurations": [
+  "version": "0.2.0",
+  "configurations": [
         {
             "cwd": "${workspaceFolder}",
             "executable": "${workspaceFolder}/build/@proj_name@.elf",
-            "name": "Debug with OpenOCD",
+            "name": "Debug with OpenOCD (RT58x/RT584)",
             "request": "launch",
             "type": "cortex-debug",
             "servertype": "openocd",
             "configFiles": [
-                "${workspaceFolder}/Tools/Debugger/OpenOCD/script/interface/cmsis-dap.cfg",
-                "${workspaceFolder}/Tools/Debugger/OpenOCD/script/target/@MY_CHIP@.cfg"
+                "${workspaceFolder}/tools/Debugger/OpenOCD/script/interface/cmsis-dap.cfg",
+                "${workspaceFolder}/tools/Debugger/OpenOCD/script/target/@MY_CHIP@.cfg"
             ],
             "searchDir": [
-                "${workspaceFolder}/Tools/Debugger/OpenOCD/script",
-                "${workspaceFolder}/Tools/Debugger/OpenOCD/target"
+                "${workspaceFolder}/tools/Debugger/OpenOCD/script",
+                "${workspaceFolder}/tools/Debugger/OpenOCD/target"
             ],
             "runToEntryPoint": "main",
             "showDevDebugOutput": "none",
-            "svdFile": "${workspaceRoot}/Tools/Debugger/@MY_CHIP@.svd"
-        }
-    ]
+            "svdFile": "${workspaceRoot}/tools/Debugger/@MY_CHIP@.svd",
+            "console": "externalTerminal"
+        },
+    {
+      "name": "Debug with J-Link CM3 (RT58x)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "executable": "${workspaceFolder}/build/@proj_name@.elf",
+      "cwd": "${workspaceFolder}",
+      "servertype": "jlink",
+      "device": "Cortex-M3",
+      "interface": "swd",
+      "serverpath": "JLinkGDBServerCL.exe"
+      "serverArgs": [
+        "-if", "SWD",
+        "-select", "USB",
+        "-device", "Cortex-M3"
+      ],
+      "runToEntryPoint": "main",
+      "preLaunchCommands": ["load"],
+      "showDevDebugOutput": "raw",
+      "svdFile": "${workspaceFolder}/tools/Debugger/@MY_CHIP@.svd",
+      "console": "externalTerminal"
+    },
+    {
+      "name": "Debug with J-Link CM33 (RT584)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "executable": "${workspaceFolder}/build/@proj_name@.elf",
+      "cwd": "${workspaceFolder}",
+      "servertype": "jlink",
+      "device": "Cortex-M33",
+      "interface": "swd",
+      "serverpath": "JLinkGDBServerCL.exe"
+      "serverArgs": [
+        "-singlerun",
+        "-if", "SWD",
+        "-select", "USB",
+        "-device", "Cortex-M33"
+      ],
+      "runToEntryPoint": "main",
+      "preLaunchCommands": ["load"],
+      "showDevDebugOutput": "raw",
+      "svdFile": "${workspaceFolder}/tools/Debugger/@MY_CHIP@.svd",
+      "console": "externalTerminal"
+    }
+  ]
 }
