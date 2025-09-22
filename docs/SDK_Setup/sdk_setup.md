@@ -116,6 +116,13 @@ Click **Install** to start the installation.
     ```  
 
  ### Adding Rafael RT58x MCU Support in JLinkDevices.xml
+  JLinkDevices.xml Default Path : 
+
+  ```bash
+    Windows (64-bit)  - C:\Program Files\SEGGER\JLink\JLinkDevices.xml
+    Windows (32-bit)  - C:\Program Files (x86)\SEGGER\JLink\JLinkDevices.xml
+  ```
+
 
 > **Note**
 >
