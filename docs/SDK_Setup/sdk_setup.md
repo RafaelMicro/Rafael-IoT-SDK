@@ -108,7 +108,7 @@ Click **Install** to start the installation.
     - **Linux** → Terminal
 2. Type the command:
     ```bash
-    JLinkExe
+    JLink.exe
     ```
    Expected output:
     ```
