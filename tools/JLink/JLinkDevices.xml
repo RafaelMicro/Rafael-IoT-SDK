@@ -1,0 +1,45 @@
+<DataBase>
+  <!--                   -->
+  <!-- Rafael -->
+  <!--                   -->
+  <Device>
+   <ChipInfo Vendor="Rafael" Name="RT581"Core="JLINK_CORE_CORTEX_M3" WorkRAMAddr="0x20000000" WorkRAMSize="0x1000" />
+   <FlashBankInfo Name="Internal Flash" BaseAddr="0x00007000" MaxSize="0x0077000" Loader=".\RT58x_1MB.FLM" LoaderType="FLASH_ALGO_TYPE_CMSIS"AlwaysPresent="1" />
+  </Device>
+  
+  <Device>
+   <ChipInfo Vendor="Rafael" Name="RT582"Core="JLINK_CORE_CORTEX_M3" WorkRAMAddr="0x20000000" WorkRAMSize="0x1000" />
+   <FlashBankInfo Name="Internal Flash" BaseAddr="0x00007000" MaxSize="0x0077000" Loader=".\RT58x_1MB.FLM" LoaderType="FLASH_ALGO_TYPE_CMSIS"AlwaysPresent="1" />
+  </Device>
+  
+  <Device>
+   <ChipInfo Vendor="Rafael" Name="RT583"Core="JLINK_CORE_CORTEX_M3" WorkRAMAddr="0x20000000" WorkRAMSize="0x1000" />
+   <FlashBankInfo Name="Internal Flash" BaseAddr="0x00007000" MaxSize="0x01F7000" Loader=".\RT58x_2MB.FLM" LoaderType="FLASH_ALGO_TYPE_CMSIS"AlwaysPresent="1" />
+  </Device>
+  
+  <Device>
+   <ChipInfo Vendor="Rafael" Name="RT584S_BOOT" Core="JLINK_CORE_CORTEX_M33" WorkRAMAddr="0x30000000"  WorkRAMSize="0x30000" />
+   <FlashBankInfo Name="Internal Flash" BaseAddr="0x10000000" MaxSize="0x00010000" Loader=".\RT584_Secure_1M.FLM" LoaderType="FLASH_ALGO_TYPE_CMSIS"AlwaysPresent="1" />
+  </Device>
+  
+  <Device>
+   <ChipInfo Vendor="Rafael" Name="RT584S"Core="JLINK_CORE_CORTEX_M33" WorkRAMAddr="0x30000000"  WorkRAMSize="0x30000" />
+   <FlashBankInfo Name="Internal Flash" BaseAddr="0x10010000" MaxSize="0x000FE000" Loader=".\RT584_Secure_1M.FLM" LoaderType="FLASH_ALGO_TYPE_CMSIS"AlwaysPresent="1" />
+  </Device>
+
+   <Device>
+   <ChipInfo Vendor="Rafael" Name="RT584H_L_BOOT" Core="JLINK_CORE_CORTEX_M33" WorkRAMAddr="0x30000000"  WorkRAMSize="0x30000" />
+   <FlashBankInfo Name="Internal Flash" BaseAddr="0x10000000" MaxSize="0x00010000" Loader=".\RT584_Secure_2M.FLM" LoaderType="FLASH_ALGO_TYPE_CMSIS"AlwaysPresent="1" />
+  </Device>
+  
+  <Device>
+   <ChipInfo Vendor="Rafael" Name="RT584L"Core="JLINK_CORE_CORTEX_M33" WorkRAMAddr="0x30000000" WorkRAMSize="0x30000" />
+   <FlashBankInfo Name="Internal Flash" BaseAddr="0x10010000" MaxSize="0x001FE000" Loader=".\RT584_Secure_2M.FLM" LoaderType="FLASH_ALGO_TYPE_CMSIS" AlwaysPresent="1" />
+  </Device>  
+  
+  <Device>
+   <ChipInfo Vendor="Rafael" Name="RT584H"Core="JLINK_CORE_CORTEX_M33" WorkRAMAddr="0x30000000" WorkRAMSize="0x30000" />
+   <FlashBankInfo Name="Internal Flash" BaseAddr="0x10010000" MaxSize="0x001FE000" Loader=".\RT584_Secure_2M.FLM" LoaderType="FLASH_ALGO_TYPE_CMSIS" AlwaysPresent="1" />
+  </Device>   
+  
+</DataBase>
