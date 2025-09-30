@@ -40,7 +40,7 @@ The following provides installation instructions, recommended versions, and lice
 
 **Downlaod toolchain**:
 
-  - **Linux**: [14.2.rel1](https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/gcc-arm-14.2.rel1-x86_64-arm-none-eabi.tar.xz)  
+  - **Linux**:[14.2.rel1](https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz)   
     Unzip to path: `toolchain/arm/Linux/`  
     **Set environment variable**:  
     ```bash
@@ -51,7 +51,7 @@ The following provides installation instructions, recommended versions, and lice
     chmod +x toolchain/arm/Linux/bin/*
     ```
 
-  - **Windows**: [14.2.rel1](https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/gcc-arm-14.2-win32.zip)  
+  - **Windows**: [14.2.rel1](https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-arm-none-eabi.zip)  
     Unzip to path: `toolchain/arm/Windows/`  
     **Set environment variable**:  
     ```powershell
