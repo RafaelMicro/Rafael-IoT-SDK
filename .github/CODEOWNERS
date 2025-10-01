@@ -1,5 +1,0 @@
-# 或指定特定資料夾/檔案
-./config/ @KCRafael1
-./examples/peripheral/ @KCRafael1 @iveslee308
-./examples/bootloader-app/ @KCRafael1 @iveslee308
-./examples/helloworld/ @KCRafael1 @iveslee308
