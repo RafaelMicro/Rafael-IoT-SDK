@@ -36,3 +36,6 @@ _deps
 .config.old
 env.txt
 run.bat
+toolchain
+thirdparty/freertos
+tools
