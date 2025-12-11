@@ -1,0 +1,17 @@
+
+/* Tighten spaces a bit */
+#titlearea { padding: 4px 8px; }
+#navrow1, #navrow2, #navrow3 { margin: 0; padding: 2px 0; }
+.tablist li { padding: 2px 8px; }
+div.header, div.headertitle, div.headertitle .title { margin: 0; padding: 6px 0; }
+#doc-content, .contents { margin-top: 0; padding-top: 0; }
+
+/* Ensure search dropdown windows never push layout */
+#MSearchSelectWindow, #MSearchResultsWindow {
+  display: none;      /* will be toggled by search.js */
+  position: absolute; /* off normal flow */
+  z-index: 9999;
+  max-height: 60vh;
+  overflow: auto;
+}
+#MSearchResults, #SRContainer { max-height: 60vh; overflow: auto; }

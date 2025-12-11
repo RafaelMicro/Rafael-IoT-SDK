@@ -1,0 +1,101 @@
+{
+  // common setting
+  "editor.formatOnSave": true,
+  "C_Cpp.clang_format_path": "D:/rafael_tool/llvm-mingw-x86_64/bin/clang-format.exe",
+  "C_Cpp.formatting": "clangFormat",
+  // Cortex-Debug common
+  "cortex-debug.armToolchainPath.windows": "${workspaceFolder}/toolchain/arm/Windows/bin",
+  "cortex-debug.armToolchainPath.linux": "${workspaceFolder}/toolchain/arm/Linux/bin",
+  "cortex-debug.openocdPath.windows": "${workspaceFolder}/tools/Debugger/OpenOCD/bin/win/openocd.exe",
+  "cortex-debug.openocdPath.osx": "${workspaceFolder}/tools/Debugger/OpenOCD/bin/osx/openocd",
+  "showDevDebugOutput": "raw",
+  // Debug for RT584
+  "cmake.debugConfig.RT58x": {
+    "MIMode": "gdb",
+    "name": "Cortex Debug (RT58x)",
+    "executable": "${command:cmake.launchTargetPath}",
+    "request": "launch",
+    "type": "cortex-debug",
+    "runToEntryPoint": "main",
+    "servertype": "openocd",
+    "configFiles": [
+      "${workspaceFolder}/tools/Debugger/OpenOCD/script/interface/cmsis-dap.cfg",
+      "${workspaceFolder}/tools/Debugger/OpenOCD/script/target/@MY_CHIP@.cfg"
+    ],
+    "searchDir": [
+      "${workspaceFolder}/tools/Debugger/OpenOCD/script"
+    ]
+  },
+  // Debug for RT584
+  "cmake.debugConfig.RT584": {
+    "MIMode": "gdb",
+    "name": "Cortex Debug (RT584)",
+    "executable": "${command:cmake.launchTargetPath}",
+    "request": "launch",
+    "type": "cortex-debug",
+    "runToEntryPoint": "main",
+    "servertype": "openocd",
+    "configFiles": [
+      "${workspaceFolder}/tools/Debugger/OpenOCD/script/interface/cmsis-dap.cfg",
+      "${workspaceFolder}/tools/Debugger/OpenOCD/script/target/@MY_CHIP@.cfg"
+    ],
+    "searchDir": [
+      "${workspaceFolder}/tools/Debugger/OpenOCD/script"
+    ]
+  },
+  "files.associations": {
+    "cstdint": "c",
+    "mcu.h": "c",
+    "chip_define.h": "c",
+    "qspi.h": "c",
+    "stdint.h": "c",
+    "status.h": "c",
+    "bit": "c",
+    "rt_ecjpake.h": "c",
+    "random": "c",
+    "arm_cmse.h": "c",
+    "bod_comp.h": "c",
+    "rt_crypto.h": "c",
+    "rt_sha256.h": "c",
+    "rt_sm3.h": "c",
+    "irm.h": "c",
+    "lpm.h": "c",
+    "aux_comp.h": "c",
+    "sysctrl.h": "c",
+    "hosal_sysctrl.h": "c",
+    "app_hooks.h": "c",
+    "system_mcu.h": "c",
+    "hosal_timer.h": "c",
+    "stdlib.h": "c",
+    "__bit_reference": "c",
+    "__hash_table": "c",
+    "__split_buffer": "c",
+    "__tree": "c",
+    "array": "c",
+    "bitset": "c",
+    "deque": "c",
+    "forward_list": "c",
+    "initializer_list": "c",
+    "list": "c",
+    "map": "c",
+    "regex": "c",
+    "set": "c",
+    "span": "c",
+    "string": "c",
+    "string_view": "c",
+    "unordered_map": "c",
+    "unordered_set": "c",
+    "vector": "c",
+    "rope": "c",
+    "slist": "c",
+    "format": "c",
+    "stacktrace": "c",
+    "ranges": "c",
+    "compare": "c",
+    "coap.h": "c",
+    "misc.h": "c",
+    "random_noncrypto.h": "c",
+    "__locale": "c",
+    "expected": "c"
+  }
+}

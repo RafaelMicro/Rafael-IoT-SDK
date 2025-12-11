@@ -1,0 +1,44 @@
+
+
+menu "PROJECT CONFIG"
+
+config  CRYPTO_AES_ENABLE
+    bool "CRYPTO_AES_ENABLE"
+    default 1
+
+
+config CRYPTO_C25519_ENABLE
+    bool "CRYPTO_C25519_ENABLE"
+    default 1
+
+config CRYPTO_SECP256R1_ENABLE
+    bool "CRYPTO_SECP256R1_ENABLE"
+    default 1
+
+config CRYPTO_SECP192R1_ENABLE
+    bool "CRYPTO_SECP192R1_ENABLE"
+    default 1
+
+config CRYPTO_SECT163R2_ENABLE
+    bool "CRYPTO_SECT163R2_ENABLE"
+    default 1
+
+if RT584
+config CRYPTO_SM3_ENABLE
+    bool "CRYPTO_SM3_ENABLE"
+    default 1
+
+config  CRYPTO_SM4_ENABLE
+    bool "CRYPTO_SM4_ENABLE"
+    default 1
+
+config  CRYPTO_SM2P256V1_ENABLE
+    bool "CRYPTO_SM2P256V1_ENABLE"
+    default 1
+
+ config  CRYPTO_SM2_P192_ENABLE
+    bool "CRYPTO_SM2_P192_ENABLE"
+    default 1      
+endif
+
+endmenu

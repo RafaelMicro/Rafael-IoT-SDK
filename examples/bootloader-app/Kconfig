@@ -1,0 +1,28 @@
+menu "BOOTLOADER Configuration"
+
+config BOOTLOADER_MAIN_VERSION
+    int "bootloader main version"
+	default 1
+    range 1 65535
+    help
+        bootloader main version
+
+config BOOTLOADER_MINOR_VERSION
+    int "bootloader minor version"
+	default 0
+    range 0 65535
+    help
+        bootloader main version
+
+config BOOTLOADER_DEBUG
+    bool "Enable bootloader debug"
+    default n
+    select BUILD_COMPONENT_UART_STDIO
+    help
+        Enable bootloader debug
+
+config HOSAL_SOC_DISABLE_MP_SECTOR_INIT
+    bool "Disable mp sector init"
+    def_bool true
+
+endmenu

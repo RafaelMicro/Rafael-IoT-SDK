@@ -1,0 +1,29 @@
+LicenseID: LicenseRef-RafaelMicro-Proprietary-1.0
+===============================================================================
+<<Rafael Microelectronics, Inc. Proprietary License – Version 1.0>>
+SPDX-License-Identifier: LicenseRef-RafaelMicro-Proprietary-1.0
+Copyright (c) 2022 - 2025 Rafael Microelectronics, Inc. 
+All rights reserved.
+===============================================================================
+
+1.  This license applies exclusively to customers (and their authorized
+    employees) who have executed a valid <<Commercial Agreement>> or
+    <<Non-Disclosure Agreement>> (collectively, “Existing Agreement”)
+    with Rafael Microelectronics, Inc. (“Company”).
+
+2. Unless expressly approved in writing by Company, Licensee must not:  
+   (a) reverse-engineer, decompile, or disassemble the Software.  
+   (b) remove, obscure, or modify any copyright, trademark, or other
+       proprietary notices in the Software.
+
+3.  The Software is provided **“AS IS”** without any express or implied
+    warranty, including but not limited to merchantability, fitness for a
+    particular purpose, or non-infringement.  Company does not warrant
+    that the Software will operate uninterrupted or error-free.
+
+4.  Company shall not be liable for any direct, indirect, incidental, 
+    consequential, or special damages arising from use of, or inability 
+    to use, the Software.
+
+
+<<End of Rafael Microelectronics, Inc. Proprietary License – Version 1.0>>

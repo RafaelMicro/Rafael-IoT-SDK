@@ -1,0 +1,11 @@
+menu "PROJECT CONFIG"
+
+config SLEEP1_TEST_ENABLE
+    bool "SLEEP1_TEST_ENABLE"
+    default true
+
+config SLEEP2_TEST_ENABLE
+    bool "SLEEP2_TEST_ENABLE"
+    default true    
+    
+endmenu

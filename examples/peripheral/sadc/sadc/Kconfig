@@ -1,0 +1,19 @@
+menu "PROJECT CONFIG"
+
+config SADC_COMP_DEBUG
+    bool "enable sadc Compensation debug"
+	def_bool false
+    help
+        enable Compensation debug log
+
+config SADC_TEST_MODE
+    bool "enable sadc test mode"
+	def_bool false
+    help
+        enable sadc test mode
+
+config SADC_CALIBRATION_VALUE
+    int "calibration value"
+	def_int 0
+
+endmenu

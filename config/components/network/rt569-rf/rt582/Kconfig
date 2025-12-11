@@ -1,0 +1,43 @@
+menu "Select Supported FW Images"
+config RF_FW_INCLUDE_PCI
+	bool "PCI FW Supported"
+	default y
+	help
+	  The RF MCU image of Proprietary Control Interface (PCI) FW is included.
+
+config RF_FW_INCLUDE_BLE
+	bool "BLE FW Supported"
+	default y
+	help
+	  The RF MCU image of Bluetooth Low Energy (BLE) FW is included.
+
+config RF_FW_INCLUDE_MULTI_2P4G
+	bool "Multi-Protocol FW Supported"
+	default y
+	help
+	  The RF MCU image of 2.4G Multi-Protocol FW is included.
+
+config RF_FW_INCLUDE_MAC_ACC
+	bool "HAM FW Supported"
+	default y
+	help
+	  The RF MCU image of Hybrid Accelerator Mode (HAM) FW is included.
+
+config RF_FW_INCLUDE_HYBRID_INST
+	bool "HMCE FW Supported"
+	default y
+	help
+	  The RF MCU image of Host Mode Command Extension (HMCE) FW is included.
+
+config RF_FW_INCLUDE_INTERNAL_TEST
+	bool "Internal Test FW Supported"
+	default y
+	help
+	  The RF MCU image of Internal Test FW is included.
+
+config RF_MCU_CONST_LOAD_SUPPORTED
+    bool "Load separate constant table for FW code size reduction"
+    default y
+    depends on RF_FW_INCLUDE_MULTI_2P4G
+
+endmenu

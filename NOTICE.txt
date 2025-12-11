@@ -1,0 +1,22 @@
+Rafael Microelectronics, Inc. 
+
+NOTICE
+======
+
+Copyright (c) 2022 - 2025 Rafael Microelectronics, Inc.
+
+This SDK bundles:
+
+• FreeRTOS -- MIT License
+• CMSIS -- Apache License 2.0
+• Openthread -- BSD 3-Clause License
+• uECC -- BSD 2-Clause License
+• LZMA SDK -- in the public domain by Igor Pavlov.
+• P256-cortex-ecdh -- BSD-2-Clause license
+• BearSSL -- MIT License
+
+Significant changes by Rafael Micro:
+
+None
+
+
