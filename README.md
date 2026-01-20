@@ -7,7 +7,10 @@
 - ### [Release Notes](docs/RELEASE_NOTES.md) 
 
 ---
+## Supported ICs List<a id="supportic"></a>
+- **[RT581, RT582, RT583, RT584L, RT584H, RF1301](#installation)**
 
+---
 ## 📑 Table of Contents
 
 - 📌 [Features](#features)
