@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "hosal_lpm.h"
+#include "hosal_sysctrl.h"
 #include "uart_stdio.h"
 
 int main(void) {
@@ -26,7 +27,8 @@ int main(void) {
 
     hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LPM_POWER_DOWN);
     hosal_lpm_ioctrl(HOSAL_LPM_SUBSYSTEM_ENTER_LOW_POWER, HOSAL_COMMUMICATION_SUBSYSTEM_PWR_STATE_DEEP_SLEEP);
-
+    printf("Wiat 1 sec\r\n");
+    hosal_delay_ms(1000);
     hosal_lpm_ioctrl(HOSAL_LPM_ENTER_LOW_POWER, HOSAL_LPM_PARAM_NONE);
 
     while (1) {;}

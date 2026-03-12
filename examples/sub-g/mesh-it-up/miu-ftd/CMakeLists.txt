@@ -17,7 +17,22 @@ add_definitions(
     -DCONFIG_APP_TASK_UDP_LISTEN_PORT=5678
     -DCONFIG_APP_TASK_CONTROL_CMD_ENABLE=1
     -DCONFIG_APP_TASK_CENTRAL_ENABLE=1
+    -DCONFIG_APP_TASK_OTA_ENABLE=1
 )
+
+if (CONFIG_BUILD_COMPONENT_ENHANCED_FLASH_DATASET)
+    if(CONFIG_FLASHCTRL_SECURE_EN)
+        sdk_add_compile_options(
+            -DEFD_START_ADDR=0x100F0000
+            -DENV_AREA_SIZE=0x4000
+        )
+    else()
+        sdk_add_compile_options(
+            -DEFD_START_ADDR=0xF0000
+            -DENV_AREA_SIZE=0x4000
+        )
+    endif()
+endif()
 
 set(MIU_COMMON_DIR "../miu-common")
 set(MIU_COMPONENTS_DIR "${CMAKE_SOURCE_DIR}/components/network/mesh-it-up")
@@ -35,11 +50,14 @@ sdk_add_include_directories(
 target_sources(app PRIVATE
     ${MIU_COMMON_DIR}/src/app_led.c
     ${MIU_COMMON_DIR}/src/app_udp.c
+    ${MIU_COMMON_DIR}/src/app_uart.c
+    ${MIU_COMMON_DIR}/src/app_ota.c
     ${MIU_COMMON_DIR}/src/app_mac_raw.c
     ${MIU_COMMON_DIR}/src/cli_uart.cpp
     ${MIU_COMMON_DIR}/src/app_control_cmd.c
     ${CMAKE_CURRENT_LIST_DIR}/src/app_net_mgm.c
     ${CMAKE_CURRENT_LIST_DIR}/src/app_task.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/ota_download_cmd_handler.c
 )
 
 # ========================================

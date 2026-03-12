@@ -63,7 +63,7 @@ HOSAL_UART_DEV_DECL(blder_uart2_dev, 2, 30, 31, UART_BAUDRATE_2000000)
     BLDER_NOTIFY_HANDEL = BLDER_EVENT_NONE;
 #if defined(CONFIG_RT582_NONE_OS)
 #define BLDER_UART_CACHE_SIZE 0x400
-#elif defined(CONFIG_RT584_NONE_OS)
+#elif defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
 #define BLDER_UART_CACHE_SIZE 0x1000
 #endif
 
@@ -142,7 +142,7 @@ __STATIC_FORCEINLINE void bootloader_isr(uint8_t id) {
     hosal_uart_dev_t* blder_uart_dev = NULL;
     uint8_t value[8] = {0};
     uart_t* uart = UART1;
-#if defined(CONFIG_RT584_NONE_OS)
+#if defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
     uint32_t isr_status;
 #endif	
 
@@ -156,7 +156,7 @@ __STATIC_FORCEINLINE void bootloader_isr(uint8_t id) {
         blder_uart_dev = &blder_uart2_dev;
     }
 
-#if defined(CONFIG_RT584_NONE_OS)
+#if defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
     isr_status = uart->isr;
     uart->isr = isr_status;
     isr_status = isr_status & uart->ier;
@@ -178,7 +178,7 @@ __STATIC_FORCEINLINE void bootloader_isr(uint8_t id) {
 #endif
 
     
-#if defined(CONFIG_RT584_NONE_OS)
+#if defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
     while( uart->lsr & UART_LSR_DR )
 #else
     while( uart->LSR & UART_LSR_DR )
@@ -490,7 +490,7 @@ uint32_t bootloader_run_loop(void) {
 #if defined(CONFIG_RT582_NONE_OS)
 void bootloader_uart1_handler(void) { bootloader_isr(1); }
 void bootloader_uart2_handler(void) { bootloader_isr(2); }
-#elif defined(CONFIG_RT584_NONE_OS)
+#elif defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
 void bootloader_uart1_handler(void) { bootloader_isr(1); }
 void bootloader_uart2_handler(void) { bootloader_isr(2); }
 #endif

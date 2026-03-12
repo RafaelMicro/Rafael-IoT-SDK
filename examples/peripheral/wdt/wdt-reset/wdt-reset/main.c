@@ -11,11 +11,13 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "hosal_wdt.h"
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 #include "hosal_dpd.h"
 #endif
 #include "app_hooks.h"
 #include "uart_stdio.h"
+
+
 
 
 void init_wdt(void) {
@@ -38,6 +40,7 @@ void init_wdt(void) {
 
 int main(void) {
     uint32_t reset_cnt;
+    uint32_t reset_cause = 0, reset_by_wdt = 0;
 
     uart_stdio_init();
     vHeapRegionsInt();
@@ -49,9 +52,11 @@ int main(void) {
     printf("/*****Start WDT Reset TEST******/\r\n");
     
 
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
-    printf("reset cause: %8x\r\n", hosal_get_all_reset_cause());
-    if (hosal_reset_by_wdt()) {
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
+    hosal_get_all_reset_cause(&reset_cause);
+    printf("reset cause: %8x\r\n", reset_cause);
+    hosal_reset_by_wdt(&reset_by_wdt);
+    if ( reset_by_wdt ) {
         puts("reset by watch dog timer \r\n");
         clear_reset_cause();
     }

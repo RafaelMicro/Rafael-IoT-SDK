@@ -153,37 +153,37 @@ int net_mgm_node_table_add(net_mgm_node_table_t* net_mgm_node_info) {
 void net_mgm_node_table_display() {
     uint16_t i = 0, count = 0;
     if (net_mgm_node_table) {
-        log_info("index role parent rloc extaddr rssi version survivaltime");
-        log_info("===============================================");
+        printf("index role parent rloc extaddr rssi version survivaltime \r\n");
+        printf("===============================================\r\n");
         for (i = 0; i < NET_MGM_NODE_TABLE_MAX_SIZE; i++) {
             if (net_mgm_node_table[i].used
                 && (net_mgm_node_table[i].role == OT_DEVICE_ROLE_ROUTER)) {
                 ++count;
-                log_info(
-                    "[%u] %s %04X %04X %02X%02X%02X%02X%02X%02X%02X%02X %d "
-                    "0x%08x %u ",
-                    count,
-                    otThreadDeviceRoleToString(net_mgm_node_table[i].role),
-                    net_mgm_node_table[i].parent, net_mgm_node_table[i].rloc,
-                    net_mgm_node_table[i].extaddr[0],
-                    net_mgm_node_table[i].extaddr[1],
-                    net_mgm_node_table[i].extaddr[2],
-                    net_mgm_node_table[i].extaddr[3],
-                    net_mgm_node_table[i].extaddr[4],
-                    net_mgm_node_table[i].extaddr[5],
-                    net_mgm_node_table[i].extaddr[6],
-                    net_mgm_node_table[i].extaddr[7],
-                    net_mgm_node_table[i].rssi, net_mgm_node_table[i].version,
-                    net_mgm_node_table[i].survivaltime);
+                printf("[%u] %s %04X %04X %02X%02X%02X%02X%02X%02X%02X%02X %d "
+                       "0x%08x %u \r\n",
+                       count,
+                       otThreadDeviceRoleToString(net_mgm_node_table[i].role),
+                       net_mgm_node_table[i].parent, net_mgm_node_table[i].rloc,
+                       net_mgm_node_table[i].extaddr[0],
+                       net_mgm_node_table[i].extaddr[1],
+                       net_mgm_node_table[i].extaddr[2],
+                       net_mgm_node_table[i].extaddr[3],
+                       net_mgm_node_table[i].extaddr[4],
+                       net_mgm_node_table[i].extaddr[5],
+                       net_mgm_node_table[i].extaddr[6],
+                       net_mgm_node_table[i].extaddr[7],
+                       net_mgm_node_table[i].rssi,
+                       net_mgm_node_table[i].version,
+                       net_mgm_node_table[i].survivaltime);
             }
         }
         for (i = 0; i < NET_MGM_NODE_TABLE_MAX_SIZE; i++) {
             if (net_mgm_node_table[i].used) {
                 if (net_mgm_node_table[i].role == OT_DEVICE_ROLE_CHILD) {
                     ++count;
-                    log_info(
+                    printf(
                         "[%u] %s %04X %04X %02X%02X%02X%02X%02X%02X%02X%02X "
-                        "%d 0x%08x %u ",
+                        "%d 0x%08x %u \r\n",
                         count,
                         otThreadDeviceRoleToString(net_mgm_node_table[i].role),
                         net_mgm_node_table[i].parent,
@@ -208,9 +208,9 @@ void net_mgm_node_table_display() {
                 if ((net_mgm_node_table[i].role != OT_DEVICE_ROLE_CHILD)
                     && (net_mgm_node_table[i].role != OT_DEVICE_ROLE_ROUTER)) {
                     ++count;
-                    log_info(
+                    printf(
                         "[%u] %s %04X %04X %02X%02X%02X%02X%02X%02X%02X%02X "
-                        "%d 0x%08x %u ",
+                        "%d 0x%08x %u \r\n",
                         count,
                         otThreadDeviceRoleToString(net_mgm_node_table[i].role),
                         net_mgm_node_table[i].parent,
@@ -229,10 +229,10 @@ void net_mgm_node_table_display() {
                 }
             }
         }
-        log_info("===============================================");
-        log_info("total num %u", count);
+        printf("=============================================== \r\n");
+        printf("total num %u \r\n", count);
     } else {
-        log_info("net_mgm_node_table is NULL ");
+        printf("net_mgm_node_table is NULL \r\n");
     }
 }
 
@@ -254,10 +254,10 @@ void net_mgm_node_table_num() {
                 unuse_cnt++;
             }
         }
-        log_info("total num (router/child/detached)/unused (%u/%u/%u)/%u",
-                 router_cnt, child_cnt, detached_cnt, unuse_cnt);
+        printf("total num (router/child/detached)/unused (%u/%u/%u)/%u \r\n",
+               router_cnt, child_cnt, detached_cnt, unuse_cnt);
     } else {
-        log_info("net_mgm_node_table is NULL ");
+        printf("net_mgm_node_table is NULL \r\n");
     }
 }
 
@@ -289,8 +289,8 @@ void net_mgm_node_survivaltime_update(uint8_t role, uint16_t parent_rloc,
             }
         }
         if (i == NET_MGM_NODE_TABLE_MAX_SIZE) {
-            log_info("No such node rloc %04X to update survivaltime",
-                     self_rloc);
+            // log_info("No such node rloc %04X to update survivaltime",
+            //          self_rloc);
         }
     } else {
         log_info("net_mgm_node_table is NULL ");
@@ -490,7 +490,7 @@ void net_mgm_survival_timeout_callback(TimerHandle_t xTimer) {
         if (otThreadGetDeviceRole(otrGetInstance())
             <= OT_DEVICE_ROLE_DETACHED) {
             /*debug use*/
-            app_set_led0_flash();
+            app_set_led0_toggle();
         } else {
             if (enroll_done == false) {
                 if (enroll_send_time == 0 || enroll_send_time > 20) {
@@ -520,6 +520,7 @@ void net_mgm_survival_timeout_callback(TimerHandle_t xTimer) {
                         }
                     }
                 }
+                app_set_led0_off();
                 app_set_led1_toggle();
             }
         }

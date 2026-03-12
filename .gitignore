@@ -33,8 +33,20 @@ CTestTestfile.cmake
 _deps
 
 tools/jq/*
+# ---------- toolchain ----------
+# ignore all toolchain content by default
+toolchain/**
+
+# keep directory structure
+!toolchain/
+!toolchain/**/
+!toolchain/**/.gitkeep
+
+# keep documentation
+!toolchain/README.md
 .config
 env.txt
+chip.txt
 *.bat
 *.old
 *.bak

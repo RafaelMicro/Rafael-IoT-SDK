@@ -1,16 +1,17 @@
 ![image](/docs/SDK_Overview/picture/logo.JPG)
 
-![Date](https://img.shields.io/badge/Date-2025--12--09-green) ![Release](https://img.shields.io/badge/Release-v2.1.0-blue)
+![Date](https://img.shields.io/badge/Date-2026--03--12-green) ![Release](https://img.shields.io/badge/Release-v2.2.0-blue)
 
 # Rafael IoT SDK
 
-- ### [Release Notes](docs/RELEASE_NOTES.md) 
-
+- ### [Release Notes](docs/RELEASE_NOTES.md)
 ---
+
 ## Supported ICs List<a id="supportic"></a>
 - **[RT581, RT582, RT583, RT584L, RT584H, RF1301](#installation)**
 
 ---
+
 ## 📑 Table of Contents
 
 - 📌 [Features](#features)

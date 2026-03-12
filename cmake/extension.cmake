@@ -270,17 +270,27 @@ macro(setup_project name)
   # add_custom_target(verify_list DEPENDS ${CHECK_STYLE_FILES})
   # add_custom_target(verify ALL COMMAND ${CMAKE_COMMAND} --build . --target verify_list)
   # target_link_libraries(sdk_intf_lib INTERFACE verify)
-
-  set(proj_name ${name}_${CONFIG_CHIP})
-  if((DEFINED CONFIG_RT584H) OR (DEFINED CONFIG_RT584L) OR (DEFINED CONFIG_RT584_NONE_OS))
+  set(rf_suffix "") 
+  if (CONFIG_RF_LABTEST_TOOL) 
+   if (CONFIG_RF_POWER_0DBM) 
+    set(rf_suffix "_0DBM") 
+   elseif (CONFIG_RF_POWER_10DBM) 
+    set(rf_suffix "_10DBM") 
+   elseif (CONFIG_RF_POWER_14DBM) 
+    set(rf_suffix "_14DBM") 
+   elseif (CONFIG_RF_POWER_20DBM) 
+    set(rf_suffix "_20DBM") 
+   endif() 
+  endif()
+  set(proj_name ${name}_${CONFIG_CHIP}${rf_suffix})
+  if((DEFINED CONFIG_RT584H) OR (DEFINED CONFIG_RT584L) OR (DEFINED CONFIG_RT584HA4) OR (DEFINED CONFIG_RT584H_NONE_OS) OR (DEFINED CONFIG_RT584L_NONE_OS) OR (CONFIG_RT584HA4_NONE_OS))
   set(MY_CHIP "rt584")
   elseif((DEFINED CONFIG_RT581) OR (DEFINED CONFIG_RT582) OR (DEFINED CONFIG_RT583) OR (DEFINED CONFIG_RT582_NONE_OS))
   set(MY_CHIP "rt58x")
+  elseif((DEFINED CONFIG_RF1301) OR (DEFINED CONFIG_RF1301_NONE_OS))
+  set(MY_CHIP "rf1301")
   endif()
 
-  configure_file(
-    ${CMAKE_SOURCE_DIR}/.vscode/launch.json.in 
-    ${CMAKE_SOURCE_DIR}/.vscode/launch.json @ONLY)
   set(HEX_FILE ${CMAKE_BINARY_DIR}/${proj_name}.hex)
   set(BIN_FILE ${CMAKE_BINARY_DIR}/${proj_name}.bin)
   set(MAP_FILE ${CMAKE_BINARY_DIR}/${proj_name}.map)
@@ -290,6 +300,9 @@ macro(setup_project name)
   target_link_libraries(${proj_name}.elf sdk_intf_lib)
   get_property(LINKER_SCRIPT_PROPERTY GLOBAL PROPERTY LINKER_SCRIPT)
 
+  set(ELF_FILE "${CMAKE_BINARY_DIR}/${proj_name}.elf")
+  #message(STATUS "[VSCode] ELF output: ${ELF_FILE}")
+  
   if(EXISTS ${LINKER_SCRIPT_PROPERTY})
     set_target_properties(${proj_name}.elf PROPERTIES LINK_FLAGS "-T${LINKER_SCRIPT_PROPERTY} -Wl,-Map=${MAP_FILE}")
     set_target_properties(${proj_name}.elf PROPERTIES LINK_DEPENDS ${LINKER_SCRIPT_PROPERTY})
@@ -308,35 +321,205 @@ macro(setup_project name)
     add_custom_command(TARGET ${proj_name}.elf POST_BUILD
       COMMAND ${CMAKE_OBJCOPY} -Obinary $<TARGET_FILE:${proj_name}.elf> ${BIN_FILE}
       COMMAND ${CMAKE_OBJDUMP} -d -S $<TARGET_FILE:${proj_name}.elf> >${ASM_FILE}
+      COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${proj_name}.elf> ${HEX_FILE}
       COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${proj_name}.elf> ${OUTPUT_DIR}/${name}/${proj_name}.elf
       COMMAND ${CMAKE_COMMAND} -E copy ${ASM_FILE} ${OUTPUT_DIR}/${name}/${proj_name}.asm
       COMMAND ${CMAKE_COMMAND} -E copy ${MAP_FILE} ${OUTPUT_DIR}/${name}/${proj_name}.map
       COMMAND ${CMAKE_COMMAND} -E copy ${BIN_FILE} ${OUTPUT_DIR}/${name}/${proj_name}.bin
-      COMMAND ${CMAKE_COMMAND} -E copy ${BIN_FILE} ${OUTPUT_DIR}/project.bin
+      COMMAND ${CMAKE_COMMAND} -E copy ${HEX_FILE} ${OUTPUT_DIR}/${name}/${proj_name}.hex
+      #COMMAND ${CMAKE_COMMAND} -E copy ${BIN_FILE} ${OUTPUT_DIR}/project.bin
       COMMENT "Generate ${BIN_FILE}\r\n"
     )
   else()
     add_custom_command(TARGET ${proj_name}.elf POST_BUILD
       COMMAND ${CMAKE_OBJCOPY} -Obinary $<TARGET_FILE:${proj_name}.elf> ${BIN_FILE}
       COMMAND ${CMAKE_OBJDUMP} -d -S $<TARGET_FILE:${proj_name}.elf> >${ASM_FILE}
+      COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${proj_name}.elf> ${HEX_FILE}
       COMMENT "Generate ${BIN_FILE}\r\n"
     )
   endif()
+
+   configure_file(
+    ${CMAKE_SOURCE_DIR}/.vscode/launch.json.in 
+    ${CMAKE_SOURCE_DIR}/.vscode/launch.json @ONLY)
+
 endmacro()
 
-macro(get_git_hash _git_hash)  
-    find_package(Git QUIET)
-    if(GIT_FOUND)
-      execute_process(
-        COMMAND ${GIT_EXECUTABLE} log -1 --pretty=format:%h
-        OUTPUT_VARIABLE ${_git_hash}
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        # ERROR_QUIET
-        WORKING_DIRECTORY
-          ${CMAKE_CURRENT_SOURCE_DIR}
-        )
+function(get_git_hash OUT_VAR)
+
+  # 1. VERSION file path
+  set(VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
+
+  # 2. read VERSION file
+  file(STRINGS ${VERSION_FILE} VERSION_CONTENTS)
+
+  # 3. loop process 
+  foreach(line ${VERSION_CONTENTS})
+    if(line MATCHES "^\\s*#")
+      continue()
     endif()
-endmacro() 
+
+    if(line MATCHES "^([^=]+)=(.*)$")
+      set(KEY "${CMAKE_MATCH_1}")
+      set(VALUE "${CMAKE_MATCH_2}")
+
+      string(STRIP "${KEY}" KEY)
+      string(STRIP "${VALUE}" VALUE)
+
+      set(${KEY} "${VALUE}" CACHE INTERNAL "")
+    endif()
+  endforeach()
+
+  set(_default_hash "${SHA}" CACHE INTERNAL "")
+
+  find_package(Git QUIET)
+
+  if(GIT_FOUND)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} log -1 --pretty=format:%h
+        OUTPUT_VARIABLE _out
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE _ret
+        ERROR_QUIET
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+
+    if(_ret EQUAL 0 AND NOT "${_out}" STREQUAL "")
+        set(${OUT_VAR} "${_out}" PARENT_SCOPE)
+        return()
+    endif()
+  endif()
+
+  # fallback — PARENT_SCOPE
+  set(${OUT_VAR} "${_default_hash}" PARENT_SCOPE)
+
+endfunction()
+
+
+function(get_fw_version MAC_OUT_VAR BLE_OUT_VAR MULTI_OUT_VAR)
+    # 預設回傳空字串
+    set(_mac_ver "")
+    set(_ble_ver "")
+    set(_multi_ver "")
+
+    # -------------------------------
+    # 1) Decide FW header paths by chip
+    # -------------------------------
+    if(
+        DEFINED CONFIG_RT581
+        OR DEFINED CONFIG_RT582
+        OR DEFINED CONFIG_RT583
+        OR DEFINED CONFIG_RT582_NONE_OS
+    )
+        message(STATUS "CONFIG_RT58x doesn't have FW version")
+
+    else()
+        if(DEFINED CONFIG_RF1301 OR DEFINED CONFIG_RF1301_NONE_OS)
+            if(DEFINED CONFIG_RF_FW_INCLUDE_PCI)
+                set(MAC_FW_HEADER ${CMAKE_SOURCE_DIR}/components/network/rt569-fw/rt584/include/prg_rf1301_mpa_asic_pci_fw.h)
+            endif()
+            if(DEFINED CONFIG_RF_FW_INCLUDE_BLE)
+                set(BLE_FW_HEADER ${CMAKE_SOURCE_DIR}/components/network/rt569-fw/rt584/include/prg_rf1301_mpa_asic_ble_fw.h)
+            endif()
+            if(DEFINED CONFIG_RF_FW_INCLUDE_MULTI_2P4G)
+                message(STATUS "RF1301 doesn't have Multi FW")
+            endif()
+
+        elseif(DEFINED CONFIG_RT584H OR DEFINED CONFIG_RT584HA4 OR DEFINED CONFIG_RT584H_NONE_OS OR DEFINED CONFIG_RT584HA4_NONE_OS)
+            if(DEFINED CONFIG_RF_FW_INCLUDE_PCI)
+                set(MAC_FW_HEADER ${CMAKE_SOURCE_DIR}/components/network/rt569-fw/rt584/include/prg_rt584h_mpa_asic_pci_fw.h)
+            endif()
+            if(DEFINED CONFIG_RF_FW_INCLUDE_BLE)
+                set(BLE_FW_HEADER ${CMAKE_SOURCE_DIR}/components/network/rt569-fw/rt584/include/prg_rt584h_mpa_asic_ble_fw.h)
+            endif()
+            if(DEFINED CONFIG_RF_FW_INCLUDE_MULTI_2P4G)
+                set(MULTI_FW_HEADER ${CMAKE_SOURCE_DIR}/components/network/rt569-fw/rt584/include/prg_rt584h_mpa_asic_multi_fw.h)
+            endif()
+
+        elseif(DEFINED CONFIG_RT584L OR DEFINED CONFIG_RT584L_NONE_OS)
+            if(DEFINED CONFIG_RF_FW_INCLUDE_PCI)
+                set(MAC_FW_HEADER ${CMAKE_SOURCE_DIR}/components/network/rt569-fw/rt584/include/prg_rt584l_mpa_asic_pci_fw.h)
+            endif()
+            if(DEFINED CONFIG_RF_FW_INCLUDE_BLE)
+                set(BLE_FW_HEADER ${CMAKE_SOURCE_DIR}/components/network/rt569-fw/rt584/include/prg_rt584l_mpa_asic_ble_fw.h)
+            endif()
+            if(DEFINED CONFIG_RF_FW_INCLUDE_MULTI_2P4G)
+                set(MULTI_FW_HEADER ${CMAKE_SOURCE_DIR}/components/network/rt569-fw/rt584/include/prg_rt584l_mpa_asic_multi_fw.h)
+            endif()
+        endif()
+    
+
+    # -------------------------------
+    # 2) Parse versions from FW headers
+    # -------------------------------
+
+    # --- MAC ---
+    if(DEFINED CONFIG_RF_FW_INCLUDE_PCI)
+        if(NOT DEFINED MAC_FW_HEADER)
+            message(FATAL_ERROR "CONFIG_RF_FW_INCLUDE_PCI is enabled but MAC_FW_HEADER is not set")
+        endif()
+
+        file(READ ${MAC_FW_HEADER} _mac_hdr)
+        string(REGEX MATCH "#define[ \t]+FW_MAC_VERSION_NO[ \t]+\\(([^)]+)\\)" _mac_match "${_mac_hdr}")
+        if(NOT _mac_match)
+            message(STATUS "FW_MAC_VERSION_NO not found in ${MAC_FW_HEADER}")
+        endif()
+
+        set(_mac_raw "${CMAKE_MATCH_1}")
+        string(REGEX REPLACE "[uUlL]+" "" _mac_ver "${_mac_raw}")
+        message(STATUS "FW_MAC_VERSION = ${_mac_ver}")
+    endif()
+
+    # --- BLE ---
+    if(DEFINED CONFIG_RF_FW_INCLUDE_BLE)
+        if(NOT DEFINED BLE_FW_HEADER)
+            message(FATAL_ERROR "CONFIG_RF_FW_INCLUDE_BLE is enabled but BLE_FW_HEADER is not set")
+        endif()
+
+        file(READ ${BLE_FW_HEADER} _ble_hdr)
+        string(REGEX MATCH "#define[ \t]+FW_BLE_VERSION_NO[ \t]+\\(([^)]+)\\)" _ble_match "${_ble_hdr}")
+        if(NOT _ble_match)
+          message(STATUS "FW_BLE_VERSION_NO not found in ${BLE_FW_HEADER}")
+        endif()
+
+        set(_ble_raw "${CMAKE_MATCH_1}")
+        string(REGEX REPLACE "[uUlL]+" "" _ble_ver "${_ble_raw}")
+        message(STATUS "FW_BLE_VERSION = ${_ble_ver}")
+    endif()
+
+    # --- MULTI ---
+    if(DEFINED CONFIG_RF_FW_INCLUDE_MULTI_2P4G)
+        if(DEFINED CONFIG_RF1301 OR DEFINED CONFIG_RF1301_NONE_OS)
+            
+        else()
+            if(NOT DEFINED MULTI_FW_HEADER)
+                message(FATAL_ERROR "CONFIG_RF_FW_INCLUDE_MULTI_2P4G is enabled but MULTI_FW_HEADER is not set")
+            endif()
+
+            file(READ ${MULTI_FW_HEADER} _multi_hdr)
+            string(REGEX MATCH "#define[ \t]+FW_MULTI_VERSION_NO[ \t]+\\(([^)]+)\\)" _multi_match "${_multi_hdr}")
+            if(NOT _multi_match)
+                message(STATUS "FW_MULTI_VERSION_NO not found in ${MULTI_FW_HEADER}")
+            endif()
+
+            set(_multi_raw "${CMAKE_MATCH_1}")
+            string(REGEX REPLACE "[uUlL]+" "" _multi_ver "${_multi_raw}")
+            message(STATUS "FW_MULTI_VERSION = ${_multi_ver}")
+        endif()
+    endif()
+
+    # -------------------------------
+    # 3) Return values to caller
+    # -------------------------------
+    set(${MAC_OUT_VAR}   "${_mac_ver}"   PARENT_SCOPE)
+    set(${BLE_OUT_VAR}   "${_ble_ver}"   PARENT_SCOPE)
+    set(${MULTI_OUT_VAR} "${_multi_ver}" PARENT_SCOPE)
+
+    message(STATUS "MAC_VER   = ${_mac_ver}")
+    message(STATUS "BLE_VER   = ${_ble_ver}")
+    message(STATUS "MULTI_VER = ${_multi_ver}")
+  endif()
+endfunction()
 
 function(config_parse config_file)
     file(READ "${config_file}" file_contents)
@@ -383,25 +566,78 @@ function(config_parse config_file)
     endforeach()
 endfunction()
 
-function(app_git_version git_version)
-    execute_process(
-        COMMAND git describe --dirty=-test --always --tags --long --match "${CONFIG_BUILD_PORJECT}*"
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-        OUTPUT_VARIABLE GIT_REV OUTPUT_STRIP_TRAILING_WHITESPACE
-        ERROR_QUIET
-    )
-    string(REPLACE "${CONFIG_BUILD_PORJECT}-" "" var ${GIT_REV}) 
-    set(${git_version} ${var} PARENT_SCOPE)
+function(app_git_version OUT_VAR)
+
+    #
+    find_package(Git QUIET)
+
+    if(GIT_FOUND)
+        execute_process(
+            COMMAND git describe --dirty=-test --always --tags --long --match "${CONFIG_BUILD_PORJECT}*"
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+            OUTPUT_VARIABLE GIT_REV OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+
+        if(NOT "${GIT_REV}" STREQUAL "")
+            message(STATUS "Using git describe: ${GIT_REV}")
+            #set(${OUT_VAR} "${GIT_REV}")
+            set(${OUT_VAR} "${GIT_REV}" PARENT_SCOPE)
+            return()
+        endif()
+    endif()
+
+    #message(STATUS "Using git commit hash: ${_default_hash}")
+
+    # Step3: return value
+    set(${OUT_VAR} "${_default_hash}" PARENT_SCOPE)
 endfunction()
 
 function(show_banner) 
+
   sdk_ifndef(_git_hash "")
   get_git_hash(_git_hash)
 
-  add_compile_options(-DRAFAEL_SDK_VER="${_git_hash}")
+  string(SUBSTRING "${CONFIG_CHIP}" 0 8 BUILD_CHIP8)
+  message(STATUS "BUILD_CHIP8: ${BUILD_CHIP8}")
 
+  #
   string(SUBSTRING "${_git_hash}" 0 8 _git_hash8)
   add_compile_options(-DLIB_VER=0x${_git_hash8})
+  message(STATUS "_git_hash8: ${_git_hash8}")
+  # 
+  set(RAFAEL_SDK_VER "v${VERSION_MAJOR}.${VERSION_MINOR}.${PATCHLEVEL}" CACHE INTERNAL "")
+  add_compile_options(-DRAFAEL_SDK_VER="${RAFAEL_SDK_VER}")
+  math(EXPR _version_hex "((${VERSION_MAJOR} << 24) | (${VERSION_MINOR} << 16) | (${PATCHLEVEL} << 8) | ${EXTRAVERSION})")
+
+  message(STATUS "Firmware Version = ${_version_hex} (V${VERSION_MAJOR}.${VERSION_MINOR}.${PATCHLEVEL}.${EXTRAVERSION})")
+  # 
+
+  string(TIMESTAMP _build_date "%Y%m%d")
+  message(STATUS "CMake build date raw = '${_build_date}'")
+
+  get_fw_version(_mac_ver _ble_ver _multi_ver)
+
+  if(_mac_ver)
+    add_compile_definitions(BUILD_MAC_FW_INFO=${_mac_ver})
+  endif()
+
+  if(_ble_ver)
+      add_compile_definitions(BUILD_BLE_FW_INFO=${_ble_ver})
+  endif()
+
+  if(_multi_ver)
+      add_compile_definitions(BUILD_MULTI_FW_INFO=${_multi_ver})
+  endif()
+
+  add_compile_options(
+  -DBUILD_CHIP_INFO=${BUILD_CHIP8}
+  -DBUILD_VERSION_INFO=${_version_hex}
+  -DBUILD_HASH_INFO=0x${_git_hash8}  
+  -DBUILD_DATE_INFO=0x${_build_date}
+  )
+
+
 
   message("   _____       ______         _   _____   _______    _____ _____  _  __")
   message("  |  __ \\     |  ____|       | | |_   _| |__   __|  / ____|  __ \\| |/ /")
@@ -410,6 +646,9 @@ function(show_banner)
   message("  | | \\ \\ (_| | | | (_| |  __/ |  _| || (_) | |     ____) | |__| | . \\")
   message("  |_|  \\_\\__,_|_|  \\__,_|\\___|_| |_____\\___/|_|    |_____/|_____/|_|\\_\\")
   message("")
+
+  # 
   message(STATUS "Current SDK version: ${RAFAEL_SDK_VER}")
   message(STATUS "Build Project: ${CONFIG_BUILD_PORJECT}")
+
 endfunction()

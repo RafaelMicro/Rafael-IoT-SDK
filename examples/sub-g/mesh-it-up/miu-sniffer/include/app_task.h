@@ -7,6 +7,6 @@
 void app_common_init();
 void app_task(void);
 
-void ncpInitUser(otInstance* instance);
+void ncpInitUser();
 
 #endif /* __APP_NET_MGM_H */

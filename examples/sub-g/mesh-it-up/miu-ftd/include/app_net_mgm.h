@@ -4,7 +4,8 @@
 #include <miu_port.h>
 #include <openthread/thread.h>
 
-#define NET_MGM_NODE_SURVIVAL_TIME 300 //5 minutes, at least 2 minutes
+#define NET_MGM_NODE_SURVIVAL_TIME                                             \
+    240 //4 minutes, at least 2 minutes, max 255 s
 
 extern uint16_t enroll_update_timeout;
 extern uint8_t enroll_send_try;
@@ -19,8 +20,8 @@ typedef struct {
     uint8_t extaddr[OT_EXT_ADDRESS_SIZE];
     int8_t rssi;
     uint32_t version;
-    uint16_t survivaltime;
-} net_mgm_node_table_t;
+    uint8_t survivaltime;
+} __attribute__((packed)) net_mgm_node_table_t;
 
 bool net_mgm_check_leader_pin_state();
 void net_mgm_node_table_num();

@@ -42,7 +42,7 @@ int main(void) {
     printf("/*******Start RTC Event********/\r\n");
     
     hosal_rtc_get_time(&current_time);
-#if defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 #if defined(CONFIG_RCO32K_ENABLE)
     hosal_rtc_set_clk(0x200000);
 #elif defined(CONFIG_RCO16K_ENABLE)
@@ -67,7 +67,7 @@ int main(void) {
     current_time.tm_hour = 12;
     current_time.tm_min = 20;
     current_time.tm_sec = 32;
-#if defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     current_time.tm_msec = 12;
 #endif
 
@@ -75,7 +75,7 @@ int main(void) {
 
     hosal_rtc_get_time(&current_time);
 
-#if defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     printf("setting time is %2d-%2d-%2d %2d:%2d:%2d.%3d \r\n", current_time.tm_year,
            current_time.tm_mon, current_time.tm_day, current_time.tm_hour,
            current_time.tm_min, current_time.tm_sec, current_time.tm_msec);
@@ -102,7 +102,7 @@ int main(void) {
     alarm_mode = HOSAL_RTC_MODE_HOUR_EVENT_INTERRUPT
                  | HOSAL_RTC_MODE_EVENT_INTERRUPT;
 
-#if defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     printf("setting alarm time is %2d-%2d-%2d %2d:%2d:%2d.%3d \r\n",
             alarm_tm.tm_year, alarm_tm.tm_mon, alarm_tm.tm_day,
             alarm_tm.tm_hour, alarm_tm.tm_min, alarm_tm.tm_sec,
@@ -116,7 +116,7 @@ int main(void) {
     hosal_rtc_set_alarm(&alarm_tm, alarm_mode, rtc_callback);
     NVIC_EnableIRQ(Rtc_IRQn);
 
-#if defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     current_time.tm_msec = 12;
 #endif
 
@@ -125,7 +125,7 @@ int main(void) {
             puts("specify time alarm\r\n");
             rtc_alarm = 0;
             hosal_rtc_get_time(&current_time);
-#if defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
             printf("current time is %2d-%2d-%2d %2d:%2d:%2d.%3d \r\n",
                    current_time.tm_year, current_time.tm_mon,
                    current_time.tm_day, current_time.tm_hour,

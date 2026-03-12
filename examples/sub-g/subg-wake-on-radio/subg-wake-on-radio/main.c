@@ -173,6 +173,7 @@ void gpio_frequency_chek() {
     hosal_gpio_pin_get(23, &pin23_value);
     hosal_gpio_pin_get(14, &pin14_value);
     hosal_gpio_pin_get(9, &pin9_value);
+    subg_ctrl_frequency_set(905000);
 
     if (pin31_value == 0) {
         subg_ctrl_frequency_set(g_freq_support[0]);
@@ -221,7 +222,7 @@ void subg_cfg_set(subg_ctrl_modulation_t mode, uint8_t data_rate) {
 
         subg_ctrl_sfd_set(mode, 0x00007209);
 
-        subg_ctrl_filter_set(mode, SUBG_CTRL_FILTER_TYPE_GFSK);
+        subg_ctrl_filter_set(mode, SUBG_CTRL_FILTER_TYPE_FSK);
     } else {
         lmac15p4_init(LMAC15P4_SUBG_OQPSK, HOSAL_RF_BAND_SUBG_915M);
 
@@ -235,8 +236,53 @@ void subg_cfg_set(subg_ctrl_modulation_t mode, uint8_t data_rate) {
         subg_ctrl_mac_set(mode, SUBG_CTRL_CRC_TYPE_16,
                           SUBG_CTRL_WHITEN_DISABLE);
     }
+    /* PHY PIB Parameters */
+    lmac15p4_phy_pib_set(SUBG_PHY_TURNAROUND_TIMER, SUBG_PHY_CCA_DETECT_MODE,
+                         SUBG_PHY_CCA_THRESHOLD, SUBG_PHY_CCA_DETECTED_TIME);
+
+    /* MAC PIB Parameters */
+    lmac15p4_mac_pib_set(SUBG_MAC_UNIT_BACKOFF_PERIOD,
+                         SUBG_MAC_MAC_ACK_WAIT_DURATION, SUBG_MAC_MAC_MAX_BE,
+                         SUBG_MAC_MAC_MAX_CSMACA_BACKOFFS,
+                         SUBG_MAC_MAC_MAX_FRAME_TOTAL_WAIT_TIME,
+                         SUBG_MAC_MAC_MAX_FRAME_RETRIES, SUBG_MAC_MAC_MIN_BE);
+
+    uint16_t short_addr = SUBG_MAC_SHORT_ADDR;
+
+    uint32_t long_addr_0 = (SUBG_MAC_LONG_ADDR >> 32);
+
+    uint32_t long_addr_1 = SUBG_MAC_LONG_ADDR & 0xFFFFFFFF;
+
+    uint16_t pnaid = 0x1AAA;
+
+    lmac15p4_address_filter_set(0, false, short_addr, long_addr_0, long_addr_1,
+                                pnaid, true);
+
+    /* AUTO ACK Enable Flag */
+    lmac15p4_auto_ack_set(true);
+
+    /* Frame Pending Bit */
+    lmac15p4_ack_pending_bit_set(0, true);
+
+    /* Auto State */
+    lmac15p4_auto_state_set(false);
+
+    lmac15p4_src_match_ctrl(0, true);
 
     gpio_frequency_chek();
+
+#if CONFIG_HOSAL_SOC_IDLE_SLEEP
+    hosal_rf_wake_on_radio_t wake_on_radio;
+
+    g_rx_time = 3;
+    wake_on_radio.frequency = gpio_frequency_get();
+    wake_on_radio.rx_on_time = g_rx_time;
+    wake_on_radio.sleep_time = SUBG_RX_ON_RADIO_SLEEP_TIME;
+    hosal_lpm_ioctrl(HOSAL_LPM_UNMASK, HOSAL_LOW_POWER_MASK_BIT_RVD27);
+    hosal_rf_ioctl(HOSAL_RF_IOCTL_WAKE_ON_RADIO_SET, &wake_on_radio);
+    log_info("300K RX on radio start: sleep %d ms ,rx %d ms \r\n",
+             wake_on_radio.sleep_time, wake_on_radio.rx_on_time);
+#endif
 }
 
 #if !CONFIG_HOSAL_SOC_IDLE_SLEEP
@@ -492,6 +538,7 @@ void subg_config_init() {
 
     /*rf init */
     hosal_rf_init(HOSAL_RF_MODE_RUCI_CMD);
+#if 0
     /*Choose the frequency band you want */
     lmac15p4_init(LMAC15P4_SUBG_FSK, HOSAL_RF_BAND_SUBG_915M);
 
@@ -515,7 +562,7 @@ void subg_config_init() {
 
     subg_ctrl_sfd_set(SUBG_CTRL_MODU_FSK, 0x00007209);
 
-    subg_ctrl_filter_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_FILTER_TYPE_GFSK);
+    subg_ctrl_filter_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_FILTER_TYPE_FSK);
 
     /* PHY PIB Parameters */
     lmac15p4_phy_pib_set(SUBG_PHY_TURNAROUND_TIMER, SUBG_PHY_CCA_DETECT_MODE,
@@ -563,6 +610,7 @@ void subg_config_init() {
     hosal_rf_ioctl(HOSAL_RF_IOCTL_WAKE_ON_RADIO_SET, &wake_on_radio);
     log_info("300K RX on radio start: sleep %d ms ,rx %d ms \r\n",
              wake_on_radio.sleep_time, wake_on_radio.rx_on_time);
+#endif
 #endif
 }
 

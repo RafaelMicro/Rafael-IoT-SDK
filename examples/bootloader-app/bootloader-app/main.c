@@ -24,13 +24,13 @@
 #include "rt_ecjpake.h"
 #include "rt_sha256.h"
 
-#include "version_api.h"
-
 #include "bootloader.h"
 #include "slip.h"
 
-#if defined(CONFIG_RT584_NONE_OS)
-#define SECURE_BOOT_INFO_PAGE       0x100
+
+
+#if defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
+#define SECURE_BOOT_INFO_PAGE       0x1200
 #else
 #define SECURE_BOOT_INFO_PAGE       0x1000
 #endif
@@ -73,8 +73,6 @@ uint8_t sha256_digest[32];
 uint8_t le_sha256_digest[32];
 
 uint32_t buf[256];
-
-extern void lib_version_init(void);
 
 typedef void(FUNC_PTR)(void);
 
@@ -152,6 +150,8 @@ static int load_image_into_flash(uint32_t image_base, uint32_t flash_addr,
     return 0;
 }
 
+#if 0
+/* pointer version */
 uint32_t crc32(uint32_t flash_addr, uint32_t data_len) {
     uint8_t RemainLen = (data_len & (0x3));
     uint32_t i;
@@ -191,6 +191,29 @@ uint32_t crc32(uint32_t flash_addr, uint32_t data_len) {
     ChkSum = ~ChkSum;
     return ChkSum;
 }
+#else
+/* read flash version */
+uint32_t crc32(uint32_t flash_addr, uint32_t data_len) {
+    uint32_t i;
+    uint16_t j, k;
+    uint32_t ChkSum = ~0;
+    uint8_t Read;
+
+    for (i = 0; i < data_len; i++) {
+        //get 8 bits at one time
+        Read = flash_read_byte((flash_addr + i));
+        while (flash_check_busy()) {}
+        //get the CRC of 8 bits
+        ChkSum ^= Read;
+        for (k = 0; k < 8; k++) {
+            ChkSum = (ChkSum & 1) ? (ChkSum >> 1) ^ 0xedb88320
+                                    : ChkSum >> 1;
+        }
+    }
+    ChkSum = ~ChkSum;
+    return ChkSum;
+}
+#endif
 
 void* MyAlloc(size_t size) {
     void* tset;
@@ -230,7 +253,9 @@ static SRes Decode2(CLzmaDec* state, uint32_t OutAddress, uint32_t InAddress,
             DEBUG_PRINT("\r\ninSize = %d, inPos = %d, process = %d\r\n", inSize,
                         inPos, processed);
 
-            memcpy(inBuf, (void*)(InAddress + processed), inSize);
+            for (uint32_t i = 0; i < inSize; i++) {
+                inBuf[i] = flash_read_byte(InAddress + processed + i);
+            }
         }
         //DEBUG_PRINT("\r\n\r\n\r\n\r\ninSize = %d, inPos = %d, process = %d\r\n",inSize, inPos, processed);
         {
@@ -410,12 +435,13 @@ int main(void) {
     uart_stdio_init();
 #endif
 
+
     char* ptr = NULL;
     fota_information_t* p_fota_info =
         (fota_information_t*)(FOTA_UPDATE_BANK_INFO_ADDRESS);
 
     uint32_t i, status, target_sig_address;
-#if defined(CONFIG_RT584_NONE_OS)
+#if defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
     bootloader_signature_info_t* p_bootloader_key;
 
     uint32_t bootloader_version = *(uint32_t *)0x100000B0;
@@ -429,8 +455,6 @@ int main(void) {
     /*init software sha256 vector*/
     sha256_vector_init();
 #endif
-
-    lib_version_init();
 
     secure_boot = SECURE_BOOT_NOT_SUPPORT;
     fota_check = DO_NOT_CHECK_FOTA_IMAGE_EXIST;
@@ -453,7 +477,7 @@ int main(void) {
     DEBUG_PRINT("[BOOT] Version: %d.%d.%d\r\n", (version_info >> 16) & 0xFF,
                 (version_info >> 8) & 0xFF, version_info & 0xFF);
     DEBUG_PRINT("[BOOT] Heap %u@%p\r\n", (unsigned int)&_heap_size, &_heap_start);
-#if defined(CONFIG_RT584_NONE_OS)
+#if defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
     ver_major = (bootloader_version>>16) & 0xFFFF; 
     ver_minor = bootloader_version & 0xFFFF;
 
@@ -518,7 +542,12 @@ int main(void) {
                     }
                     else
                     {
-                        check_verify_size = *((uint32_t *) (ptr + 0x28));
+                        check_verify_size = 0;
+                        check_verify_size = (flash_read_byte((uint32_t)ptr + 0x28)) | check_verify_size;
+                        check_verify_size = (flash_read_byte((uint32_t)ptr + 0x29) << 8) | check_verify_size;
+                        check_verify_size = (flash_read_byte((uint32_t)ptr + 0x2A) << 16) | check_verify_size;
+                        check_verify_size = (flash_read_byte((uint32_t)ptr + 0x2B) << 24) | check_verify_size;
+                        //check_verify_size = *((uint32_t *) (ptr + 0x28));
                     }
 
                     if (check_verify_size == 0)
@@ -562,9 +591,12 @@ int main(void) {
                         while (flash_check_busy());
                         break;
                     }
-                    #if defined(CONFIG_RT584_NONE_OS)
+                    #if defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
+                    #if 0
                     sha256((uint8_t *)ptr, check_verify_size, le_sha256_digest);
-
+                    #else
+                    sha256_flash((uint32_t)ptr, check_verify_size, le_sha256_digest);
+                    #endif 
                     //memcpy (public_key.x, (uint8_t *) p_bootloader_key->key_x, 32);          /*public key, this public key is little endian*/
                     //memcpy (public_key.y, (uint8_t *) p_bootloader_key->key_y, 32);
                     memcpy (public_key.x, (uint8_t *) (sec_page_buf + 2), 32);          /*public key, this public key is little endian*/
@@ -630,7 +662,6 @@ int main(void) {
             fota_check = DO_NOT_CHECK_FOTA_IMAGE_EXIST;
             break;
         }
-        //new firmware validation
         if (p_fota_info->fotabank_crc == crc32((uint32_t)p_fota_info->fotabank_startaddr, p_fota_info->fotabank_datalen))
         {
             if (p_fota_info->target_startaddr >= APP_START_ADDRESS)
@@ -639,21 +670,8 @@ int main(void) {
                 if ( p_fota_info->fota_image_info & FOTA_IMAGE_INFO_COMPRESSED )
                 {
                     DEBUG_PRINT("[FOTA] FOTA_IMAGE_INFO_COMPRESSED.\r\n");
-                    if ( flash_size() == FLASH_512K )
-                    {
-                        DEBUG_PRINT("[FOTA] 512.\r\n");
-                        set_flash_erase(APP_START_ADDRESS, (FOTA_UPDATE_BUFFER_FW_ADDRESS_512K - APP_START_ADDRESS));
-                    }
-                    else if ( flash_size() == FLASH_1024K )
-                    {
-                        DEBUG_PRINT("[FOTA] 1024.\r\n");
-                        set_flash_erase(APP_START_ADDRESS, (FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB - APP_START_ADDRESS));
-                    }
-                    else if ( flash_size() == FLASH_2048K )
-                    {
-                        DEBUG_PRINT("[FOTA] 2048.\r\n");
-                        set_flash_erase(APP_START_ADDRESS, (FOTA_UPDATE_BUFFER_FW_ADDRESS_2MB - APP_START_ADDRESS));
-                    }
+                    DEBUG_PRINT("[FOTA] %.8x\r\n",FOTA_UPDATE_BUFFER_FW_ADDRESS);
+                    set_flash_erase(APP_START_ADDRESS, (FOTA_UPDATE_BUFFER_FW_ADDRESS - APP_START_ADDRESS));
                     res = Decode(p_fota_info->target_startaddr, p_fota_info->fotabank_startaddr);
                 }
                 else
@@ -699,9 +717,9 @@ int main(void) {
         app_verify_result = SECURE_VERIFY_FAIL;
         do
         {
-            /*Here assume APP located  in flash +32K offset */
+            
             ptr = (uint8_t *) APP_START_ADDRESS;
-            /*Here assume APP image located in +0x8028 */
+            
             check_verify_size = *((uint32_t *) (APP_START_ADDRESS + 0x28)) ;
 
             /*Here we don't limit image size */
@@ -738,8 +756,12 @@ int main(void) {
                 DEBUG_PRINT("[SECURE_BOOT] Error, Signature length does not match!  %u %u \r\n", check_verify_size, sig_buf[1]);
                 break;
             }
-            #if defined(CONFIG_RT584_NONE_OS)
+            #if defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
+            #if 0
             sha256((uint8_t *)ptr, check_verify_size, le_sha256_digest);
+            #else
+            sha256_flash((uint32_t)ptr, check_verify_size, le_sha256_digest);
+            #endif 
 
             //memcpy (public_key.x, (uint8_t *) p_bootloader_key->key_x, 32);          /*public key, this public key is little endian*/
             //memcpy (public_key.y, (uint8_t *) p_bootloader_key->key_y, 32);
@@ -794,6 +816,7 @@ int main(void) {
 #if defined(CONFIG_BOOTLOADER_DEBUG)
     uart_stdio_deinit();
 #endif
+
 
     flush_cache();
     jump_to_application(APP_START_ADDRESS);

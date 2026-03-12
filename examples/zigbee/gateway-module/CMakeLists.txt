@@ -15,14 +15,24 @@ target_sources(app PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src/zigbee_zcl_msg_handler.c
 )
 if (CONFIG_BUILD_COMPONENT_ENHANCED_FLASH_DATASET)
-    if(CONFIG_FLASHCTRL_SECURE_EN)
-        sdk_add_compile_options(
-            -DEFD_START_ADDR=0x100F0000
-            -DENV_AREA_SIZE=0x4000
-        )
-    else()
+    if(CONFIG_RT581 OR CONFIG_RT582)
         sdk_add_compile_options(
             -DEFD_START_ADDR=0xF0000
+            -DENV_AREA_SIZE=0x4000
+        )
+    elseif(CONFIG_RT583)
+        sdk_add_compile_options(
+            -DEFD_START_ADDR=0x1F0000
+            -DENV_AREA_SIZE=0x4000
+        )
+    elseif(CONFIG_RT584H OR CONFIG_RT584L)
+        sdk_add_compile_options(
+            -DEFD_START_ADDR=0x101F0000
+            -DENV_AREA_SIZE=0x4000
+        )
+    elseif(CONFIG_RT584HA4)
+        sdk_add_compile_options(
+            -DEFD_START_ADDR=0x103F0000
             -DENV_AREA_SIZE=0x4000
         )
     endif()

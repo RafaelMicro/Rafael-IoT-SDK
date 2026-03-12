@@ -3,7 +3,7 @@
   "configurations": [
         {
             "cwd": "${workspaceFolder}",
-            "executable": "${workspaceFolder}/build/@proj_name@.elf",
+            "executable": "@ELF_FILE@",
             "name": "Debug with OpenOCD (RT58x/RT584)",
             "request": "launch",
             "type": "cortex-debug",
@@ -21,16 +21,33 @@
             "svdFile": "${workspaceRoot}/tools/Debugger/@MY_CHIP@.svd",
             "console": "externalTerminal"
         },
+        {
+            "name": "(WSL) Attach OpenOCD (@MY_CHIP@)",
+            "type": "cortex-debug",
+            "request": "attach",
+            "servertype": "external",
+            "gdbTarget": "127.0.0.1:50000",
+            "gdbPath": "${workspaceFolder}/toolchain/arm/Linux/bin/arm-none-eabi-gdb",
+            "executable": "@ELF_FILE@",
+            "showDevDebugOutput": "raw",
+            "console": "integratedTerminal",
+            "postAttachCommands": [
+              "set breakpoint pending on",
+              "monitor reset halt",
+              "tbreak main",
+              "continue"
+            ]
+        },
     {
       "name": "Debug with J-Link CM3 (RT58x)",
       "type": "cortex-debug",
       "request": "launch",
-      "executable": "${workspaceFolder}/build/@proj_name@.elf",
+      "executable": "@ELF_FILE@",
       "cwd": "${workspaceFolder}",
       "servertype": "jlink",
       "device": "Cortex-M3",
       "interface": "swd",
-      "serverpath": "JLinkGDBServerCL.exe"
+      "serverpath": "JLinkGDBServerCL.exe",
       "serverArgs": [
         "-if", "SWD",
         "-select", "USB",
@@ -46,7 +63,7 @@
       "name": "Debug with J-Link CM33 (RT584)",
       "type": "cortex-debug",
       "request": "launch",
-      "executable": "${workspaceFolder}/build/@proj_name@.elf",
+      "executable": "@ELF_FILE@",
       "cwd": "${workspaceFolder}",
       "servertype": "jlink",
       "device": "Cortex-M33",

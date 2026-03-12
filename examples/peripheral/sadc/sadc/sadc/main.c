@@ -40,7 +40,7 @@ void sadc_int_callback_handler(hosal_sadc_cb_t* p_cb) {
 }
 
 void init_default_pin_mux(void) {
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     /*
      * AIO 0 ->  GPIO 21
      * AIO 1 ->  GPIO 22
@@ -80,7 +80,7 @@ int main(void) {
     hosal_sadc_config_enable(sadc_set, sadc_int_callback_handler);
     NVIC_EnableIRQ((IRQn_Type)(Sadc_IRQn));
 
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 #else
     hosal_sadc_compensation_init(1);
 #endif
@@ -103,7 +103,7 @@ int main(void) {
 
                 case HOSAL_SADC_CH_VBAT:
                     printf("VBAT ADC = %dmv\r\n", sadc_convert_value);
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
                     read_ch.channel = HOSAL_SADC_CH_TEMPERATURE;
                     break;
 

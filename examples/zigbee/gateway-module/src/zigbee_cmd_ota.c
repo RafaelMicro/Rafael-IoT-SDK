@@ -28,6 +28,7 @@
 
 #include <zigbee_platform.h>
 #include "log.h"
+#include "hosal_flash.h"
 #include "zigbee_api.h"
 #include "zigbee_cmd_nwk.h"
 #include "zigbee_cmd_app.h"
@@ -147,24 +148,24 @@ static void _check_ota_file_valid(ota_file_info_t *file_info)
     uint32_t crc32=0, crcread=0;
 
     //read the ota image file size
-    tmp[0] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+0x34);
-    tmp[1] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+0x35);
-    tmp[2] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+0x36);
-    tmp[3] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+0x37);
+    tmp[0] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+0x34);
+    tmp[1] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+0x35);
+    tmp[2] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+0x36);
+    tmp[3] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+0x37);
     memcpy(&file_info->image_size, tmp, 4);
     while (flash_check_busy()) {} ;
 
     if(file_info->image_size<0x73FFC)  //464*1024-4=0x73FFC
     {  
-        crc32 = crc32checksum(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS, file_info->image_size);
+        crc32 = crc32checksum(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS, file_info->image_size);
         gt_img_info.image_size = file_info->image_size;
         log_info("image_size: 0x%08X", file_info->image_size);
         log_info("crc32: 0x%08X", crc32);
 
-        tmp[0] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+file_info->image_size+0);
-        tmp[1] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+file_info->image_size+1);
-        tmp[2] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+file_info->image_size+2);
-        tmp[3] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+file_info->image_size+3);
+        tmp[0] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+file_info->image_size+0);
+        tmp[1] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+file_info->image_size+1);
+        tmp[2] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+file_info->image_size+2);
+        tmp[3] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+file_info->image_size+3);
         memcpy(&crcread, tmp, 4);
         while (flash_check_busy()) {};
         log_info("crc32 in flash: 0x%08X", crcread);
@@ -174,24 +175,24 @@ static void _check_ota_file_valid(ota_file_info_t *file_info)
             file_info->image_found = 1;
             file_info->server_ready = ota_image_ready;
             //read the ota image manufacturer_code
-            tmp[0] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+10);
-            tmp[1] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+11);
+            tmp[0] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+10);
+            tmp[1] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+11);
             memcpy(&file_info->manufacturer_code, tmp, 2);
             gt_img_info.manufacturer_code = file_info->manufacturer_code;
             log_info("manufacturer_code: 0x%04X", file_info->manufacturer_code);
 
             //read the ota image type
-            tmp[0] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+12);
-            tmp[1] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+13);
+            tmp[0] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+12);
+            tmp[1] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+13);
             memcpy(&file_info->image_type, tmp, 2);
             gt_img_info.image_type = file_info->image_type;
             log_info("image_type: 0x%04X", file_info->image_type);
 
             //read the ota image file_version
-            tmp[0] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+14);
-            tmp[1] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+15);
-            tmp[2] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+16);
-            tmp[3] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS+17);
+            tmp[0] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+14);
+            tmp[1] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+15);
+            tmp[2] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+16);
+            tmp[3] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS+17);
             memcpy(&file_info->image_version, tmp, 4);
             gt_img_info.file_version = file_info->image_version;
             log_info("file_version: 0x%08X", file_info->image_version);
@@ -386,7 +387,7 @@ void _gw_ota_cmd_handle(uint32_t cmd_id, uint8_t *pBuf)
     uint32_t status = 0;
     static uint8_t *p_tmp_buf;
     static uint32_t recv_cnt = 0;
-    static uint32_t flash_addr = FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS, tmp_len = 0;
+    static uint32_t flash_addr = FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS, tmp_len = 0;
     uint32_t crc32, poffset;
     ota_img_info_t *upg_data;
 
@@ -395,12 +396,13 @@ void _gw_ota_cmd_handle(uint32_t cmd_id, uint8_t *pBuf)
     {
         recv_cnt = 0;
         tmp_len = 0;
-        flash_addr = FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS;
+        flash_addr = FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS;
+
         for (i = 0; i < 0x74; i++)
         {
             // Page erase (4096 bytes)
             while (flash_check_busy());
-            flash_erase(FLASH_ERASE_SECTOR, FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS + (0x1000 * i));
+            flash_erase(FLASH_ERASE_SECTOR, FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS + (0x1000 * i));
         }
         zigbee_gw_cmd_send((GW_CMD_OTA_UPLOAD_START_REQUEST | 0x8000), 0, 0, 0, (uint8_t *)&status, 4);
     }
@@ -462,11 +464,11 @@ void _gw_ota_cmd_handle(uint32_t cmd_id, uint8_t *pBuf)
                     flash_addr += 0x100;
                 }
                 flush_cache();
-                crc32 = crc32checksum(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS, gt_img_info.image_size);
+                crc32 = crc32checksum(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS, gt_img_info.image_size);
 
                 //if (((0x0007C000 + gt_img_info.image_size) % 0x1000) > 0)
                 {
-                    poffset = (FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS + gt_img_info.image_size) - ((FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS + gt_img_info.image_size) % 0x1000);
+                    poffset = (FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS + gt_img_info.image_size) - ((FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS + gt_img_info.image_size) % 0x1000);
                 }
 
                 for (int i = 0; i < 0x10; i++)
@@ -475,7 +477,7 @@ void _gw_ota_cmd_handle(uint32_t cmd_id, uint8_t *pBuf)
                     flash_read_page((uint32_t)&gp_ota_imgae_cache[i * 0x100], poffset + (i * 0x100));
                 }
 
-                memcpy(&gp_ota_imgae_cache[((FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS + gt_img_info.image_size) % 0x1000)], &crc32, 4);
+                memcpy(&gp_ota_imgae_cache[((FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS + gt_img_info.image_size) % 0x1000)], &crc32, 4);
 
                 while (flash_check_busy());
                 flash_erase(FLASH_ERASE_SECTOR, poffset);
@@ -512,7 +514,7 @@ void _gw_ota_cmd_handle(uint32_t cmd_id, uint8_t *pBuf)
         if(file_info.image_found) {
             zb_ret_t ret = 0x00000000;
             log_info("insert ota file");
-            _ota_file_insert(FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS, gt_img_info.image_size + 4, gt_img_info.file_version, gt_img_info.image_type, gt_img_info.manufacturer_code);
+            _ota_file_insert(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS, gt_img_info.image_size + 4, gt_img_info.file_version, gt_img_info.image_type, gt_img_info.manufacturer_code);
             zigbee_gw_cmd_send((GW_CMD_OTA_FILE_INSERT_REQUEST | 0x8000), 0, 0, 0, (uint8_t *)&ret, 4);
         }
         else

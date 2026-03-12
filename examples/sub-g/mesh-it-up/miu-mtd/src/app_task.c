@@ -22,12 +22,16 @@
 #include "lmac15p4.h"
 #include "log.h"
 #include "main.h"
+#include "miu_bin_version.h"
 #include "miu_ext_mem.h"
 #include "subg_ctrl.h"
 #include "util_string.h"
 
 #include <openthread/logging.h>
 #include <openthread/random_noncrypto.h>
+
+#define BIN_TYPE_ARR 'm', 'i', 'u', '-', 'm', 't', 'd', 't', 'y', 'p', 'e', '-'
+const sys_information_t systeminfo = SYSTEMINFO_INIT(BIN_TYPE_ARR);
 
 #define PHY_PIB_TURNAROUND_TIMER  1000
 #define PHY_PIB_CCA_DETECTED_TIME 640 // 8 symbols for 50 kbps-data rate
@@ -157,13 +161,9 @@ static void otsleepInit(otInstance* instance) {
     mode.mNetworkData = false;
 #ifdef CONFIG_HOSAL_SOC_IDLE_SLEEP
     mode.mRxOnWhenIdle = false;
-#if 1                                    //sed
-    otLinkSetPollPeriod(instance, 1000); // 1s sleep poll period
-#else                                    //ssed
-    otLinkCslSetChannel(instance, netconfig.channel);
-    otLinkCslSetPeriod(instance, (6250 * 2));
-    otLinkCslSetTimeout(instance, 10000);
-#endif
+    //sed
+    otLinkSetPollPeriod(
+        instance, CONFIG_APP_TASK_SLEEP_POLL_PERIOD); // 1s sleep poll period
 #else
     mode.mRxOnWhenIdle = true;
 #endif
@@ -212,6 +212,52 @@ void app_start_join(otInstance* instance) {
     xTimerStart(sJoinRetryTimer, 0);
 }
 
+static void otnetworkinfo(otInstance* instance) {
+    log_info("Channel            : %d", otLinkGetChannel(instance));
+    log_info("Ext PAN ID         : %02x%02x%02x%02x%02x%02x%02x%02x",
+             otThreadGetExtendedPanId(instance)->m8[0],
+             otThreadGetExtendedPanId(instance)->m8[1],
+             otThreadGetExtendedPanId(instance)->m8[2],
+             otThreadGetExtendedPanId(instance)->m8[3],
+             otThreadGetExtendedPanId(instance)->m8[4],
+             otThreadGetExtendedPanId(instance)->m8[5],
+             otThreadGetExtendedPanId(instance)->m8[6],
+             otThreadGetExtendedPanId(instance)->m8[7]);
+    log_info("Mesh Local Prefix  : %02x%02x:%02x%02x:%02x%02x:%02x%02x::/64",
+             otThreadGetMeshLocalPrefix(instance)->m8[0],
+             otThreadGetMeshLocalPrefix(instance)->m8[1],
+             otThreadGetMeshLocalPrefix(instance)->m8[2],
+             otThreadGetMeshLocalPrefix(instance)->m8[3],
+             otThreadGetMeshLocalPrefix(instance)->m8[4],
+             otThreadGetMeshLocalPrefix(instance)->m8[5],
+             otThreadGetMeshLocalPrefix(instance)->m8[6],
+             otThreadGetMeshLocalPrefix(instance)->m8[7]);
+    otNetworkKey netKey;
+    otThreadGetNetworkKey(instance, &netKey);
+    log_info("Network Key        : "
+             "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+             netKey.m8[0], netKey.m8[1], netKey.m8[2], netKey.m8[3],
+             netKey.m8[4], netKey.m8[5], netKey.m8[6], netKey.m8[7],
+             netKey.m8[8], netKey.m8[9], netKey.m8[10], netKey.m8[11],
+             netKey.m8[12], netKey.m8[13], netKey.m8[14], netKey.m8[15]);
+
+    log_info("Network Name       : %s", otThreadGetNetworkName(instance));
+    log_info("Link Mode          : %d, %d, %d",
+             otThreadGetLinkMode(instance).mRxOnWhenIdle,
+             otThreadGetLinkMode(instance).mDeviceType,
+             otThreadGetLinkMode(instance).mNetworkData);
+    log_info("PAN ID             : 0x%04x", otLinkGetPanId(instance));
+    log_info("Extaddr            : %02x%02x%02x%02x%02x%02x%02x%02x",
+             otLinkGetExtendedAddress(instance)->m8[0],
+             otLinkGetExtendedAddress(instance)->m8[1],
+             otLinkGetExtendedAddress(instance)->m8[2],
+             otLinkGetExtendedAddress(instance)->m8[3],
+             otLinkGetExtendedAddress(instance)->m8[4],
+             otLinkGetExtendedAddress(instance)->m8[5],
+             otLinkGetExtendedAddress(instance)->m8[6],
+             otLinkGetExtendedAddress(instance)->m8[7]);
+}
+
 static void otdatasetInit(otInstance* instance) {
     otOperationalDatasetTlvs app_dataset_tlv;
     otOperationalDataset app_dataset;
@@ -241,6 +287,16 @@ static void otdatasetInit(otInstance* instance) {
         }
     }
 
+    /* set extaddr to equal eui64*/
+    otExtAddress extAddress;
+    otLinkGetFactoryAssignedIeeeEui64(instance, &extAddress);
+    otLinkSetExtendedAddress(instance, &extAddress);
+
+    /* set mle eid to equal eui64*/
+    otIp6InterfaceIdentifier iid;
+    memcpy(iid.mFields.m8, extAddress.m8, OT_EXT_ADDRESS_SIZE);
+    otIp6SetMeshLocalIid(instance, &iid);
+
     if (load_default_config) {
         app_start_join(instance);
     } else {
@@ -254,54 +310,11 @@ static void otdatasetInit(otInstance* instance) {
         otDatasetSetActiveTlvs(instance, &app_dataset_tlv);
 
         otThreadSetEnabled(instance, true);
+
+        log_info("Active Timestamp   : %lld",
+                 (unsigned long long)app_dataset.mActiveTimestamp.mSeconds);
+        otnetworkinfo(instance);
     }
-    /* set extaddr to equal eui64*/
-    otExtAddress extAddress;
-    otLinkGetFactoryAssignedIeeeEui64(instance, &extAddress);
-    otLinkSetExtendedAddress(instance, &extAddress);
-
-    /* set mle eid to equal eui64*/
-    otIp6InterfaceIdentifier iid;
-    memcpy(iid.mFields.m8, extAddress.m8, OT_EXT_ADDRESS_SIZE);
-    otIp6SetMeshLocalIid(instance, &iid);
-
-    log_info("Active Timestamp   : %lld",
-             (unsigned long long)app_dataset.mActiveTimestamp.mSeconds);
-    log_info("Channel            : %d", app_dataset.mChannel);
-    // log_info("Wake-up Channel    : %d", app_dataset.mWakeupChannel);
-    log_info("Ext PAN ID         : %02x%02x%02x%02x%02x%02x%02x%02x",
-             app_dataset.mExtendedPanId.m8[0], app_dataset.mExtendedPanId.m8[1],
-             app_dataset.mExtendedPanId.m8[2], app_dataset.mExtendedPanId.m8[3],
-             app_dataset.mExtendedPanId.m8[4], app_dataset.mExtendedPanId.m8[5],
-             app_dataset.mExtendedPanId.m8[6],
-             app_dataset.mExtendedPanId.m8[7]);
-    log_info(
-        "Mesh Local Prefix  : %02x%02x:%02x%02x:%02x%02x:%02x%02x::/64",
-        app_dataset.mMeshLocalPrefix.m8[0], app_dataset.mMeshLocalPrefix.m8[1],
-        app_dataset.mMeshLocalPrefix.m8[2], app_dataset.mMeshLocalPrefix.m8[3],
-        app_dataset.mMeshLocalPrefix.m8[4], app_dataset.mMeshLocalPrefix.m8[5],
-        app_dataset.mMeshLocalPrefix.m8[6], app_dataset.mMeshLocalPrefix.m8[7]);
-    log_info("Network Key        : "
-             "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-             app_dataset.mNetworkKey.m8[0], app_dataset.mNetworkKey.m8[1],
-             app_dataset.mNetworkKey.m8[2], app_dataset.mNetworkKey.m8[3],
-             app_dataset.mNetworkKey.m8[4], app_dataset.mNetworkKey.m8[5],
-             app_dataset.mNetworkKey.m8[6], app_dataset.mNetworkKey.m8[7],
-             app_dataset.mNetworkKey.m8[8], app_dataset.mNetworkKey.m8[9],
-             app_dataset.mNetworkKey.m8[10], app_dataset.mNetworkKey.m8[11],
-             app_dataset.mNetworkKey.m8[12], app_dataset.mNetworkKey.m8[13],
-             app_dataset.mNetworkKey.m8[14], app_dataset.mNetworkKey.m8[15]);
-
-    log_info("Network Name       : %s", app_dataset.mNetworkName.m8);
-    log_info("Link Mode          : %d, %d, %d",
-             otThreadGetLinkMode(instance).mRxOnWhenIdle,
-             otThreadGetLinkMode(instance).mDeviceType,
-             otThreadGetLinkMode(instance).mNetworkData);
-    log_info("PAN ID             : 0x%04x", app_dataset.mPanId);
-    log_info("Extaddr            : %02x%02x%02x%02x%02x%02x%02x%02x",
-             extAddress.m8[0], extAddress.m8[1], extAddress.m8[2],
-             extAddress.m8[3], extAddress.m8[4], extAddress.m8[5],
-             extAddress.m8[6], extAddress.m8[7]);
 }
 
 void otrInitUser(otInstance* instance) {
@@ -364,32 +377,11 @@ void app_task(void) {
         if (xQueueReceive(appEventQueue, &evt, portMAX_DELAY)) {
             OT_THREAD_SAFE(
                 otInstance* instance = otrGetInstance(); if (instance) {
+                    uint32_t role = otThreadGetDeviceRole(instance);
                     switch (evt.id) {
                         case APP_EVENT_JOIN_SUCCESS:
                             log_info("Proceeding to attach...");
-                            /* set extaddr to equal eui64*/
-                            otExtAddress extAddress;
-                            otLinkGetFactoryAssignedIeeeEui64(instance,
-                                                              &extAddress);
-                            otLinkSetExtendedAddress(instance, &extAddress);
-
-                            /* set mle eid to equal eui64*/
-                            otIp6InterfaceIdentifier iid;
-                            memcpy(iid.mFields.m8, extAddress.m8,
-                                   OT_EXT_ADDRESS_SIZE);
-                            otIp6SetMeshLocalIid(instance, &iid);
-                            log_info("Extaddr            : "
-                                     "%02x%02x%02x%02x%02x%02x%02x%02x",
-                                     extAddress.m8[0], extAddress.m8[1],
-                                     extAddress.m8[2], extAddress.m8[3],
-                                     extAddress.m8[4], extAddress.m8[5],
-                                     extAddress.m8[6], extAddress.m8[7]);
-                            log_info("mesh id            : "
-                                     "%02x%02x%02x%02x:%02x%02x%02x%02x",
-                                     iid.mFields.m8[0], iid.mFields.m8[1],
-                                     iid.mFields.m8[2], iid.mFields.m8[3],
-                                     iid.mFields.m8[4], iid.mFields.m8[5],
-                                     iid.mFields.m8[6], iid.mFields.m8[7]);
+                            otnetworkinfo(instance);
                             otThreadSetEnabled(instance, true);
                             if (sJoinRetryTimer) {
                                 xTimerDelete(sJoinRetryTimer, 0);
@@ -398,7 +390,6 @@ void app_task(void) {
                             break;
                         case APP_EVENT_RETRY_JOIN_NOW:
                         case APP_EVENT_JOIN_FAILED:
-                            uint32_t role = otThreadGetDeviceRole(instance);
                             if (role != OT_DEVICE_ROLE_DISABLED) {
                                 log_info("not join state ");
                                 break;
@@ -436,9 +427,11 @@ void app_task(void) {
                             break;
                         case APP_EVENT_CHANGE_ROLE:
 #if CONFIG_APP_TASK_CENTRAL_ENABLE
-                            enroll_send_time = 0;
-                            enroll_send_try = 0;
-                            enroll_done = false;
+                            if (role == OT_DEVICE_ROLE_CHILD) {
+                                enroll_send_time = 0;
+                                enroll_send_try = 0;
+                                enroll_done = false;
+                            }
 #endif
                             break;
 #if CONFIG_APP_TASK_CENTRAL_ENABLE
@@ -466,6 +459,15 @@ void app_common_init() {
     log_info("Mesh It Up MTD");
     log_info("Band               : %s", band_str[sPhyFrequencyBand]);
     log_info("Data Rate          : %s", data_rate_str[sPhyDataRate]);
+    log_info(
+        "bin version        : %s "
+        "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+        systeminfo.prefix, systeminfo.sysinfo[0], systeminfo.sysinfo[1],
+        systeminfo.sysinfo[2], systeminfo.sysinfo[3], systeminfo.sysinfo[4],
+        systeminfo.sysinfo[5], systeminfo.sysinfo[6], systeminfo.sysinfo[7],
+        systeminfo.sysinfo[8], systeminfo.sysinfo[9], systeminfo.sysinfo[10],
+        systeminfo.sysinfo[11], systeminfo.sysinfo[12], systeminfo.sysinfo[13],
+        systeminfo.sysinfo[14], systeminfo.sysinfo[15]);
 
     /*subg phy parameter setting*/
     cca_duration = cca_duration_table[sPhyDataRate];
@@ -622,10 +624,8 @@ static int _cli_cmd_miu_app(int argc, char** argv, cb_shell_out_t log_out,
 
     if (!strncmp(argv[1], "help", 4)) {
         print_help(log_out);
-        return 0;
-    }
-
-    if (!strncmp(argv[1], "udp", 3)) {
+        ret = 0;
+    } else if (!strncmp(argv[1], "udp", 3)) {
         if (argc < 3) {
             log_out("Too few parameters \r\n");
             return -1;
@@ -645,7 +645,7 @@ static int _cli_cmd_miu_app(int argc, char** argv, cb_shell_out_t log_out,
         extMemory();
         ret = 0;
     } else {
-        log_out("Unknown command\r\n");
+        print_help(log_out);
     }
 
     if (ret == 0) {

@@ -755,7 +755,7 @@ int main(void) {
         printf("=============================================================\r\n ");
 
         /*create random share secret and x1 x2 x3 x4*/
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 
         hosal_trng_get_random_number((uint32_t *)ecjpake_test_ex1, 8);    /*because random number is 4 bytes unit32_t for each.*/
         hosal_trng_get_random_number((uint32_t *)ecjpake_test_ex2, 8);

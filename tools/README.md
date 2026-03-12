@@ -13,12 +13,13 @@ This folder contains all the necessary tools and utilities required for Rafael S
 | ---------- | --------------- | ---------- |
 | RT58x      | RT581 / RT582   | 1MB        |
 | RT58x      | RT583           | 2MB        |
+| RF1301     | RF1301          | 1MB        |
 | RT584      | RT584H / RT584L | 2MB        |
 
 ---
 ### 3. Rafael Extension
 
-- `rafael-extension-0.0.1.vsix`
+- `rafael-extension-0.0.2.vsix`
 
 ### 4. Requirement
 

@@ -244,7 +244,6 @@ static int cmd_network_join_request_handler(const void* srcAddr,
 
 static int cmd_network_join_response_handler(const void* srcAddr,
                                              const ctrl_packet_t* pkt) {
-#if CONFIG_MIU_DEVICE_TYPE_MTD
     if (pkt->len != sizeof(net_join_response_t)) {
         log_info("Invalid network join response length %u\r\n", pkt->len);
         return -1;
@@ -256,7 +255,42 @@ static int cmd_network_join_response_handler(const void* srcAddr,
              mac_addr[5], mac_addr[6], mac_addr[7]);
     net_join_response_t* join_response = (net_join_response_t*)pkt->data;
     app_join_response_handler(join_response->panid, join_response->netkey);
-#endif
+    return 0;
+}
+
+static TimerHandle_t kick_levave_timer;
+
+static void kick_levave_timer_cb(TimerHandle_t xTimer) {
+    otInstanceFactoryReset(otrGetInstance());
+    xTimerDelete(kick_levave_timer, 0);
+}
+
+static int cmd_network_kick_handler(const void* srcAddr,
+                                    const ctrl_packet_t* pkt) {
+    if (pkt->len != sizeof(uint32_t)) {
+        log_info("Invalid network kick length %u\r\n", pkt->len);
+        return -1;
+    }
+    uint32_t leave_time = *(uint32_t*)pkt->data;
+    char string[OT_IP6_ADDRESS_STRING_SIZE];
+    otIp6AddressToString((otIp6Address*)srcAddr, string, sizeof(string));
+    log_info("[Network] << kick %s [%d]", string, leave_time);
+
+    /*chage to disable*/
+    otThreadSetEnabled(otrGetInstance(), false);
+
+    if (kick_levave_timer == NULL) {
+        kick_levave_timer = xTimerCreate("kick_levave_timer",
+                                         pdMS_TO_TICKS(leave_time * 1000),
+                                         pdFALSE, // one-shot
+                                         NULL, kick_levave_timer_cb);
+    }
+
+    if (kick_levave_timer != NULL) {
+        xTimerChangePeriod(kick_levave_timer, pdMS_TO_TICKS(leave_time * 1000),
+                           0);
+        xTimerStart(kick_levave_timer, 0);
+    }
     return 0;
 }
 
@@ -322,6 +356,7 @@ static const ctrl_cmd_entry_t s_cmd_table[] = {
     {CMD_ID_NETWORK_PROVISIONING_SET, cmd_network_provisioning_set_handler},
     {CMD_ID_NETWORK_JOIN_REQUEST, cmd_network_join_request_handler},
     {CMD_ID_NETWORK_JOIN_RESPONSE, cmd_network_join_response_handler},
+    {CMD_ID_NETWORK_NODE_KICK, cmd_network_kick_handler},
     {CMD_ID_GET_VERSION_REQ, cmd_get_version_request_handler},
     {CMD_ID_GET_VERSION_RESP, cmd_get_version_response_handler},
     {CMD_ID_REBOOT, cmd_reboot_handler},

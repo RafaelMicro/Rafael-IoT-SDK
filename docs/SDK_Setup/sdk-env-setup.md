@@ -299,6 +299,7 @@ The Create Project panel allows you to create a new SDK project. You can use the
 >   - `default-rt581-evb.config`  
 >   - `default-rt582-evb.config`  
 >   - `default-rt583-evb.config`  
+>   - `default-rf1301-evb.config`  
 >   - `default-rt584h-evb.config`  
 >   - `default-rt584l-evb.config`  
 

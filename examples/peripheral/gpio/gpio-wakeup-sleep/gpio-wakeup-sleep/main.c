@@ -53,7 +53,7 @@ int main(void) {
 
     wakeupio_init();
 
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     hosal_lpm_ioctrl(HOSAL_LPM_ENABLE_WAKE_UP_SOURCE, HOSAL_LOW_POWER_WAKEUP_GPIO0);
     hosal_lpm_ioctrl(HOSAL_LPM_SUBSYSTEM_ENTER_LOW_POWER,
                      HOSAL_COMMUMICATION_SUBSYSTEM_PWR_STATE_SLEEP);

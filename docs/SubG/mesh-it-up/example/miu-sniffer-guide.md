@@ -1,6 +1,6 @@
 # miu-sniffer Example
 
-## What is the miu-sniffer Example?
+## 1. What is the miu-sniffer Example?
 
 The `miu-sniffer` example is based on the OpenThread RCP (Radio Co-Processor). In this example, it is used as a sniffer to capture Thread network packets and display them in Wireshark. The following sections describe how to configure and use this setup.
 
@@ -14,7 +14,7 @@ By default, this is set to UART0. However, users can change it to `1` to use UAR
 
 ---
 
-## Sub-GHz Frequency & Data Rate Configuration
+## 2. Sub-GHz Frequency & Data Rate Configuration
 
 The MIU SDK leverages the Rafael RT58x's Sub-GHz capabilities, allowing flexible configuration of frequency bands and data rates. These are defined at **compile-time** using specific configuration macros, typically found in `sdk_config.h` or the project's `CMakeLists.txt`.
 
@@ -39,7 +39,7 @@ The MIU SDK leverages the Rafael RT58x's Sub-GHz capabilities, allowing flexible
 
 ---
 
-## Required Tools
+## 3. Required Tools
 
 Please download and install the following tools:
 
@@ -57,67 +57,86 @@ pip3 install pyspinel
 
 Then copy `extcap_ot.py` and `extcap_ot.bat` (from [https://github.com/RafaelMicro/pyspinel.git](https://github.com/RafaelMicro/pyspinel.git)) into Wireshark's extcap directory. Refer to the illustration below for the correct path.
 
+### Figure 1: Extcap Directory
   <p align="center">
-    <img src="../../../picture/miu-sniffer-extcap-directory.jpg" alt="MIU Sniffer Extcap Directory" width="600"/>
+    <img src="../picture/miu-sniffer-extcap-directory.jpg" alt="MIU Sniffer Extcap Directory" width="600"/>
   </p>
 
 After setup, restart Wireshark and check if the "sniffer" interface appears. If not, go to **Capture → Refresh Interfaces** to rescan available interfaces.
 
+### Figure 2: Capture Interfaces
   <p align="center">
-    <img src="../../../picture/miu-sniffer-capture-interfaces.jpg" alt="MIU Sniffer Capture Interfaces" width="600"/>
+    <img src="../picture/miu-sniffer-capture-interfaces.jpg" alt="MIU Sniffer Capture Interfaces" width="600"/>
   </p>
 
 ---
 
-## Wireshark Options Settings
+## 4. Wireshark Options Settings
 
 1. Set the **Channel** to your desired value.
 2. Check **IEEE 802.15.4 TAP** to ensure channel information is included in the pcap output and visible in the Wireshark GUI.
 3. Check **Save parameters on capture start** to retain these settings for future use (unless a channel change is needed).
 4. Click **Start** to begin capturing.
   
+### Figure 3: Channel
   <p align="center">
-    <img src="../../../picture/miu-sniffer-channel.jpg" alt="MIU Sniffer Channel" width="600"/>
+    <img src="../picture/miu-sniffer-channel.jpg" alt="MIU Sniffer Channel" width="600"/>
   </p>
 
 ---
 
-## Thread Protocol Configuration in Wireshark
+## 5. Thread Protocol Configuration in Wireshark
 
 Navigate to **Preferences → Protocols** in Wireshark to configure protocol settings.
 
-### IEEE 802.15.4
+### 5.1 IEEE 802.15.4
 
 1. Click the `+` button to add a new decryption key.
 2. Enter the **Thread Network Master Key** in the **Decryption Key** field.
 3. Set the **Decryption Key Index** to `1`.
 4. Set **Key Hash** to `Thread hash`.
 
+### Figure 4: IEEE802.15.4 key
   <p align="center">
-    <img src="../../../picture/miu-sniffer-IEEE802.15.4-key.jpg" alt="MIU Sniffer IEEE802.15.4 Key" width="600"/>
+    <img src="../picture/miu-sniffer-IEEE802.15.4-key.jpg" alt="MIU Sniffer IEEE802.15.4 Key" width="600"/>
   </p>
 
-### Thread
+### 5.2 Thread
 
 1. Set the **Thread sequence counter** to `00000000`.
 2. Uncheck **Use PAN ID as first two octets of master key**.
 3. Check **Automatically acquire Thread sequence counter**.
 
+### Figure 5: Thread
   <p align="center">
-    <img src="../../../picture/miu-sniffer-thread.jpg" alt="MIU Sniffer Thread" width="600"/>
+    <img src="../picture/miu-sniffer-thread.jpg" alt="MIU Sniffer Thread" width="600"/>
   </p>
 
-### CoAP
+### 5.3 CoAP
 
 1. Set the **UDP port** to `61631`.
 2. Set the **TCP port** to `5683`.
 
+### Figure 6: UDP
   <p align="center">
-    <img src="../../../picture/miu-sniffer-coap.jpg" alt="MIU Sniffer Coap" width="600"/>
+    <img src="../picture/miu-sniffer-coap.jpg" alt="MIU Sniffer Coap" width="600"/>
   </p>
-
----
 
 After completing these steps, you will be able to view Thread network packets in Wireshark.
 
 These settings typically only need to be configured once. However, if certain parameters change (such as the IEEE 802.15.4 network key), you will need to update the corresponding settings again.
+
+---
+
+## 6. Next Steps
+
+Now that you've successfully created a basic Mesh network with `miu-sniffer` devices, you can explore more advanced functionalities:
+
+* **Explore other examples:** Learn to run `miu-ftd` or `miu-mtd` to understand different MIU example.
+    * [`miu-ftd Example Guide`](miu-ftd-guide.md)
+    * [`miu-mtd Example Guide`](miu-mtd-guide.md)
+* **Learn about MIU Services:** Dive into Rafael's proprietary Network Management and OTA features.
+    * [`Network Management Guide`](../Network-management-guide.md)
+    * [`OTA Guide`](../OTA-guide.md)
+* **Utilize MIU Tools:** Discover how to use additional tools, such as the Topology Tool.
+    * [`Topology Tool Guide`](../Topology-Tool-guide.md)

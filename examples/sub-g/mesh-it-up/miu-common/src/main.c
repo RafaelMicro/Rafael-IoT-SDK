@@ -15,11 +15,17 @@
 #include "app_task.h"
 #include "cli.h"
 #include "hosal_dma.h"
+#include "hosal_gpio.h"
+#include "hosal_sysctrl.h"
+#include "hosal_wdt.h"
 #include "main.h"
 #include "mcu.h"
 #include "miu_ext_mem.h"
 #include "task.h"
 #include "uart_stdio.h"
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
+#include "hosal_dpd.h"
+#endif
 
 #ifndef CONFIG_MIU_DEVICE_TYPE_RCP
 #include "dump_boot_info.h"
@@ -33,7 +39,10 @@ static void pin_mux_init(void) {
     int i;
     /*set all pin to gpio, except GPIO16, GPIO17 */
     for (i = 0; i < 32; i++) {
-        pin_set_mode(i, MODE_GPIO);
+        if ((i != 16) && (i != 17)) {
+            hosal_pin_set_mode(i, HOSAL_MODE_GPIO);
+            hosal_pin_set_pullopt(i, HOSAL_PULL_UP_100K);
+        }
     }
     return;
 }
@@ -56,9 +65,45 @@ void vApplicationMallocFailedHook(void) {
     while (1) {}
 }
 
+void wdt_cb(void) {
+    /* show when lock enable, can not change wdt setting*/
+    hosal_wdt_config_mode_t cfg;
+    hosal_wdt_config_tick_t tick;
+
+    cfg.int_enable = 1;
+    cfg.lock_enable = 0;
+    cfg.prescale = HOSAL_WDT_PRESCALE_32;
+    cfg.reset_enable = 0;
+
+    tick.wdt_ticks = 0xFFFFFFFF;
+    tick.wdt_min_ticks = 0;
+    tick.int_ticks = 0xFFFFFFFF - 4000000;
+
+    hosal_wdt_start(cfg, tick, wdt_cb);
+
+    hosal_wdt_kick();
+}
+
+void init_wdt_init(void) {
+    hosal_wdt_config_mode_t cfg;
+    hosal_wdt_config_tick_t tick;
+
+    cfg.int_enable = 1;
+    cfg.lock_enable = 0;
+    cfg.prescale = HOSAL_WDT_PRESCALE_32;
+    cfg.reset_enable = 0;
+
+    tick.wdt_ticks = 0xFFFFFFFF;
+    tick.wdt_min_ticks = 0;
+    tick.int_ticks = 0xFFFFFFFF - 1000000;
+
+    hosal_wdt_start(cfg, tick, wdt_cb);
+    NVIC_EnableIRQ(Wdt_IRQn);
+}
+
 static void app_task_entry(void* pvParameters) {
     /*watch dog init*/
-    // init_wdt_init(); // debug should be close
+    init_wdt_init(); // debug should be close
 
     /*falsh Protection Mechanism*/
     enhanced_flash_dataset_init();
@@ -94,6 +139,13 @@ int main(void) {
 #ifndef CONFIG_MIU_DEVICE_TYPE_RCP
     /*boot information dump*/
     _dump_boot_info();
+#if 0 //defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
+    printf("reset cause: %8x\r\n", hosal_get_all_reset_cause());
+    if (hosal_reset_by_wdt()) {
+        puts("reset by watch dog timer \r\n");
+        clear_reset_cause();
+    }
+#endif /* defined(CONFIG_RT584) */
 #endif
 
 #ifdef CONFIG_HOSAL_SOC_IDLE_SLEEP

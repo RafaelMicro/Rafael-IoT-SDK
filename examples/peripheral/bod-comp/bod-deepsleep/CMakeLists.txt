@@ -1,7 +1,7 @@
 sdk_add_subdirectory_ifdef(CONFIG_FREERTOS ${CMAKE_CURRENT_LIST_DIR}/rtos)
 sdk_add_include_directories(${CMAKE_CURRENT_LIST_DIR}/bod-deepsleep/include)
 sdk_set_main_file(${CMAKE_CURRENT_LIST_DIR}/bod-deepsleep/main.c)
-if(  (NOT CONFIG_CHIP STREQUAL "RT584H") AND (NOT CONFIG_CHIP STREQUAL "RT584L"))
+if( (NOT CONFIG_CHIP STREQUAL "RF1301") AND (NOT CONFIG_CHIP STREQUAL "RT584H") AND (NOT CONFIG_CHIP STREQUAL "RT584HA4") AND (NOT CONFIG_CHIP STREQUAL "RT584L"))
     message(FATAL_ERROR "please choose chip type as rt584 series")
 endif()
 setup_project(bod-deepsleep)

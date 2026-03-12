@@ -38,7 +38,7 @@ int main(void) {
     global_var_init();
     puts("/*******Start RTC Match Time********/\r\n");
 
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 #if defined(CONFIG_RCO32K_ENABLE)
     hosal_rtc_set_clk(0x200000);
 #elif defined(CONFIG_RCO16K_ENABLE)

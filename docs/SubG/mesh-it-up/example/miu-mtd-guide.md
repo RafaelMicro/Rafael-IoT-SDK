@@ -1,6 +1,6 @@
 # miu-mtd Example Guide
 
-## What is the miu-mtd Example?
+## 1. What is the miu-mtd Example?
 
 The `miu-mtd` example demonstrates a Minimal Thread Device (MTD) implementation in the Mesh It Up (MIU) SDK.
 It is designed for low-power end devices that join an existing Thread network via the provisioning (commissioning) process.
@@ -8,7 +8,7 @@ Compared with the Full Thread Device (FTD), it focuses on energy efficiency and 
 
 ---
 
-## Configuration Options
+## 2. Configuration Options
 
 The `miu-mtd` example behavior is controlled by several build-time options:
 
@@ -28,7 +28,52 @@ The `miu-mtd` example behavior is controlled by several build-time options:
 
 ---
 
-## Sub-GHz Frequency & Data Rate Configuration
+## 3. Application Structure and Core Functions (app_task.c Deep Dive)
+
+The `app_task.c` file implements the core application logic, utilizing FreeRTOS for task management and integrating the various MIU proprietary features on top of OpenThread.
+
+### 3.1 Application Tasks and Event Handling
+The main application logic runs within a FreeRTOS task (`app_task`). It uses a **Queue** (`appEventQueue`) and a **Semaphore** (`appSemHandle`) for thread-safe communication and event processing.
+
+* **`ot_stateChangeCallback`**: This is a critical function registered with the OpenThread stack. When the device's Thread state changes (e.g., to Leader, Router, or Child), this callback is triggered.
+    * It logs the device's new role and its key IPv6 addresses (RLOC, Mesh Local EID).
+    * It sends an application event (`APP_EVENT_CHANGE_ROLE`) to the main application queue to update application-specific behavior, such as LED indication.
+
+### 3.2 Application Layer Services
+The `app_task.c` integrates and utilizes the following MIU services (enabled via configuration flags):
+* **Network Management (app_net_mgm.h)**: Centralized network orchestration.
+* **Application Control Commands (app_control_cmd.h / app_udp.h)**: Handles incoming UDP packets and parses them into executable control commands (e.g., LED Toggle).
+* **Over-the-Air (OTA) (app_ota.h)**: Manages firmware updates.
+* **LED Control (app_led.h)**: Manages application-specific LED behaviors.
+
+---
+
+## 4. LED Indicator and GPIO Pinout
+
+The application uses an application-specific LED to visually indicate the device's network state, which is handled by the `app_led.h` module and triggered by the role change in `ot_stateChangeCallback`.
+
+| Network State |  Other Device LED Behavior |
+| :--- | :--- |
+| **Out-of-Network** | Slow LED 0 Blinking  (e.g., 1s on/off) |
+| **Network enrolling** | Fast LED 0 Blinking (e.g., 100ms on/off) |
+| **Enrolling success** | Slow LED 1 Blinking (e.g., 1s on/off) |
+
+---
+
+## 5 Common Standard OpenThread Commands
+All standard OpenThread commands must be prefixed with `ot`.
+
+| Command | Purpose | Example |
+| :--- | :--- | :--- |
+| `ot state` | Returns the device's current Thread role (e.g., leader, router). | `ot state` |
+| `ot dataset` | Manages the Active or Pending Operational Dataset (network parameters). | `ot dataset panid 0x1234` |
+| `ot ipaddr` | Displays various IPv6 addresses (Mesh Local, Link Local, etc.). | `ot ipaddr mleid` |
+| `ot ping` | Sends an ICMPv6 Echo Request (ping) to another node. | `ot ping fd00::xxxx` |
+| `ot factoryreset` | Erases all Thread network credentials stored in flash memory. | `ot factoryreset` |
+
+---
+
+## 6. Sub-GHz Frequency & Data Rate Configuration
 
 The MIU SDK leverages the Rafael RT58x's Sub-GHz capabilities, allowing flexible configuration of frequency bands and data rates. These are defined at **compile-time** using specific configuration macros, typically found in `sdk_config.h` or the project's `CMakeLists.txt`.
 
@@ -38,6 +83,7 @@ The MIU SDK leverages the Rafael RT58x's Sub-GHz capabilities, allowing flexible
     * `CONFIG_SUBG_FREQUENCY_BAND_868` (868 MHz)
     * `CONFIG_SUBG_FREQUENCY_BAND_470` (470 MHz)
     * `CONFIG_SUBG_FREQUENCY_BAND_433` (433 MHz)
+      
     By default, `HOSAL_RF_BAND_SUBG_915M` is often selected.
 
 * **Data Rate (e.g., `CONFIG_SUBG_DATA_RATE_FSK_300K`)**:
@@ -47,13 +93,14 @@ The MIU SDK leverages the Rafael RT58x's Sub-GHz capabilities, allowing flexible
     * `CONFIG_SUBG_DATA_RATE_FSK_100K` (100 kbps FSK)
     * `CONFIG_SUBG_DATA_RATE_FSK_50K` (50 kbps FSK)
     * `CONFIG_SUBG_DATA_RATE_OQPSK_25K` (25 kbps OQPSK)
+      
     The default is often `HOSAL_RF_PHY_DATA_RATE_300K`.
 
 **Important:** For devices to communicate within the same mesh network, they **must be configured with the same frequency band and data rate** during compilation.
 
 -----
 
-## Network Join Flow
+## 7. Network Join Flow
 
 Unlike the FTD, which can form a network with default parameters when flash is empty,
 the MTD must actively perform a join process to obtain the Thread credentials (Network Key, PAN ID, Channel, etc.) from a Provisioner (Leader/Router).
@@ -70,18 +117,18 @@ The MTD acts as a Joiner, while the FTD or Leader acts as a Provisioner.
 | 4	| Join successful	| Closes provisioning window or times out | 
 
 
-##  Process Diagram
+##  8. Process Diagram
 
 ### Figure 1: Flow Overview
   <p align="center">
-    <img src="../../../picture/miu_mtd_join_flow.png" alt="Flow Overview" width="600"/>
+    <img src="../picture/miu_mtd_join_flow.png" alt="Flow Overview" width="600"/>
   </p>
 
 The Joiner repeatedly scans channels and sends join requests until it receives a valid Join Response from the Provisioner.
 If all channels are tried without success, it waits for a random backoff period before retrying.
 
 ---
-##  Power Saving Behavior
+##  9. Power Saving Behavior
 
 The MTD example prioritizes low power operation.
 When idle, the system enters deep sleep through hosal_soc_sleep() while maintaining accurate time using CONFIG_HOSAL_SOC_SLEEP_TIMER_ID.
@@ -93,15 +140,15 @@ After wake-up:
 * Pending events such as join retries or network messages resume seamlessly.
 
 
-## Getting Started: Joining a Network (Two Devices)
+##  10. Getting Started: Joining a Network (Two Devices)
 
-### Device 1: Leader/Provisioner (using miu-ftd)
+### 10.1 Device 1: Leader/Provisioner (using miu-ftd)
 
 1. Flash miu-ftd.bin and start it as the Leader (ot state leader).
 
 2. Open the provisioning window by command(app provisioner <start/stop> <time (s)> ) or automatically when the network starts.
 
-Device 2 — Joiner (using miu-mtd)
+### 10.2 Device 2 — Joiner (using miu-mtd)
 
 1. Flash miu-mtd.bin.
 
@@ -135,11 +182,11 @@ At this point, you have successfully formed a two-device Thread Mesh network!
 
 -----
 
-## UDP Communication and Application & Control Commands
+## 11. UDP Communication and Application
 
 The `miu-mtd` example includes basic UDP communication capabilities, allowing devices to send and receive data, including application-specific control commands. The MIU SDK provides specialized CLI commands to interact with these application-level features.
 
-### 1. Sending Raw UDP Data (`app udp send`)
+### 11.1 Sending Raw UDP Data (`app udp send`)
 
 You can send arbitrary hexadecimal or string data as a UDP payload to a specific IPv6 address. This is useful for testing raw data transfer.
 
@@ -154,26 +201,7 @@ You can send arbitrary hexadecimal or string data as a UDP payload to a specific
     app udp send fd00:db8:0:0:200:0:0:0 -x 123456
     ```
 
-### 2. Sending Application Control Commands (`app ctrl`)
-
-The app ctrl CLI command is available only when CONFIG_APP_TASK_CONTROL_CMD_ENABLE is enabled.
-It allows structured application-level interactions using predefined control commands (defined in the command_id_t enumeration).
-
-* **Syntax:**
-    ```bash
-    app ctrl <ipv6> <command id> [data]
-    ```
-    * `<ipv6>`: The target IPv6 address (e.g., Mesh Local EID of Device 2).
-    * `<command id>`: <command id>: The hexadecimal ID of the control command (e.g., `0x03` for LED Toggle. see command_id_t definition).
-    * `[data]`: Optional additional data for the command (e.g., `times` for `CMD_ID_LED_FLASH`).
-
-* **Example: Triggering LED actions:**
-    Send an LED Toggle command (ID `0x03`) to Device 2's Mesh IPv6 Address:
-    ```bash
-    app ctrl fd00:db8:0:0:200:0:0:0 0x03
-    ```
-
-### Other Application Commands (`app help`)
+### 11.2 Other Application Commands (`app help`)
 
 To see other basic application-level CLI commands, type `app help`:
 
@@ -193,7 +221,7 @@ app ctrl <ipv6> <cmd id> [data]
 
 -----
 
-## Setting Network Parameters via CLI
+## 12. Setting Network Parameters via CLI
 
 Beyond the default configuration, you can dynamically adjust various Thread network parameters using the OpenThread CLI.
 
@@ -213,15 +241,15 @@ These settings will be stored in flash memory and automatically loaded after a r
 
 -----
 
-## Next Steps
+## 13. Next Steps
 
-Now that you've successfully created a basic Mesh network with `miu-ftd` devices, you can explore more advanced functionalities:
+Now that you've successfully created a basic Mesh network with `miu-mtd` devices, you can explore more advanced functionalities:
 
-* **Explore other examples:** Learn to run `miu-mtd` or `miu-sniffer` to understand different MIU example.
+* **Explore other examples:** Learn to run `miu-ftd` or `miu-sniffer` to understand different MIU example.
     * [`miu-ftd Example Guide`](miu-ftd-guide.md)
     * [`miu-sniffer Example Guide`](miu-sniffer-guide.md)
 * **Learn about MIU Services:** Dive into Rafael's proprietary Network Management and OTA features.
-    * [`Network Management Guide`](../Network-management-guid.md)
-    * [`OTA Guide`](../OTA-guid.md)
+    * [`Network Management Guide`](../Network-management-guide.md)
+    * [`OTA Guide`](../OTA-guide.md)
 * **Utilize MIU Tools:** Discover how to use additional tools, such as the Topology Tool.
-    * [`Topology Tool Guide`](../Topology-guid.md)
+    * [`Topology Tool Guide`](../Topology-Tool-guide.md)

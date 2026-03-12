@@ -65,9 +65,12 @@ static uint8_t sPhyDataRate = HOSAL_RF_PHY_DATA_RATE_25K;
 static uint8_t sPhyDataRate = HOSAL_RF_PHY_DATA_RATE_300K;
 #endif
 
-void otrInitUser(otInstance* instance) { ncpInitUser(instance); }
+void otrInitUser(otInstance* instance) {
+    otAppCliInit((otInstance*)instance);
+    otAppNcpInit((otInstance*)instance);
+}
 
-void app_task(void) {}
+void app_task(void) { ncpInitUser(); }
 
 void app_common_init() {
 

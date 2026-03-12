@@ -66,7 +66,7 @@ void pwr_level3_int_callback(uint32_t pin, void* isr_param) {
 void pwr_level2_int_callback(uint32_t pin, void* isr_param) {
 
 
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L) || \
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) || defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L) || \
     defined(CONFIG_RT584_NONE_OS)
     hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LPM_POWER_DOWN);
 #else
@@ -83,7 +83,7 @@ void pwr_level2_int_callback(uint32_t pin, void* isr_param) {
  * \return None
  */
 void pwr_level1_int_callback(uint32_t pin, void* isr_param) {
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L) || \
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) || defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L) || \
     defined(CONFIG_RT584_NONE_OS)
     hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LPM_DEEP_SLEEP);
 #else
@@ -101,7 +101,7 @@ void pwr_level1_int_callback(uint32_t pin, void* isr_param) {
  * \return None
  */
 void pwr_level0_int_callback(uint32_t pin, void* isr_param) {
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L) || \
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) || defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L) || \
     defined(CONFIG_RT584_NONE_OS)
     hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LPM_SLEEP);
 #else
@@ -175,7 +175,7 @@ void gpio_init(void) {
     hosal_gpio_int_enable(WAKEUP_KEY);
     NVIC_EnableIRQ(Gpio_IRQn);
 
-   #if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L) || \
+   #if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) || defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L) || \
     defined(CONFIG_RT584_NONE_OS)
     hosal_gpio_setup_deep_sleep_io(WAKEUP_KEY, HOSAL_GPIO_LEVEL_LOW);
     hosal_gpio_setup_deep_powerdown_io(WAKEUP_KEY, HOSAL_GPIO_LEVEL_LOW);
@@ -194,7 +194,7 @@ int main(void) {
     printf("Build Time:%s \r\n",__TIME__);
     printf("----------------------------------------------------------------\r\n");
     printf("Sleep Example\r\n");
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L) || defined(CONFIG_RT584_NONE_OS)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) || defined(CONFIG_RT584L) || defined(CONFIG_RT584_NONE_OS)
     printf("press PWR_LEVEL2_KEY to enter power down mode\r\n");
     printf("press PWR_LEVEL1_KEY to enter deep sleep mode\r\n");
     printf("press PWR_LEVEL0_KEY to enter sleep mode \r\n");
@@ -211,7 +211,7 @@ int main(void) {
     gpio_init();
     hosal_lpm_init();
 
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L) || \
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) || defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L) || \
     defined(CONFIG_RT584_NONE_OS)
     hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LPM_SLEEP);
     hosal_lpm_ioctrl(HOSAL_LPM_SUBSYSTEM_ENTER_LOW_POWER,
@@ -265,4 +265,3 @@ int main(void) {
     }
 }
 
-/** @} */ /* end of examples group */

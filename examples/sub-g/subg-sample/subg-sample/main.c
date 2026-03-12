@@ -182,6 +182,8 @@ void gpio_frequency_chek() {
     hosal_gpio_pin_get(23, &pin23_value);
     hosal_gpio_pin_get(14, &pin14_value);
     hosal_gpio_pin_get(9, &pin9_value);
+    subg_ctrl_frequency_set(905000);
+
     if (pin31_value == 0) {
         subg_ctrl_frequency_set(g_freq_support[0]);
         printf("RF Frequency is 903MHz\r\n");
@@ -229,7 +231,7 @@ void subg_cfg_set(subg_ctrl_modulation_t mode, uint8_t data_rate) {
 
         subg_ctrl_sfd_set(mode, 0x00007209);
 
-        subg_ctrl_filter_set(mode, SUBG_CTRL_FILTER_TYPE_GFSK);
+        subg_ctrl_filter_set(mode, SUBG_CTRL_FILTER_TYPE_FSK);
     } else {
         lmac15p4_init(LMAC15P4_SUBG_OQPSK, HOSAL_RF_BAND_SUBG_915M);
 
@@ -243,7 +245,38 @@ void subg_cfg_set(subg_ctrl_modulation_t mode, uint8_t data_rate) {
         subg_ctrl_mac_set(mode, SUBG_CTRL_CRC_TYPE_16,
                           SUBG_CTRL_WHITEN_DISABLE);
     }
+    /* PHY PIB Parameters */
+    lmac15p4_phy_pib_set(SUBG_PHY_TURNAROUND_TIMER, SUBG_PHY_CCA_DETECT_MODE,
+                         SUBG_PHY_CCA_THRESHOLD, SUBG_PHY_CCA_DETECTED_TIME);
 
+    /* MAC PIB Parameters */
+    lmac15p4_mac_pib_set(SUBG_MAC_UNIT_BACKOFF_PERIOD,
+                         SUBG_MAC_MAC_ACK_WAIT_DURATION, SUBG_MAC_MAC_MAX_BE,
+                         SUBG_MAC_MAC_MAX_CSMACA_BACKOFFS,
+                         SUBG_MAC_MAC_MAX_FRAME_TOTAL_WAIT_TIME,
+                         SUBG_MAC_MAC_MAX_FRAME_RETRIES, SUBG_MAC_MAC_MIN_BE);
+
+    uint16_t short_addr = 0x1234;
+
+    uint32_t long_addr_0 = 0x11223344;
+
+    uint32_t long_addr_1 = 0x55667788;
+
+    uint16_t pnaid = 0x1AAA;
+
+    lmac15p4_address_filter_set(0, false, short_addr, long_addr_0, long_addr_1,
+                                pnaid, true);
+
+    /* AUTO ACK Enable Flag */
+    lmac15p4_auto_ack_set(true);
+
+    /* Frame Pending Bit */
+    lmac15p4_ack_pending_bit_set(0, true);
+
+    /* Auto State */
+    lmac15p4_auto_state_set(true);
+
+    lmac15p4_src_match_ctrl(0, true);
     gpio_frequency_chek();
 }
 
@@ -331,7 +364,7 @@ static void app_button_process(uint32_t pin) {
             if (keyevent == BUTTON_EVENT_NONE) {
                 /*first press */
                 keyevent = BUTTON_EVENT_0;
-                subg_cfg_set(SUBG_CTRL_MODU_OPQSK, SUBG_CTRL_DATA_RATE_6P25K);
+                //subg_cfg_set(SUBG_CTRL_MODU_OPQSK, SUBG_CTRL_DATA_RATE_6P25K);
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     /*close tx timer*/
                     xTimerStop(tx_timer, 0);
@@ -345,6 +378,7 @@ static void app_button_process(uint32_t pin) {
                 }
             } else if (keyevent == BUTTON_EVENT_0) {
                 /*second press*/
+                subg_cfg_set(SUBG_CTRL_MODU_OPQSK, SUBG_CTRL_DATA_RATE_6P25K);
                 keyevent = BUTTON_EVENT_NONE;
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     g_tx_no_ack_cnt = 0;
@@ -370,7 +404,7 @@ static void app_button_process(uint32_t pin) {
             if (keyevent == BUTTON_EVENT_NONE) {
                 /*first press */
                 keyevent = BUTTON_EVENT_1;
-                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_50K);
+                //subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_50K);
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     /*close tx timer*/
                     xTimerStop(tx_timer, 0);
@@ -384,6 +418,7 @@ static void app_button_process(uint32_t pin) {
                 }
             } else if (keyevent == BUTTON_EVENT_1) {
                 /*second press*/
+                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_50K);
                 keyevent = BUTTON_EVENT_NONE;
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     g_tx_no_ack_cnt = 0;
@@ -410,7 +445,6 @@ static void app_button_process(uint32_t pin) {
             if (keyevent == BUTTON_EVENT_NONE) {
                 /*first press */
                 keyevent = BUTTON_EVENT_2;
-                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_100K);
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     /*close tx timer*/
                     xTimerStop(tx_timer, 0);
@@ -424,6 +458,7 @@ static void app_button_process(uint32_t pin) {
                 }
             } else if (keyevent == BUTTON_EVENT_2) {
                 /*second press*/
+                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_100K);
                 keyevent = BUTTON_EVENT_NONE;
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     g_tx_no_ack_cnt = 0;
@@ -450,7 +485,6 @@ static void app_button_process(uint32_t pin) {
             if (keyevent == BUTTON_EVENT_NONE) {
                 /*first press */
                 keyevent = BUTTON_EVENT_3;
-                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_200K);
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     /*close tx timer*/
                     xTimerStop(tx_timer, 0);
@@ -464,6 +498,7 @@ static void app_button_process(uint32_t pin) {
                 }
             } else if (keyevent == BUTTON_EVENT_3) {
                 /*second press*/
+                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_200K);
                 keyevent = BUTTON_EVENT_NONE;
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     g_tx_no_ack_cnt = 0;
@@ -490,7 +525,6 @@ static void app_button_process(uint32_t pin) {
             if (keyevent == BUTTON_EVENT_NONE) {
                 /*first press */
                 keyevent = BUTTON_EVENT_4;
-                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_300K);
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     /*close tx timer*/
                     xTimerStop(tx_timer, 0);
@@ -504,6 +538,7 @@ static void app_button_process(uint32_t pin) {
                 }
             } else if (keyevent == BUTTON_EVENT_4) {
                 /*second press*/
+                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_300K);
                 keyevent = BUTTON_EVENT_NONE;
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     g_tx_no_ack_cnt = 0;
@@ -721,6 +756,7 @@ void subg_config_init() {
 
     /*rf init */
     hosal_rf_init(HOSAL_RF_MODE_RUCI_CMD);
+#if 0
     /*Choose the frequency band you want */
     lmac15p4_init(LMAC15P4_SUBG_FSK, HOSAL_RF_BAND_SUBG_915M);
 
@@ -745,7 +781,7 @@ void subg_config_init() {
 
     subg_ctrl_sfd_set(SUBG_CTRL_MODU_FSK, 0x00007209);
 
-    subg_ctrl_filter_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_FILTER_TYPE_GFSK);
+    subg_ctrl_filter_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_FILTER_TYPE_FSK);
 
     /* PHY PIB Parameters */
     lmac15p4_phy_pib_set(SUBG_PHY_TURNAROUND_TIMER, SUBG_PHY_CCA_DETECT_MODE,
@@ -780,19 +816,20 @@ void subg_config_init() {
 
     lmac15p4_src_match_ctrl(0, true);
 #endif
-
+#endif
     /* Init test counters*/
     g_crc_success_count = 0;
     g_crc_fail_count = 0;
     g_rx_total_count = 0;
     g_tx_total_count = 0;
-
+#if 0
     fsk_data_gen(&g_prbs9_buf[0], FSK_RX_LENGTH);
 
     uint32_t freq = g_freq_support[0];
     // uint32_t Fw_ver = lmac15p4_get_version();
     printf("Firmware version: %d\r\n", 0);
     gpio_frequency_chek();
+#endif
 }
 
 static void app_main_entry(void* pvParameters)

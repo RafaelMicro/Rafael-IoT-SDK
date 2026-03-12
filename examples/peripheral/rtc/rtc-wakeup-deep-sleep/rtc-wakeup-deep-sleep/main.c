@@ -13,7 +13,7 @@
 #include "hosal_rtc.h"
 #include "hosal_lpm.h"
 #include "hosal_sysctrl.h"
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 #include "hosal_dpd.h"
 #endif
 #include "app_hooks.h"
@@ -33,6 +33,7 @@ int main(void) {
     uint32_t i;
     hosal_rtc_time_t current_time, alarm_tm;
     uint32_t alarm_mode;
+    uint32_t reset_cause = 0, reset_by_deep_sleep = 0;
 
     uart_stdio_init();
     vHeapRegionsInt();
@@ -42,7 +43,7 @@ int main(void) {
 
     global_var_init();
     printf("/*******Start RTC Wakeup From Deep Sleep********/\r\n");
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 #if defined(CONFIG_RCO32K_ENABLE)
     hosal_rtc_set_clk(0x200000);
 #elif defined(CONFIG_RCO16K_ENABLE)
@@ -63,9 +64,11 @@ int main(void) {
            current_time.tm_hour, current_time.tm_min, current_time.tm_sec);
 #endif
 
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
-    printf("Deep sleep wake up,%.8lx\r\n", hosal_get_all_reset_cause());
-    if ( hosal_reset_by_deep_sleep() ) {
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
+    hosal_get_all_reset_cause(&reset_cause);
+    printf("Deep sleep wake up,%.8lx\r\n", reset_cause);
+    hosal_reset_by_deep_sleep(&reset_by_deep_sleep);
+    if ( reset_by_deep_sleep ) {
         hosal_clear_reset_cause();
     } else {
         current_time.tm_year = 23;
@@ -89,7 +92,7 @@ int main(void) {
 #endif
 
     hosal_rtc_get_time(&current_time);
-    #if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+    #if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     printf("setting time is %2d-%2d-%2d %2d:%2d:%2d.%3d\r\n",
             current_time.tm_year, current_time.tm_mon, current_time.tm_day,
             current_time.tm_hour, current_time.tm_min, current_time.tm_sec,
@@ -115,7 +118,7 @@ int main(void) {
     hosal_rtc_set_alarm(&alarm_tm, alarm_mode, rtc_callback);
 
 
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     hosal_lpm_ioctrl(HOSAL_LPM_ENABLE_WAKE_UP_SOURCE, HOSAL_LOW_POWER_WAKEUP_RTC_TIMER);
     hosal_lpm_ioctrl(HOSAL_LPM_SUBSYSTEM_ENTER_LOW_POWER,
                      HOSAL_COMMUMICATION_SUBSYSTEM_PWR_STATE_DEEP_SLEEP);

@@ -20,6 +20,8 @@
 
 
 int main(void) {
+    uint32_t reset_cause = 0, reset_by_deep_power_down = 0;
+
     uart_stdio_init();
     vHeapRegionsInt();
     
@@ -30,8 +32,10 @@ int main(void) {
     printf("/***START GPIO WAKE UP FROM DEEP POWER DOWN***/\r\n");
     printf("/*********************************************/\r\n");
 
-    printf("Deep power down wake up,%.8lx\r\n", hosal_get_all_reset_cause());
-    if ( hosal_reset_by_deep_power_down() ) {
+    hosal_get_all_reset_cause(&reset_cause);
+    printf("Deep power down wake up,%.8lx\r\n", reset_cause);
+    hosal_reset_by_deep_power_down(&reset_by_deep_power_down);
+    if ( reset_by_deep_power_down ) {
         hosal_clear_reset_cause();
     }
     hosal_gpio_setup_deep_powerdown_io(GPIO0, HOSAL_GPIO_LEVEL_LOW);

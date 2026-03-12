@@ -321,6 +321,8 @@ static void hids_timer_handler(TimerHandle_t timer)
 static void ble_svcs_hids_evt_handler(ble_evt_att_param_t *p_param)
 {
     ble_info_link0_t *p_profile_info = (ble_info_link0_t *)ble_app_link_info[p_param->host_id].profile_info;
+    ble_gatt_data_param_t gatt_param;
+    ble_err_t status;
 
     if (p_param->gatt_role == BLE_GATT_ROLE_SERVER)
     {
@@ -379,6 +381,97 @@ static void ble_svcs_hids_evt_handler(ble_evt_att_param_t *p_param)
                 {
                     printf("HIDS timer start failed. \n");
                 }
+            }
+            break;
+
+       case BLESERVICE_HIDS_BOOT_KEYBOARD_INPUT_REPORT_READ_EVENT:
+            gatt_param.host_id = p_param->host_id;
+            gatt_param.handle_num = p_profile_info->svcs_info_hids.server_info.handles.hdl_boot_keyboard_input_report;
+            gatt_param.length = sizeof(p_profile_info->svcs_info_hids.server_info.data.boot_keyboard_intput_report);
+            gatt_param.p_data = p_profile_info->svcs_info_hids.server_info.data.boot_keyboard_intput_report;
+
+            status = ble_svcs_data_send(TYPE_BLE_GATT_READ_RSP, &gatt_param);
+            if (status != BLE_ERR_OK)
+            {
+                printf("ble_svcs_data_send fail!!!");
+            }
+            break;
+
+        case BLESERVICE_HIDS_BOOT_KEYBOARD_OUTPUT_REPORT_READ_EVENT:
+            gatt_param.host_id = p_param->host_id;
+            gatt_param.handle_num = p_profile_info->svcs_info_hids.server_info.handles.hdl_boot_keyboard_output_report;
+            gatt_param.length = sizeof(p_profile_info->svcs_info_hids.server_info.data.boot_keyboard_output_report);
+            gatt_param.p_data = p_profile_info->svcs_info_hids.server_info.data.boot_keyboard_output_report;
+
+            status = ble_svcs_data_send(TYPE_BLE_GATT_READ_RSP, &gatt_param);
+            if (status != BLE_ERR_OK)
+            {
+                printf("ble_svcs_data_send fail!!!");
+            }
+            break;
+
+        case BLESERVICE_HIDS_KEYBOARD_INPUT_REPORT_READ_EVENT:
+            gatt_param.host_id = p_param->host_id;
+            gatt_param.handle_num = p_profile_info->svcs_info_hids.server_info.handles.hdl_keyboard_input_report;
+            gatt_param.length = sizeof(p_profile_info->svcs_info_hids.server_info.data.keyboard_intput_report);
+            gatt_param.p_data = p_profile_info->svcs_info_hids.server_info.data.keyboard_intput_report;
+
+            status = ble_svcs_data_send(TYPE_BLE_GATT_READ_RSP, &gatt_param);
+            if (status != BLE_ERR_OK)
+            {
+                printf("ble_svcs_data_send fail!!!");
+            }
+            break;
+
+        case BLESERVICE_HIDS_KEYBOARD_OUTPUT_REPORT_READ_EVENT:
+            gatt_param.host_id = p_param->host_id;
+            gatt_param.handle_num = p_profile_info->svcs_info_hids.server_info.handles.hdl_keyboard_output_report;
+            gatt_param.length = sizeof(p_profile_info->svcs_info_hids.server_info.data.keyboard_output_report);
+            gatt_param.p_data = p_profile_info->svcs_info_hids.server_info.data.keyboard_output_report;
+
+            status = ble_svcs_data_send(TYPE_BLE_GATT_READ_RSP, &gatt_param);
+            if (status != BLE_ERR_OK)
+            {
+                printf("ble_svcs_data_send fail!!!");
+            }
+            break;
+
+        case BLESERVICE_HIDS_CONSUMER_INPUT_REPORT_READ_EVENT:
+            gatt_param.host_id = p_param->host_id;
+            gatt_param.handle_num = p_profile_info->svcs_info_hids.server_info.handles.hdl_consumer_input_report;
+            gatt_param.length = sizeof(p_profile_info->svcs_info_hids.server_info.data.consumer_input_report);
+            gatt_param.p_data = p_profile_info->svcs_info_hids.server_info.data.consumer_input_report;
+
+            status = ble_svcs_data_send(TYPE_BLE_GATT_READ_RSP, &gatt_param);
+            if (status != BLE_ERR_OK)
+            {
+                printf("ble_svcs_data_send fail!!!");
+            }
+            break;
+
+        case BLESERVICE_HIDS_MOUSE_INPUT_REPORT_READ_EVENT:
+            gatt_param.host_id = p_param->host_id;
+            gatt_param.handle_num = p_profile_info->svcs_info_hids.server_info.handles.hdl_mouse_input_report;
+            gatt_param.length = sizeof(p_profile_info->svcs_info_hids.server_info.data.mouse_input_report);
+            gatt_param.p_data = p_profile_info->svcs_info_hids.server_info.data.mouse_input_report;
+
+            status = ble_svcs_data_send(TYPE_BLE_GATT_READ_RSP, &gatt_param);
+            if (status != BLE_ERR_OK)
+            {
+                printf("ble_svcs_data_send fail!!!");
+            }
+            break;
+
+        case BLESERVICE_HIDS_BOOT_MOUSE_INPUT_REPORT_READ_EVENT:
+            gatt_param.host_id = p_param->host_id;
+            gatt_param.handle_num = p_profile_info->svcs_info_hids.server_info.handles.hdl_boot_mouse_input_report;
+            gatt_param.length = sizeof(p_profile_info->svcs_info_hids.server_info.data.boot_mouse_input_report);
+            gatt_param.p_data = p_profile_info->svcs_info_hids.server_info.data.boot_mouse_input_report;
+
+            status = ble_svcs_data_send(TYPE_BLE_GATT_READ_RSP, &gatt_param);
+            if (status != BLE_ERR_OK)
+            {
+                printf("ble_svcs_data_send fail!!!");
             }
             break;
 
@@ -1845,6 +1938,7 @@ static void app_init(void)
     hosal_gpio_debounce_enable(GPIO_WAKE_UP_PIN);
     hosal_gpio_int_enable(GPIO_WAKE_UP_PIN);
     NVIC_EnableIRQ(Gpio_IRQn);
+    hosal_lpm_ioctrl(HOSAL_LPM_ENABLE_WAKE_UP_SOURCE, HOSAL_LOW_POWER_WAKEUP_GPIO);
 }
 
 /**
@@ -1878,6 +1972,7 @@ static void pin_mux_init(void)
 static void app_main_entry(void* pvParameters)
 {
     hosal_lpm_init();
+    hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LOW_POWER_LEVEL_SLEEP0);
     hosal_rf_init(HOSAL_RF_MODE_BLE_CONTROLLER);
     
     /* application init */

@@ -5,6 +5,9 @@
 #include <openthread/thread.h>
 
 typedef enum {
+    APP_EVENT_RETRY_JOIN_NOW,
+    APP_EVENT_JOIN_SUCCESS,
+    APP_EVENT_JOIN_FAILED,
     APP_EVENT_CHANGE_ROLE,
     APP_EVENT_MAC_JOIN_RESPONSE_SEND,
 #if CONFIG_APP_TASK_CENTRAL_ENABLE
@@ -27,5 +30,7 @@ void app_set_provisioning_mode(bool enable, uint32_t provision_time);
 uint16_t app_provision_get_remain_time();
 
 void app_join_request_handler();
+
+void app_join_response_handler(uint16_t panid, uint8_t* net_key);
 
 #endif /* __APP_NET_MGM_H */

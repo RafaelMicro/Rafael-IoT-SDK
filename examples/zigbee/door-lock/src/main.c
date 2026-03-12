@@ -14,8 +14,10 @@
 #include "zigbee_api.h"
 #include "device_api.h"
 
+#include "hosal_flash.h"
 #include "hosal_rf.h"
 #include "hosal_uart.h"
+#include "hosal_lpm.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -33,10 +35,17 @@ static uint8_t g_joined_channel = 0xFF;
 int main(void) {
     uart_stdio_init();
     vHeapRegionsInt();
+    hosal_flash_init();
     log_info("%s version : %s", CONFIG_BUILD_PORJECT, CONFIG_PROJECT_VERSION);
 
     enhanced_flash_dataset_init();
     hosal_rf_init(HOSAL_RF_MODE_RUCI_CMD);
+    hosal_lpm_init();
+#ifdef ZB_USE_SLEEP
+    hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LPM_SLEEP);
+    hosal_lpm_ioctrl(HOSAL_LPM_ENABLE_WAKE_UP_SOURCE, HOSAL_LOW_POWER_WAKEUP_GPIO);
+#endif
+
     zigbee_app_init();
     zbStart();
     vTaskStartScheduler();

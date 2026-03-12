@@ -1326,6 +1326,7 @@ static void app_init(void)
     hosal_gpio_debounce_enable(GPIO_WAKE_UP_PIN);
     hosal_gpio_int_enable(GPIO_WAKE_UP_PIN);
     NVIC_EnableIRQ(Gpio_IRQn);
+    hosal_lpm_ioctrl(HOSAL_LPM_ENABLE_WAKE_UP_SOURCE, HOSAL_LOW_POWER_WAKEUP_GPIO);
 }
 
 /**
@@ -1359,6 +1360,7 @@ static void pin_mux_init(void)
 static void app_main_entry(void* pvParameters)
 {
     hosal_lpm_init();
+    hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LOW_POWER_LEVEL_SLEEP0);
     hosal_rf_init(HOSAL_RF_MODE_BLE_CONTROLLER);
 
     /* application init */

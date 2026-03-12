@@ -27,6 +27,7 @@ void init_bod_comp(void) {
     cfg.debounce_sel = HOSAL_BOD_SLOW_CLOKC_8;
     cfg.rising_edge_int_en = 1;
     cfg.falling_edge_int_en = 1;
+    cfg.voltage_threshold = 1900;
 
     hosal_bod_comp_open(cfg, bod_Callback);
     NVIC_EnableIRQ((IRQn_Type)(Bod_Comp_IRQn));

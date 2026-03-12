@@ -58,20 +58,10 @@ int main(void) {
 
 void app_task_1(void *parameters_ptr)
 {
-    uint32_t test[10];
-    uint32_t i = 0;
-
-    memset(test, 0, sizeof(test));
-    for(i = 0; i < 10; i++){
-        printf("%.8x\r\n", test[i]);
-    }
 
     for(;;){
-        hosal_trng_get_random_number(test, 1);
-        for(i = 0; i < 10; i++){
-        printf("%.8x\r\n", test[i]);
-        }
-        vTaskDelay(2000);
+        printf("task 1 running\r\n");
+        vTaskDelay(1000);
     } 
 }
 
@@ -81,6 +71,6 @@ void app_task_2(void *parameters_ptr)
 
     for(;;){
         printf("task 2 running\r\n");
-        vTaskDelay(4000);
+        vTaskDelay(1000);
     } 
 }

@@ -4,7 +4,7 @@ menu "-------- SDK   Configuration --------"
 endmenu
 source "config/devices.config"
 
-if (RT581 || RT582 || RT583 || RT584H || RT584L)
+if (RT581 || RT582 || RT583 || RT584H ||  RT584HA4 || RT584L)
 choice APPLICATION_EXAMPLES_TYPE
 	prompt "Select Application"
 	default BASIC_EXAMPLE
@@ -56,7 +56,7 @@ endchoice
 endif
 
 
-if RT582_NONE_OS ||  RT584_NONE_OS
+if RT582_NONE_OS || RT584H_NONE_OS || RT584L_NONE_OS || RF1301_NONE_OS || RT584HA4_NONE_OS
 
 choice APPLICATION_EXAMPLES_TYPE
 	prompt "Select Application"

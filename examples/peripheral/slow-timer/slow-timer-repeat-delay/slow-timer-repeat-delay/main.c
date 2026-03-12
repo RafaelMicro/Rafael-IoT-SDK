@@ -16,7 +16,7 @@
 #include "app_hooks.h"
 #include "uart_stdio.h"
 
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 #define RT_SLOW_TIMER0     0
 #define RT_SLOW_TIMER1     1
 #else
@@ -77,7 +77,7 @@ void slow_timer_periodic(void) {
 
     hosal_slow_timer_init(RT_SLOW_TIMER0, cfg0, timer0_cb);
     hosal_slow_timer_init(RT_SLOW_TIMER1, cfg1, timer1_cb);
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     NVIC_EnableIRQ((IRQn_Type)(SlowTimer0_IRQn));
     NVIC_EnableIRQ((IRQn_Type)(SlowTimer1_IRQn));
 #else
@@ -99,7 +99,7 @@ int main(void) {
     printf("/*****Start Slow Timer Repeat Delay*****/\r\n");
     
     slow_timer_periodic();
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     hosal_lpm_ioctrl(HOSAL_LPM_ENABLE_WAKE_UP_SOURCE, HOSAL_LOW_POWER_WAKEUP_SLOW_TIMER);
     hosal_lpm_ioctrl(HOSAL_LPM_SUBSYSTEM_ENTER_LOW_POWER,
                      HOSAL_COMMUMICATION_SUBSYSTEM_PWR_STATE_SLEEP);

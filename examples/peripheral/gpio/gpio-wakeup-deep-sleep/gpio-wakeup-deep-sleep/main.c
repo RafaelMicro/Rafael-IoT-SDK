@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include "FreeRTOS.h"
 #include "task.h"
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 #include "hosal_dpd.h"
 #endif
 #include "hosal_gpio.h"
@@ -20,7 +20,7 @@
 #include "uart_stdio.h"
 
 
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 #else
 /*wakeup io init */
 void wakeupio_init(void)
@@ -41,6 +41,8 @@ void wakeupio_init(void)
 #endif
 
 int main(void) {
+    uint32_t reset_cause = 0, reset_by_deep_sleep = 0;
+
     uart_stdio_init();
     vHeapRegionsInt();
     printf("Starting %s now %d.... \r\n", CONFIG_CHIP,
@@ -55,9 +57,11 @@ int main(void) {
     printf("/********************************************/\r\n");
     printf("/*****START GPIO WAKE UP FROM DEEP SLEEP*****/\r\n");
     printf("/********************************************/\r\n");
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
-    printf("Deep sleep wake up,%.8lx\r\n", hosal_get_all_reset_cause());
-    if ( hosal_reset_by_deep_sleep() ) {
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
+    hosal_get_all_reset_cause(&reset_cause);
+    printf("Deep sleep wake up,%.8lx\r\n", reset_cause);
+    hosal_reset_by_deep_sleep(&reset_by_deep_sleep);
+    if ( reset_by_deep_sleep ) {
         hosal_clear_reset_cause();
     }
     hosal_gpio_setup_deep_sleep_io(GPIO0, HOSAL_GPIO_LEVEL_LOW);

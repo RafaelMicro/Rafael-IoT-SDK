@@ -92,7 +92,7 @@ static void _zcl_doorlock_process(uint16_t cmd, uint16_t datalen, uint8_t *pdata
         if (datalen > 0 && get_pincode()[0] > 0)
         {
             code_len = pdata[0];
-            if (code_len > 0 && code_len == get_pincode()[0] && !memcmp(pdata, get_pincode(), code_len))
+            if (code_len > 0 && code_len == get_pincode()[0] && !memcmp(pdata+1, get_pincode()+1, code_len))
             {
                 log_info("PIN code match");
                 set_lock_state((cmd == ZB_ZCL_CMD_DOOR_LOCK_LOCK_DOOR) ? ZB_ZCL_ATTR_DOOR_LOCK_LOCK_STATE_LOCKED :

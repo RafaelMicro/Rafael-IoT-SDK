@@ -7,7 +7,10 @@
   "cortex-debug.armToolchainPath.windows": "${workspaceFolder}/toolchain/arm/Windows/bin",
   "cortex-debug.armToolchainPath.linux": "${workspaceFolder}/toolchain/arm/Linux/bin",
   "cortex-debug.openocdPath.windows": "${workspaceFolder}/tools/Debugger/OpenOCD/bin/win/openocd.exe",
+  "cortex-debug.openocdPath.linux": "${workspaceFolder}/tools/Debugger/OpenOCD/bin/linux/openocd",
   "cortex-debug.openocdPath.osx": "${workspaceFolder}/tools/Debugger/OpenOCD/bin/osx/openocd",
+  "debug.enableDebugHover": false,
+  "editor.hover.enabled": false,
   "showDevDebugOutput": "raw",
   // Debug for RT584
   "cmake.debugConfig.RT58x": {

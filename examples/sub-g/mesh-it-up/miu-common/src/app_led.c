@@ -75,10 +75,8 @@ void app_led_pin_init(void) {
     /*EVK hardware not support GPIO-22 (need wire connection)*/
     // hosal_gpio_cfg_output(MIU_LED2_PIN);
 
-    hosal_gpio_pin_write(MIU_LED0_PIN, 1);
-    hosal_gpio_pin_write(MIU_LED1_PIN, 1);
-    hosal_gpio_pin_write(MIU_LED00_PIN, 0);
-    hosal_gpio_pin_write(MIU_LED01_PIN, 0);
+    app_set_led0_off();
+    app_set_led1_off();
     /*EVK hardware not support GPIO-22 (need wire connection)*/
-    // hosal_gpio_pin_write(MIU_LED2_PIN, 0);
+    // app_set_led2_off();
 }

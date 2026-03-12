@@ -344,7 +344,7 @@ void rfb_trx_init(uint32_t rx_timeout_timer, bool rx_continuous)
     subg_ctrl_mac_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_CRC_TYPE_16, SUBG_CTRL_WHITEN_ENABLE);
     subg_ctrl_preamble_set(SUBG_CTRL_MODU_FSK, 8);
     subg_ctrl_sfd_set(SUBG_CTRL_MODU_FSK, 0x00007209);
-    subg_ctrl_filter_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_FILTER_TYPE_GFSK);
+    subg_ctrl_filter_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_FILTER_TYPE_FSK);
 
     /*
     * Set channel frequency :

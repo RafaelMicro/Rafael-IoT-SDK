@@ -16,8 +16,24 @@ endif()
 add_definitions(
     -DCONFIG_APP_TASK_UDP_LISTEN_PORT=5678
     -DCONFIG_APP_OT_NCP_OPERATION_UART_PORT=0
+    -DCONFIG_APP_OT_NCP_OPERATION_UART_TX_PIN=17
+    -DCONFIG_APP_OT_NCP_OPERATION_UART_RX_PIN=16
     -DCONFIG_APP_OT_NCP_OPERATION_UART_BAUDRATE=115200
 )
+
+if (CONFIG_BUILD_COMPONENT_ENHANCED_FLASH_DATASET)
+    if(CONFIG_FLASHCTRL_SECURE_EN)
+        sdk_add_compile_options(
+            -DEFD_START_ADDR=0x100F0000
+            -DENV_AREA_SIZE=0x4000
+        )
+    else()
+        sdk_add_compile_options(
+            -DEFD_START_ADDR=0xF0000
+            -DENV_AREA_SIZE=0x4000
+        )
+    endif()
+endif()
 
 set(MIU_COMMON_DIR "../miu-common")
 set(MIU_COMPONENTS_DIR "${CMAKE_SOURCE_DIR}/components/network/mesh-it-up")

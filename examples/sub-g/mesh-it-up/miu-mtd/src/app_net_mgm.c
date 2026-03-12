@@ -26,6 +26,7 @@ bool enroll_done = false;
 
 uint8_t enroll_send_try = 0;
 uint8_t enroll_send_time = 0;
+uint16_t inactivity_timer = 0;
 
 void net_mgm_enroll_req_received_done(int status, uint16_t comission_time) {
     if (status < 0) {
@@ -97,8 +98,15 @@ void net_mgm_survival_timeout_callback(TimerHandle_t xTimer) {
 
     if (otThreadGetDeviceRole(otrGetInstance()) <= OT_DEVICE_ROLE_DETACHED) {
         /*debug use*/
-        app_set_led0_flash();
+        app_set_led0_toggle();
+        inactivity_timer++;
+        if (inactivity_timer >= 240) {
+            otInstanceFactoryReset(otrGetInstance());
+        }
     } else {
+        if (inactivity_timer != 0) {
+            inactivity_timer = 0;
+        }
         if (enroll_done == false) {
             if (enroll_send_time == 0 || enroll_send_time > 20) {
                 if (enroll_send_try < 5) {
@@ -115,6 +123,7 @@ void net_mgm_survival_timeout_callback(TimerHandle_t xTimer) {
             }
             app_set_led0_flash();
         } else {
+            app_set_led0_off();
             app_set_led1_toggle();
         }
     }

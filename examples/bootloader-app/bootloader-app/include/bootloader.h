@@ -24,7 +24,7 @@
 #define DEBUG_PRINT(fmt, args...)
 #endif
 
-#if defined(CONFIG_RT584_NONE_OS)
+#if defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
 typedef struct
 {
     uint32_t            magic_header;           /* Magic number */

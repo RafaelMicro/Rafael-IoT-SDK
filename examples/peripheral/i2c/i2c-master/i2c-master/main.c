@@ -154,7 +154,7 @@ void do_i2c_master_test(void) {
 
 void init_default_pin_mux(void) {
     
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     hosal_pin_set_pullopt(I2CM0_SCL, HOSAL_PULL_DOWN_10K);
     hosal_pin_set_pullopt(I2CM0_SDA, HOSAL_PULL_DOWN_10K);
 #endif /* !defined(CONFIG_RT584) */

@@ -33,6 +33,7 @@ void init_bod_comp(void) {
     cfg.counter_mode_en = 1;
     cfg.counter_mode_int_en = 1;
     cfg.counter_mode_threshold = 10;
+    cfg.voltage_threshold = 1900;
 
     hosal_bod_comp_open(cfg, bod_callback);
     NVIC_EnableIRQ(Bod_Comp_IRQn);

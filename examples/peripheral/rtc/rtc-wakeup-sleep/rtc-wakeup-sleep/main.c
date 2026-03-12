@@ -40,7 +40,7 @@ int main(void) {
 
     global_var_init();
     printf("/*******Start RTC Wakeup From Sleep********/\r\n");
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 #if defined(CONFIG_RCO32K_ENABLE)
     hosal_rtc_set_clk(0x200000);
 #elif defined(CONFIG_RCO16K_ENABLE)
@@ -71,7 +71,7 @@ int main(void) {
     hosal_rtc_set_time(&current_time);
 
     hosal_rtc_get_time(&current_time);
-    #if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+    #if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
             printf("setting time is %2d-%2d-%2d %2d:%2d:%2d.%3d\r\n",
                     current_time.tm_year, current_time.tm_mon, current_time.tm_day,
                     current_time.tm_hour, current_time.tm_min, current_time.tm_sec,
@@ -97,7 +97,7 @@ int main(void) {
     hosal_rtc_set_alarm(&alarm_tm, alarm_mode, rtc_callback);
 
 
-#if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
     hosal_lpm_ioctrl(HOSAL_LPM_ENABLE_WAKE_UP_SOURCE, HOSAL_LOW_POWER_WAKEUP_RTC_TIMER);
     hosal_lpm_ioctrl(HOSAL_LPM_SUBSYSTEM_ENTER_LOW_POWER,
                      HOSAL_COMMUMICATION_SUBSYSTEM_PWR_STATE_SLEEP);
@@ -116,7 +116,7 @@ int main(void) {
             printf("wakeup\r\n");
             rtc_alarm = 0;
             hosal_rtc_get_time(&current_time);
-            #if  defined(CONFIG_RT584H) || defined(CONFIG_RT584L)
+            #if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
             printf("current time is %2d-%2d-%2d %2d:%2d:%2d.%3d\r\n",
                     current_time.tm_year, current_time.tm_mon, current_time.tm_day,
                     current_time.tm_hour, current_time.tm_min, current_time.tm_sec,

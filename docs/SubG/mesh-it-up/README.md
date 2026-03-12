@@ -6,7 +6,7 @@ This document provides a high-level overview of the **Mesh It Up (MIU) SDK**, co
 
 ## 1. Core Features and Objectives
 
-**Mesh It Up (MIU)** is a development SDK based on **[OpenThread](https://openthread.io/) over Sub-GHz**, designed to help developers quickly build long-range, low-power, and **multi-hop mesh networking** solutions.
+**Mesh It Up (MIU)** is a development SDK based on **[OpenThread](https://openthread.io/guides/thread-primer) over Sub-GHz**, designed to help developers quickly build long-range, low-power, and **multi-hop mesh networking** solutions.
 
 ### Key MIU Technological Highlights:
 
@@ -24,7 +24,7 @@ MIU is the ideal choice for applications like smart metering, Industrial IoT (II
 The MIU SDK follows a strict modular structure, clearly divided into the **Components Layer** and the **Application Examples Layer**.
 
 ### Figure 1: MIU SDK Layered Architecture
-![MIU SDK Architecture](../../picture/miu_protocol_stack.png)
+![MIU SDK Architecture](picture/miu_protocol_stack.png)
 
 ### 2.1 Core Components Layer
 
@@ -54,8 +54,9 @@ Located within `example/sun-g/mesh-it-up/`, these provide pre-compiled applicati
 
 * [`Quick-start.md`](Quick-start.md): Step-by-step guide on setting up the development environment, building, and running your first MIU example.
 * **Example Guides:** [`miu-ftd-guide.md`](example/miu-ftd-guide.md), [`miu-mtd-guide.md`](example/miu-mtd-guide.md), [`miu-sniffer-guide.md`](example/miu-sniffer-guide.md)
-* **OTA Guides:** [`OTA-guid.md`](OTA-guide.md) : OTA Design and Operation Instructions.
-* **Network Management Guides:** [`Network-management-guid.md`](Network-management-guid.md) : Network Management Design and Operation Instructions.
+* **OTA Guides:** [`OTA-guide.md`](OTA-guide.md) : OTA Design and Operation Instructions.
+* **Network Management Guides:** [`Network-management-guide.md`](Network-management-guide.md) : Network Management Design and Operation Instructions.
+* **Topology Tool Guides:** [`Topology-Tool-guide.md`](Topology-Tool-guide.md) : Topology Tool Operation Instructions.
 
 ### External Resources
 
