@@ -103,28 +103,36 @@ ota_upgrade_test_file_t ota_file =
 zb_ret_t next_data_ind_cb(zb_uint8_t index, zb_zcl_parsed_hdr_t *zcl_hdr, zb_uint32_t offset,
     zb_uint8_t size, zb_uint8_t **data)
 {
-    *data = ((ota_file.pdata) + offset);
+    static uint8_t temp_buf[64];
+    for(uint8_t i = 0; i < size; i++) {
+        temp_buf[i] = flash_read_byte(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS + offset + i);
+        while (flash_check_busy()) {}
+    }
+    *data = temp_buf;
     return RET_OK;
 }
 //=============================================================================
 //                Function
 //=============================================================================
-static uint32_t crc32checksum(uint32_t flash_addr, uint32_t data_len)
-{
-    uint16_t k;
+uint32_t crc32checksum(uint32_t flash_addr, uint32_t data_len) {
     uint32_t i;
-    uint8_t *buf = ((uint8_t *)flash_addr);
-    uint32_t chkSum = ~0, len = data_len;
+    uint16_t j, k;
+    uint32_t ChkSum = ~0;
+    uint8_t Read;
 
-    for (i = 0; i < len; i ++ )
-    {
-        chkSum ^= *buf++;
-        for (k = 0; k < 8; k ++)
-        {
-            chkSum = chkSum & 1 ? (chkSum >> 1) ^ 0xedb88320 : chkSum >> 1;
+    for (i = 0; i < data_len; i++) {
+        //get 8 bits at one time
+        Read = flash_read_byte((flash_addr + i));
+        while (flash_check_busy()) {}
+        //get the CRC of 8 bits
+        ChkSum ^= Read;
+        for (k = 0; k < 8; k++) {
+            ChkSum = (ChkSum & 1) ? (ChkSum >> 1) ^ 0xedb88320
+                                    : ChkSum >> 1;
         }
     }
-    return ~chkSum;
+    ChkSum = ~ChkSum;
+    return ChkSum;
 }
 void insert_ota_file(zb_uint8_t param)
 {

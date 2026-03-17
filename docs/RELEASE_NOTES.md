@@ -1,6 +1,6 @@
 # Rafael-IoT-SDK Release Note
 
-![Date](https://img.shields.io/badge/Date-2026--03--12-green) ![Release](https://img.shields.io/badge/Release-v2.2.0-blue)
+![Date](https://img.shields.io/badge/Date-2026--03--17-green) ![Release](https://img.shields.io/badge/Release-v2.2.0-blue)
 
 
 ---
