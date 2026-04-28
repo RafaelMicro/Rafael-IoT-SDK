@@ -163,7 +163,7 @@ static void _check_ota_file_valid(ota_file_info_t *file_info)
     memcpy(&file_info->image_size, tmp, 4);
     while (flash_check_busy()) {} ;
 
-    if(file_info->image_size<0x73FFC)  //464*1024-4=0x73FFC
+    if(file_info->image_size<SIZE_OF_FOTA_BANK_UNCOMPRESS)  //464*1024-4=0x73FFC
     {  
         crc32 = crc32checksum(FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS, file_info->image_size);
         gt_img_info.image_size = file_info->image_size;
@@ -406,12 +406,15 @@ void _gw_ota_cmd_handle(uint32_t cmd_id, uint8_t *pBuf)
         tmp_len = 0;
         flash_addr = FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS;
 
-        for (i = 0; i < 0x74; i++)
+        for (i = 0; i < SIZE_OF_FOTA_BANK_UNCOMPRESS / 0x1000; i++)
         {
             // Page erase (4096 bytes)
             while (flash_check_busy());
+            taskENTER_CRITICAL();
             flash_erase(FLASH_ERASE_SECTOR, FOTA_UPDATE_BUFFER_FW_ADDRESS_UNCOMPRESS + (0x1000 * i));
+            taskEXIT_CRITICAL();
         }
+
         zigbee_gw_cmd_send((GW_CMD_OTA_UPLOAD_START_REQUEST | 0x8000), 0, 0, 0, (uint8_t *)&status, 4);
     }
     else if (cmd_id == GW_CMD_OTA_BLOCK_REQUEST)

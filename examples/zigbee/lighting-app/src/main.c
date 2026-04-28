@@ -118,7 +118,19 @@ void app_main_loop(void* parameters_ptr) {
                     scene_db_check();
                     startup_db_check();
                     set_startup_status();
-
+                                    
+                    uint8_t mCurrentProtocol = 1;
+                    efd_set_env_blob("prot", &mCurrentProtocol, sizeof(uint8_t));
+                    size_t actual_len;
+                    efd_get_env_blob("prot", (void *) &mCurrentProtocol, sizeof(uint8_t), &actual_len);
+                    if(actual_len == 0) {
+                        log_info("Protocol not found,");
+                    }
+                    else
+                    {
+                        log_info("Protocol: %s", mCurrentProtocol ==0 ? "None" : 
+                        mCurrentProtocol == 1 ? "Zigbee" : "Matter");
+                    }
                     ZB_THREAD_SAFE(g_panid = zb_get_pan_id();
                                    g_short_addr = zb_get_short_address();
                                    g_joined_channel = zb_get_current_channel();)

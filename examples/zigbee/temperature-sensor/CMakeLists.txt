@@ -18,18 +18,18 @@ if (CONFIG_BUILD_COMPONENT_ENHANCED_FLASH_DATASET)
         )
     elseif(CONFIG_RT583)
         sdk_add_compile_options(
-            -DEFD_START_ADDR=0x1F0000
-            -DENV_AREA_SIZE=0x4000
+            -DEFD_START_ADDR=0x1E0000
+            -DENV_AREA_SIZE=0x10000
         )
     elseif(CONFIG_RT584H OR CONFIG_RT584L)
         sdk_add_compile_options(
-            -DEFD_START_ADDR=0x101F0000
-            -DENV_AREA_SIZE=0x4000
+            -DEFD_START_ADDR=0x101E0000
+            -DENV_AREA_SIZE=0x10000
         )
     elseif(CONFIG_RT584HA4)
         sdk_add_compile_options(
-            -DEFD_START_ADDR=0x103F0000
-            -DENV_AREA_SIZE=0x4000
+            -DEFD_START_ADDR=0x103E0000
+            -DENV_AREA_SIZE=0x10000
         )
     endif()
 endif()
