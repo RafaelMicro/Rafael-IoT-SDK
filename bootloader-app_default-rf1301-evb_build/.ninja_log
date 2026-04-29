@@ -1,0 +1,16 @@
+# ninja log v5
+1	708	1777428514660638113	components/platform/hosal/rt584_hosal/CMakeFiles/rt584_hosal.dir/Src/hosal_wdt.c.obj	d576bf15289b3756
+18	752	1777428514704638254	components/platform/soc/rt584/rt584_driver/CMakeFiles/rt584_driver.dir/Src/wdt.c.obj	d5d4d73c59fb41c0
+1	766	1777428514706638260	components/platform/soc/rt584/rt584_bootloader/CMakeFiles/rt584h_bootloader.dir/bootloader/src/boot/gcc/startup.c.obj	3945c7a4adcc0b7e
+4	790	1777428514744638382	components/platform/soc/rt584/rt584_driver/CMakeFiles/rt584_driver.dir/Src/dma.c.obj	45fff06fb636ed97
+4	870	1777428514822638632	components/platform/soc/rt584/rt584_driver/CMakeFiles/rt584_driver.dir/Src/bod_comp.c.obj	d082dbe04c314c3a
+23	890	1777428514837638680	components/platform/soc/rt584/rt584_crypto/CMakeFiles/rt584_crypto.dir/rt_crypto_util.c.obj	66789f75111c0018
+10	937	1777428514890638850	components/platform/soc/rt584/rt584_driver/CMakeFiles/rt584_driver.dir/Src/dwt.c.obj	7b0c617fead563f2
+4	1005	1777428514958639068	components/platform/soc/rt584/rt584_driver/CMakeFiles/rt584_driver.dir/Src/gpio.c.obj	e73dbb3a71d0516c
+19	1048	1777428514995639208	components/platform/soc/rt584/rt584_crypto/CMakeFiles/rt584_crypto.dir/rt_ecjpake.c.obj	69b92b2b960a2da2
+20	1199	1777428515152639804	components/platform/soc/rt584/rt584_crypto/CMakeFiles/rt584_crypto.dir/rt_aes.c.obj	7d0d78a3c98e4ebd
+1	1226	1777428515180639910	components/platform/hosal/rt584_hosal/CMakeFiles/rt584_hosal.dir/Src/hosal_uart.c.obj	3e4578e708b06cdf
+11	1251	1777428515205640005	components/platform/soc/rt584/rt584_driver/CMakeFiles/rt584_driver.dir/Src/sadc.c.obj	b4d104c28bf5f550
+17	1289	1777428515242640145	components/platform/soc/rt584/rt584_driver/CMakeFiles/rt584_driver.dir/Src/timer.c.obj	b12a16b3ed3429b5
+9	1297	1777428515251640179	components/platform/soc/rt584/rt584_driver/CMakeFiles/rt584_driver.dir/Src/sysctrl.c.obj	d5e8af0adc8557d1
+9	1300	1777428515254640191	components/platform/soc/rt584/rt584_driver/CMakeFiles/rt584_driver.dir/Src/flashctl.c.obj	d51e113eb537a289
