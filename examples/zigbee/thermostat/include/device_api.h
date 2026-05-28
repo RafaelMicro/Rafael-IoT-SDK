@@ -18,6 +18,10 @@
 #ifndef __DEVICE_API_H
 #define __DEVICE_API_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "EnhancedFlashDataset.h"
 #include "zigbee_api.h"
 
@@ -25,4 +29,7 @@
 
 void set_led_onoff(uint8_t led, uint8_t on);
 void button_init(void);
+#ifdef __cplusplus
+}
+#endif
 #endif // __DEVICE_API_H

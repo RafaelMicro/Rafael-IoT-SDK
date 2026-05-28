@@ -18,6 +18,10 @@
 #ifndef __ZIGBEE_CMD_OTA_H
 #define __ZIGBEE_CMD_OTA_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "stdint.h"
 
 typedef enum {
@@ -40,4 +44,7 @@ typedef enum {
 void _gw_ota_cmd_handle(uint32_t cmd_id, uint8_t *pBuf);
 void zigbee_gw_ota_cb(uint8_t param);
 
+#ifdef __cplusplus
+}
+#endif
 #endif // __ZIGBEE_CMD_OTA_H

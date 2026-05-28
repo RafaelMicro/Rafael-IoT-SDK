@@ -7,6 +7,7 @@
 
 #include <FreeRTOS.h>
 #include <task.h>
+#include "app_led.h"
 #include "app_miu_config.h"
 #include "app_task.h"
 #include "hosal_rf.h"
@@ -35,7 +36,7 @@ static const char* const data_rate_str[] = {
 static const char* const band_str[] = {"SubG_915M", "2P4G",      "SubG_868M",
                                        "SubG_433M", "SubG_315M", "SubG_470M"};
 uint16_t cca_duration = 0;
-uint16_t frame_total_wait_time = 0;
+uint32_t frame_total_wait_time = 0;
 uint32_t backof_period = 0;
 /*set subg frequencydatarate*/
 #if CONFIG_SUBG_FREQUENCY_BAND_915
@@ -66,11 +67,13 @@ static uint8_t sPhyDataRate = HOSAL_RF_PHY_DATA_RATE_300K;
 #endif
 
 void otrInitUser(otInstance* instance) {
+    app_led_pin_init();
     otAppCliInit((otInstance*)instance);
     otAppNcpInit((otInstance*)instance);
+    ncpInitUser();
 }
 
-void app_task(void) { ncpInitUser(); }
+void app_task(void) {}
 
 void app_common_init() {
 
@@ -124,8 +127,8 @@ void app_common_init() {
     log_info("Channel Range     : %d ~ %d",
              OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MIN,
              OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MAX);
-    log_info("Channel Frequency : %d MHz", OPENTHREAD_CONFIG_CHANNEL_FREQUENCY);
-    log_info("Channel Spacing   : %d MHz", OPENTHREAD_CONFIG_CHANNEL_SPACING);
+    log_info("Channel Frequency : %d ", OPENTHREAD_CONFIG_CHANNEL_FREQUENCY);
+    log_info("Channel Spacing   : %d ", OPENTHREAD_CONFIG_CHANNEL_SPACING);
     otRadioChRange_t radiochrange;
     radiochrange.minChannel =
         OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MIN;

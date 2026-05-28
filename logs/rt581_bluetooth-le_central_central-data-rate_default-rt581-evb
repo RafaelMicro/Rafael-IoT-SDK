@@ -1,0 +1,22 @@
+C Compiler: arm-none-eabi-gcc
+-- The C compiler identification is GNU 14.2.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /home/jacky/rafael-iot-sdk/toolchain/arm/Linux/bin/arm-none-eabi-gcc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+CMake Error at /home/jacky/rafael-iot-sdk/toolchain/cmake/Linux/share/cmake-3.31/Modules/CMakeTestCCompiler.cmake:80 (configure_file):
+  No such file or directory
+Call Stack (most recent call first):
+  CMakeLists.txt:4 (project)
+
+
+CMake Error at /home/jacky/daily_build/Build/CMakeFiles/3.31.8/CMakeCCompiler.cmake:84:
+  Parse error.  Expected "(", got quoted argument with text "".
+Call Stack (most recent call first):
+  /home/jacky/rafael-iot-sdk/toolchain/cmake/Linux/share/cmake-3.31/Modules/CMakeTestCCompiler.cmake:85 (include)
+  CMakeLists.txt:4 (project)
+
+
+-- Configuring incomplete, errors occurred!
+ninja: error: loading 'build.ninja': No such file or directory

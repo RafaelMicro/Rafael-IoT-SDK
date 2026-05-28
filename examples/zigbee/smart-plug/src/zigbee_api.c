@@ -42,6 +42,7 @@
 #ifdef ZB_USE_SLEEP
 #define APP_KEEP_ALIVE_TIMEOUT  1000
 #endif
+zb_app_event_t g_zb_app_evt_var = ZB_APP_EVENT_NONE;
 /*! Active scan duration, valid range 0 ~ 14, (15.36ms * (2^SD +1)) ms in one channel.  */
 uint8_t ZB_RAF_SCAN_DURATION = 3;
 static TimerHandle_t tmr_identify;
@@ -191,6 +192,9 @@ void zboss_signal_handler(zb_uint8_t param) {
             case ZB_BDB_SIGNAL_STEERING:
             case ZB_BDB_SIGNAL_DEVICE_REBOOT:
                 if (z_ret != 0) {
+#ifdef ZB_USE_SLEEP
+                    ZB_TRANSCEIVER_SET_RX_ON_OFF(0);
+#endif
                     ZIGBEE_APP_NOTIFY(ZB_APP_EVENT_NOT_JOINED);
                 } else if (z_ret == 0) {
                     ZIGBEE_APP_NOTIFY(ZB_APP_EVENT_JOINED);

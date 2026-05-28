@@ -54,7 +54,7 @@
 //                Private Global Variables
 //=============================================================================
 static TaskHandle_t zb_app_taskHandle;
-zb_app_event_t g_zb_app_evt_var;
+zb_app_event_t g_zb_app_evt_var = ZB_APP_EVENT_NONE;
 static QueueHandle_t zb_app_handle;
 
 static TimerHandle_t zb_time_timer;

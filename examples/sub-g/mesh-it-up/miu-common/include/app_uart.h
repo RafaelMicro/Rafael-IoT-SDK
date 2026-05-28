@@ -9,5 +9,7 @@ typedef enum {
 } uart_handler_data_sts_t;
 
 void app_uart_init();
+void app_uart0_enable(void);
+void app_uart0_disable(void);
 
 #endif /* APP_UART_H */

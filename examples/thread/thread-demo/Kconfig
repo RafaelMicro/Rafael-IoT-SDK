@@ -1,0 +1,317 @@
+menu "Thread demo configurations"
+
+choice APP_DEVICE_TYPE
+    prompt "Device Type"
+    default APP_DEVICE_TYPE_FTD
+
+config APP_DEVICE_TYPE_FTD
+    bool "Full thread device"
+    help
+        FTD.
+
+config APP_DEVICE_TYPE_MTD
+    bool "Minimal thread device"
+    help
+        MTD.
+
+endchoice
+
+choice APP_RF_BAND
+    prompt "RF Band"
+    default APP_RF_BAND_2_4G
+
+config APP_RF_BAND_2_4G
+    bool "2.4G"
+    help
+        2.4G.   
+
+config APP_RF_BAND_SUBG
+    select RADIO_SUBGHZ_OQPSK_SUPPORT
+    bool "SubG"
+    help
+        SubG.
+
+endchoice
+
+menu "SubG Setting"
+    depends on APP_RF_BAND_SUBG 
+
+choice APP_SUBG_SETTING_FREQUENCY_BAND
+    prompt "Frequency Band"
+    default APP_SUBG_SETTING_FREQUENCY_BAND_868
+
+config APP_SUBG_SETTING_FREQUENCY_BAND_868
+    select SUBG_FREQUENCY_BAND_868
+    bool "868MHz"
+    help
+        868MHz.
+
+config APP_SUBG_SETTING_FREQUENCY_BAND_915
+    select SUBG_FREQUENCY_BAND_915
+    bool "915MHz"
+    help
+        915MHz.
+
+config APP_SUBG_SETTING_FREQUENCY_BAND_470
+    select SUBG_FREQUENCY_BAND_470
+    bool "470MHz"
+    help
+        470MHz.
+
+config APP_SUBG_SETTING_FREQUENCY_BAND_433
+    select SUBG_FREQUENCY_BAND_433
+    bool "433MHz"
+    help
+        433MHz.
+    
+endchoice
+
+choice APP_SUBG_SETTING_DATA_RATE
+    prompt "Data Rate"
+    default APP_SUBG_SETTING_DATA_RATE_50K
+
+config APP_SUBG_SETTING_DATA_RATE_50K
+    bool "50Kbps"
+    help
+        50Kbps.
+
+config APP_SUBG_SETTING_DATA_RATE_100K
+    bool "100Kbps"
+    help
+        100Kbps.
+
+config APP_SUBG_SETTING_DATA_RATE_200K
+    bool "200Kbps"
+    help
+        200Kbps.
+
+config APP_SUBG_SETTING_DATA_RATE_300K
+    bool "300Kbps"
+    help
+        300Kbps.
+endchoice
+
+config APP_SUBG_SETTING_TX_POWER_INDEX
+    int "TX Power index"
+    range 0 29
+    default 29
+
+endmenu
+
+menu "Thread network configurations"
+
+config APP_THREAD_NETWORK_NAME
+    string "Thread network name"
+    default "OpenThread"
+    help
+        Thread network name.
+
+config APP_THREAD_NETWORK_PANID
+    int "Thread network PANID"
+    range 0 65530
+    default 2200
+    help
+        Thread network PANID.
+
+config APP_THREAD_NETWORK_CHANNEL
+    depends on APP_RF_BAND_2_4G
+    int "Thread network channel"
+    range 11 26
+    default 25
+    help
+        Thread network channel.
+
+config APP_THREAD_NETWORK_CHANNEL
+    depends on APP_RF_BAND_SUBG
+    int "Thread network channel"
+    range 1 20
+    default 1
+    help
+        Thread network channel.
+
+config APP_THRREAD_NETWORK_MASTER_KEY
+    string "Thread network master key"
+    default "00112233445566778899aabbccddeeff"
+    help
+        Thread network master key.
+
+config APP_THREAD_NETWORK_DATA_POLL_PERIOD
+    depends on APP_DEVICE_TYPE_MTD
+    int "Thread network data poll period"
+    range 0 65535
+    default 2000
+    help
+        Thread network data poll period.
+
+config APP_THREAD_NETWORK_CHILD_TIMEOUT
+    depends on APP_DEVICE_TYPE_MTD
+    int "Thread network child timeout"
+    range 10 65535
+    default 60
+    help
+        Thread network child timeout.
+
+config APP_THREAD_CHANNEL_SCAN_RETRY
+    depends on APP_DEVICE_TYPE_MTD
+    int "Thread channel scan retry"
+    range 1 5
+    default 2
+    help
+        Thread scan network retry configurations
+
+config APP_THREAD_CHANNEL_SCAN_TIMEOUT
+    depends on APP_DEVICE_TYPE_MTD 
+    int "Thread channel scan timeout (mini second)"
+    range 100 5000
+    default 2000
+    help
+        Thread scan timeout (mini second) 
+
+config APP_THREAD_LONG_DEEPSLEEP_WAKEUP_TIME
+    depends on APP_DEVICE_TYPE_MTD
+    int "Thread long deepsleep wakeup time (second)"
+    range 1 65535
+    default 30
+    help
+        Thread deepsleep wakeup time (second)
+
+config APP_THREAD_SHORT_DEEPSLEEP_WAKEUP_TIME
+    depends on APP_DEVICE_TYPE_MTD
+    int "Thread short deepsleep wakeup time (second)"
+    range 1 65535
+    default 5
+    help
+        Thread deepsleep wakeup time (second)
+
+config APP_THREAD_UDP_LISTEN_PORT
+    int "Application udp listen port"
+    range 0 65535
+    default 10010
+
+config APP_THREAD_CHANNEL_SCAN_NUMBER
+    int "Thread scan channel number"
+    range 5 20
+    default 5
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL01
+    int "Thread scan 1st channel"
+    range 1 20
+    default 20
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL02
+    int "Thread scan 2nd channel"
+    range 1 20
+    default 11
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL03
+    int "Thread scan 3rd channel"
+    range 1 20
+    default 3
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL04
+    int "Thread scan 4th channel"
+    range 1 20
+    default 16
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL05
+    int "Thread scan 5th channel"
+    range 1 20
+    default 5
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL06
+    int "Thread scan 6th channel"
+    range 1 20
+    default 12
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL07
+    int "Thread scan 7th channel"
+    range 1 20
+    default 7
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL08
+    int "Thread scan 8th channel"
+    range 1 20
+    default 11
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL09
+    int "Thread scan 9th channel"
+    range 1 20
+    default 19
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL10
+    int "Thread scan 10th channel"
+    range 1 20
+    default 10
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL11
+    int "Thread scan 11th channel"
+    range 1 20
+    default 8
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL12
+    int "Thread scan 12th channel"
+    range 1 20
+    default 6
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL13
+    int "Thread scan 13th channel"
+    range 1 20
+    default 13
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL14
+    int "Thread scan 14th channel"
+    range 1 20
+    default 2
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL15
+    int "Thread scan 15th channel"
+    range 1 20
+    default 15
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL16
+    int "Thread scan 16th channel"
+    range 1 20
+    default 4
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL17
+    int "Thread scan 17th channel"
+    range 1 20
+    default 17
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL18
+    int "Thread scan 18th channel"
+    range 1 20
+    default 18
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL19
+    int "Thread scan 19th channel"
+    range 1 20
+    default 9
+
+config APP_THREAD_CHANNEL_SCAN_CHANNEL20
+    int "Thread scan 20th channel"
+    range 1 20
+    default 1
+
+endmenu
+
+config APP_IDLE_SLEEP
+    depends on APP_DEVICE_TYPE_MTD
+    select HOSAL_SOC_IDLE_SLEEP
+    bool "Idle sleep"
+    default n
+    help
+        Idle sleep.
+
+config APP_TASK_STACK_SIZE
+    int "Application task stack size"
+	range 256 4096
+    default 2048
+
+config APP_TASK_PRIORITY
+    int "Application task priority"
+    range 10 30
+    default 15
+endmenu
+
+

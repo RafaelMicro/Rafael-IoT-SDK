@@ -39,7 +39,7 @@ See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 #define configMINIMAL_STACK_SIZE                                               \
     ((unsigned short)256) /* SIZE-1-1-12-16-30-34>=4 */
 #define configTOTAL_HEAP_SIZE                   ((size_t)20 * 1024)
-#define configMAX_TASK_NAME_LEN                 (16)
+#define configMAX_TASK_NAME_LEN                 (24)
 #define configUSE_TRACE_FACILITY                1
 #define configUSE_STATS_FORMATTING_FUNCTIONS    1
 #define configUSE_16_BIT_TICKS                  0
@@ -136,7 +136,7 @@ standard names. */
 
 #if (CONFIG_BUILD_COMPONENT_MESH_IT_UP == 1)
 #ifndef CONFIG_MIU_OPENTHREAD_TASK_PRIORITY
-#define CONFIG_MIU_OPENTHREAD_TASK_PRIORITY (E_TASK_PRIORITY_IDLE + 1)
+#define CONFIG_MIU_OPENTHREAD_TASK_PRIORITY (configMAX_PRIORITIES - 5)
 #endif /* CONFIG_MIU_OPENTHREAD_TASK_PRIORITY */
 #endif /* CONFIG_BUILD_COMPONENT_MESH_IT_UP */
 

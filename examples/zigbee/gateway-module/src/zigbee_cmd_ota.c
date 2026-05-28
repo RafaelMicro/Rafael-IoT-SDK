@@ -99,6 +99,7 @@ ota_upgrade_test_file_t ota_file =
         },
         56,                    // Total Image size (including header)
     },
+    NULL,
 };
 zb_ret_t next_data_ind_cb(zb_uint8_t index, zb_zcl_parsed_hdr_t *zcl_hdr, zb_uint32_t offset,
     zb_uint8_t size, zb_uint8_t **data)

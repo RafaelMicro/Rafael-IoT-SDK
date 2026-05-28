@@ -376,7 +376,6 @@ static SRes Decode(uint32_t OutAddress, uint32_t InAddress) {
     unsigned char header[LZMA_PROPS_SIZE + 8];
 
     /* Read and parse header */
-
     DEBUG_PRINT("\r\n\r\n\r\n[FOTA] Decode\r\n");
 
     unpackSize = 0;
@@ -398,6 +397,48 @@ static SRes Decode(uint32_t OutAddress, uint32_t InAddress) {
     res = Decode2(&state, OutAddress, (InAddress + sizeof(header)), unpackSize);
     LzmaDec_Free(&state, &g_Alloc);
     return res;
+}
+
+static SRes check_decode_unpack_size(uint32_t InAddress) {
+    uint32_t unpackSize;
+    uint32_t local_flash_model;
+    uint32_t local_app_max_size;
+    int i;
+    SRes res;
+    CLzmaDec state;
+
+    /* header: 5 bytes of LZMA properties and 8 bytes of uncompressed size */
+    unsigned char header[LZMA_PROPS_SIZE + 8];
+
+    DEBUG_PRINT("[FOTA] Decode unpack size check\r\n");
+
+    for (i = 0; i < (int)sizeof(header); i++) {
+        header[i] = flash_read_byte(InAddress + i);
+    }
+
+    DEBUG_PRINT("[FOTA] LZMA props byte = 0x%02x, dicSize = 0x%08x\r\n",
+                header[0],
+                (uint32_t)(header[1]) | ((uint32_t)(header[2]) << 8) |
+                ((uint32_t)(header[3]) << 16) | ((uint32_t)(header[4]) << 24));
+
+    unpackSize = 0;
+    for (i = 0; i < 8; i++) {
+        unpackSize += (uint32_t)header[LZMA_PROPS_SIZE + i] << (i * 8);
+    }
+
+    DEBUG_PRINT("[FOTA] unpackSize = 0x%08x\r\n", unpackSize);
+
+    if (unpackSize == 0) {
+        DEBUG_PRINT("[FOTA] Error: unpackSize is 0, invalid image.\r\n");
+        return SZ_ERROR_DATA;
+    }
+
+    if (unpackSize == 0xFFFFFFFFUL) {
+        DEBUG_PRINT("[FOTA] Error: unpackSize is 0xFFFFFFFF, not supported.\r\n");
+        return SZ_ERROR_DATA;
+    }
+
+    return SZ_OK;
 }
 
 uint8_t checksum(uint8_t* buf) {
@@ -488,6 +529,7 @@ int main(void) {
     bootloader_uart_init();
     bootloader_run_loop();
     // memset((void *)&_heap_start, 0, (void*)&_heap_size);
+    
 
 #if 1
     do
@@ -671,8 +713,11 @@ int main(void) {
                 {
                     DEBUG_PRINT("[FOTA] FOTA_IMAGE_INFO_COMPRESSED.\r\n");
                     DEBUG_PRINT("[FOTA] %.8x\r\n",FOTA_UPDATE_BUFFER_FW_ADDRESS);
-                    set_flash_erase(APP_START_ADDRESS, (FOTA_UPDATE_BUFFER_FW_ADDRESS - APP_START_ADDRESS));
-                    res = Decode(p_fota_info->target_startaddr, p_fota_info->fotabank_startaddr);
+                    res = check_decode_unpack_size(p_fota_info->fotabank_startaddr);
+                    if( res == SZ_OK ) {
+                        set_flash_erase(APP_START_ADDRESS, (FOTA_UPDATE_BUFFER_FW_ADDRESS - APP_START_ADDRESS));
+                        res = Decode(p_fota_info->target_startaddr, p_fota_info->fotabank_startaddr);
+                    }
                 }
                 else
                 {

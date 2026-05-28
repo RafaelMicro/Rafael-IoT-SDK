@@ -18,6 +18,10 @@
 #ifndef __ZIGBEE_API_H
 #define __ZIGBEE_API_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <zigbee_platform.h>
 #include "fota_define.h"
@@ -34,11 +38,11 @@
 #define GROUP_TABLE_SIZE 16
 
 #define ZIGBEE_APP_NOTIFY_ISR(ebit)                                            \
-    (g_zb_app_evt_var |= ebit);                                                \
+    (g_zb_app_evt_var = (zb_app_event_t)(g_zb_app_evt_var | (ebit)));         \
     zb_app_signal()
 #define ZIGBEE_APP_NOTIFY(ebit)                                                \
     vPortEnterCritical();                                                      \
-    g_zb_app_evt_var |= ebit;                                                  \
+    g_zb_app_evt_var = (zb_app_event_t)(g_zb_app_evt_var | (ebit));           \
     vPortExitCritical();                                                       \
     zb_app_signal()
 #define ZIGBEE_APP_GET_NOTIFY(ebit)                                            \
@@ -90,7 +94,7 @@ void zigbee_app_nwk_start(uint32_t channel_mask, uint32_t max_child, uint32_t re
 void zigbee_start_identify(void);
 void zigbee_zcl_set_attrubute(uint8_t ep, uint16_t cluster, uint8_t role, uint16_t attr_id, uint8_t* val);
 
-zb_app_event_t g_zb_app_evt_var;
+extern zb_app_event_t g_zb_app_evt_var;
 extern uint8_t reset_to_default;
 extern scene_db_t scene_table_db;
 extern startup_entry_t startup_db;
@@ -124,4 +128,7 @@ void z_set_OTA_status(uint8_t ver);
 void z_set_OTA_downloaded_file_version(uint32_t ver);
 void z_set_OTA_downloaded_file_offset(uint32_t ver);
 
+#ifdef __cplusplus
+}
+#endif
 #endif // __ZIGBEE_API_H

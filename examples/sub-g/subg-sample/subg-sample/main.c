@@ -20,20 +20,26 @@
 #include "lmac15p4.h"
 #include "log.h"
 #include "mac_frame_gen.h"
+#include "dump_boot_info.h"
 
 /*subg use*/
-#include "subg_ctrl.h"
 #include "app_hooks.h"
+#include "subg_ctrl.h"
 #include "uart_stdio.h"
 
 #define GPIO_LED_0 20
 #define GPIO_LED_1 21
 #define GPIO_LED_2 22
 
-#define BUTTON_EVENT_0    0
-#define BUTTON_EVENT_1    1
-#define BUTTON_EVENT_2    2
-#define BUTTON_EVENT_3    3
+#define BUTTON_EVENT_0 0
+#define BUTTON_EVENT_1 1
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+#define BUTTON_EVENT_2 2
+#define BUTTON_EVENT_3 3
+#else
+#define BUTTON_EVENT_2 5
+#define BUTTON_EVENT_3 6
+#endif
 #define BUTTON_EVENT_4    4
 #define BUTTON_EVENT_NONE 0xFF
 
@@ -151,7 +157,7 @@ static subg_transfer_mode_t transfer_mode_get() {
     2. SUBG_TRANSFER_RX_MODE: Tester receives and verify packets
     */
     subg_transfer_mode_t transfer_mode;
-    uint32_t pin_value; 
+    uint32_t pin_value;
 
     hosal_gpio_pin_get(15, &pin_value);
     if (pin_value == 0) {
@@ -172,8 +178,8 @@ void led_on(uint32_t led) { hosal_gpio_pin_write(led, 0); }
 void led_off(uint32_t led) { hosal_gpio_pin_write(led, 1); }
 
 void gpio_frequency_chek() {
-    uint32_t pin31_value, pin30_value, pin29_value, pin28_value, 
-             pin23_value, pin14_value, pin9_value;
+    uint32_t pin31_value, pin30_value, pin29_value, pin28_value, pin23_value,
+        pin14_value, pin9_value;
 
     hosal_gpio_pin_get(31, &pin31_value);
     hosal_gpio_pin_get(30, &pin30_value);
@@ -215,23 +221,40 @@ void subg_cfg_set(subg_ctrl_modulation_t mode, uint8_t data_rate) {
     modem_type = mode;
     subg_ctrl_idle_set();
     if (mode == SUBG_CTRL_MODU_FSK) {
-        lmac15p4_init(LMAC15P4_SUBG_FSK, HOSAL_RF_BAND_SUBG_915M);
-
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+        if (data_rate <= SUBG_CTRL_DATA_RATE_1M) {
+            lmac15p4_init(LMAC15P4_SUBG_BLE, HOSAL_RF_BAND_SUBG_915M);
+        } else
+#endif
+        {
+            lmac15p4_init(LMAC15P4_SUBG_FSK, HOSAL_RF_BAND_SUBG_915M);
+        }
         lmac15p4_callback_t mac_cb;
         mac_cb.rx_cb = subg_mac_rx_done;
         mac_cb.tx_cb = subg_mac_tx_done;
         lmac15p4_cb_set(0, &mac_cb);
+        gpio_frequency_chek();
 
-        subg_ctrl_modem_config_set(mode, data_rate, SUBG_CTRL_FSK_MOD_1);
-
-        subg_ctrl_mac_set(mode, SUBG_CTRL_CRC_TYPE_16,
-                          SUBG_CTRL_WHITEN_DISABLE);
-
-        subg_ctrl_preamble_set(mode, 8);
-
-        subg_ctrl_sfd_set(mode, 0x00007209);
-
-        subg_ctrl_filter_set(mode, SUBG_CTRL_FILTER_TYPE_FSK);
+        if (data_rate <= SUBG_CTRL_DATA_RATE_1M) {
+            subg_ctrl_modem_config_set(mode, data_rate, SUBG_CTRL_FSK_MOD_0P5);
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+            subg_ctrl_ble_mac_set(0x71764129, SUBG_CTRL_WHITEN_ENABLE);
+#else
+            subg_ctrl_sfd_set(mode, 0x71764129);
+#endif
+        } else {
+            subg_ctrl_modem_config_set(mode, data_rate, SUBG_CTRL_FSK_MOD_1);
+            subg_ctrl_sfd_set(mode, 0x00007209);
+        }
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+        if (data_rate > SUBG_CTRL_DATA_RATE_1M)
+#endif
+        {
+            subg_ctrl_filter_set(mode, SUBG_CTRL_FILTER_TYPE_FSK);
+            subg_ctrl_mac_set(mode, SUBG_CTRL_CRC_TYPE_16,
+                              SUBG_CTRL_WHITEN_ENABLE);
+            subg_ctrl_preamble_set(mode, 8);
+        }
     } else {
         lmac15p4_init(LMAC15P4_SUBG_OQPSK, HOSAL_RF_BAND_SUBG_915M);
 
@@ -239,11 +262,11 @@ void subg_cfg_set(subg_ctrl_modulation_t mode, uint8_t data_rate) {
         mac_cb.rx_cb = subg_mac_rx_done;
         mac_cb.tx_cb = subg_mac_tx_done;
         lmac15p4_cb_set(0, &mac_cb);
+        gpio_frequency_chek();
 
-        subg_ctrl_modem_config_set(mode, data_rate, SUBG_CTRL_FSK_MOD_1);
+        subg_ctrl_modem_config_set(mode, data_rate, SUBG_CTRL_FSK_MOD_UNDEF);
 
-        subg_ctrl_mac_set(mode, SUBG_CTRL_CRC_TYPE_16,
-                          SUBG_CTRL_WHITEN_DISABLE);
+        subg_ctrl_mac_set(mode, SUBG_CTRL_CRC_TYPE_16, SUBG_CTRL_WHITEN_ENABLE);
     }
     /* PHY PIB Parameters */
     lmac15p4_phy_pib_set(SUBG_PHY_TURNAROUND_TIMER, SUBG_PHY_CCA_DETECT_MODE,
@@ -277,7 +300,6 @@ void subg_cfg_set(subg_ctrl_modulation_t mode, uint8_t data_rate) {
     lmac15p4_auto_state_set(true);
 
     lmac15p4_src_match_ctrl(0, true);
-    gpio_frequency_chek();
 }
 
 void fsk_data_gen(uint8_t* pbuf, uint16_t len) {
@@ -343,6 +365,8 @@ static void button_cb(uint32_t pin, void* isr_param) {
         case 2:
         case 3:
         case 4:
+        case 5:
+        case 6:
             t_app_q.event = APP_BUTTON_EVT;
             t_app_q.data = pin;
 
@@ -360,7 +384,7 @@ static void app_button_process(uint32_t pin) {
     led_off(GPIO_LED_1);
     led_off(GPIO_LED_2);
     switch (pin) {
-        case 0:
+        case BUTTON_EVENT_0:
             if (keyevent == BUTTON_EVENT_NONE) {
                 /*first press */
                 keyevent = BUTTON_EVENT_0;
@@ -400,7 +424,7 @@ static void app_button_process(uint32_t pin) {
                 keyevent = BUTTON_EVENT_NONE;
             }
             break;
-        case 1:
+        case BUTTON_EVENT_1:
             if (keyevent == BUTTON_EVENT_NONE) {
                 /*first press */
                 keyevent = BUTTON_EVENT_1;
@@ -441,31 +465,31 @@ static void app_button_process(uint32_t pin) {
                 keyevent = BUTTON_EVENT_NONE;
             }
             break;
-        case 2:
+        case BUTTON_EVENT_2:
             if (keyevent == BUTTON_EVENT_NONE) {
                 /*first press */
                 keyevent = BUTTON_EVENT_2;
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     /*close tx timer*/
                     xTimerStop(tx_timer, 0);
-                    printf("Tx: SUBG_CTRL_DATA_RATE_100K\r\n");
+                    printf("Tx: SUBG_CTRL_DATA_RATE_1M\r\n");
                 } else {
                     /*close rx timer*/
                     xTimerStop(rx_timer, 0);
                     /* Disable RX*/
                     test_auto_state_set(false);
-                    printf("Rx: SUBG_CTRL_DATA_RATE_100K\r\n");
+                    printf("Rx: SUBG_CTRL_DATA_RATE_1M\r\n");
                 }
             } else if (keyevent == BUTTON_EVENT_2) {
                 /*second press*/
-                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_100K);
+                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_1M);
                 keyevent = BUTTON_EVENT_NONE;
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     g_tx_no_ack_cnt = 0;
                     g_tx_total_count = 0;
                     xTimerStart(tx_timer, 0);
                     printf(
-                        "Tx: SUBG_CTRL_DATA_RATE_100K, Transmission Start\r\n");
+                        "Tx: SUBG_CTRL_DATA_RATE_1M, Transmission Start\r\n");
                 } else {
                     g_crc_success_count = 0;
                     g_rx_total_count = 0;
@@ -473,7 +497,7 @@ static void app_button_process(uint32_t pin) {
                     /* Enable RX*/
                     test_auto_state_set(true);
                     xTimerStart(rx_timer, 0);
-                    printf("Rx: SUBG_CTRL_DATA_RATE_100K, Receiving start\r\n");
+                    printf("Rx: SUBG_CTRL_DATA_RATE_1M, Receiving start\r\n");
                 }
             } else {
                 xTimerStop(tx_timer, 0);
@@ -481,31 +505,31 @@ static void app_button_process(uint32_t pin) {
                 keyevent = BUTTON_EVENT_NONE;
             }
             break;
-        case 3:
+        case BUTTON_EVENT_3:
             if (keyevent == BUTTON_EVENT_NONE) {
                 /*first press */
                 keyevent = BUTTON_EVENT_3;
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     /*close tx timer*/
                     xTimerStop(tx_timer, 0);
-                    printf("Tx: SUBG_CTRL_DATA_RATE_200K\r\n");
+                    printf("Tx: SUBG_CTRL_DATA_RATE_2M\r\n");
                 } else {
                     /*close rx timer*/
                     xTimerStop(rx_timer, 0);
                     /* Disable RX*/
                     test_auto_state_set(false);
-                    printf("Rx: SUBG_CTRL_DATA_RATE_200K\r\n");
+                    printf("Rx: SUBG_CTRL_DATA_RATE_2M\r\n");
                 }
             } else if (keyevent == BUTTON_EVENT_3) {
                 /*second press*/
-                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_200K);
+                subg_cfg_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_2M);
                 keyevent = BUTTON_EVENT_NONE;
                 if (transfer_mode_get() == SUBG_TRANSFER_TX_MODE) {
                     g_tx_no_ack_cnt = 0;
                     g_tx_total_count = 0;
                     xTimerStart(tx_timer, 0);
                     printf(
-                        "Tx: SUBG_CTRL_DATA_RATE_200K, Transmission Start\r\n");
+                        "Tx: SUBG_CTRL_DATA_RATE_2M, Transmission Start\r\n");
                 } else {
                     g_crc_success_count = 0;
                     g_rx_total_count = 0;
@@ -513,7 +537,7 @@ static void app_button_process(uint32_t pin) {
                     /* Enable RX*/
                     test_auto_state_set(true);
                     xTimerStart(rx_timer, 0);
-                    printf("Rx: SUBG_CTRL_DATA_RATE_200K, Receiving start\r\n");
+                    printf("Rx: SUBG_CTRL_DATA_RATE_2M, Receiving start\r\n");
                 }
             } else {
                 xTimerStop(tx_timer, 0);
@@ -521,7 +545,7 @@ static void app_button_process(uint32_t pin) {
                 keyevent = BUTTON_EVENT_NONE;
             }
             break;
-        case 4:
+        case BUTTON_EVENT_4:
             if (keyevent == BUTTON_EVENT_NONE) {
                 /*first press */
                 keyevent = BUTTON_EVENT_4;
@@ -675,7 +699,7 @@ void button_init(void) {
     hosal_gpio_set_debounce_time(DEBOUNCE_SLOWCLOCKS_1024);
     NVIC_SetPriority(Gpio_IRQn, 7);
     NVIC_EnableIRQ(Gpio_IRQn);
-    for (i = 0; i < 5; i++) {
+    for (i = 0; i < 7; i++) {
         hosal_gpio_debounce_enable(i);
         hosal_pin_set_pullopt(i, HOSAL_PULL_UP_100K);
         hosal_gpio_cfg_input(i, pin_cfg);
@@ -832,20 +856,19 @@ void subg_config_init() {
 #endif
 }
 
-static void app_main_entry(void* pvParameters)
-{
+static void app_main_entry(void* pvParameters) {
     /* initil SubG*/
     subg_config_init();
     app_main_task();
 
-    while (1) {
-    }
+    while (1) {}
 }
 
 int main(void) {
     pin_init();
     uart_stdio_init();
     vHeapRegionsInt();
+
     /* led init */
     hosal_gpio_cfg_output(GPIO_LED_0);
     hosal_gpio_cfg_output(GPIO_LED_1);
@@ -863,6 +886,9 @@ int main(void) {
     /* initil Button*/
     button_init();
 
+    /*boot information dump*/
+    _dump_boot_info();
+
     /* event queue*/
     app_msg_q = xQueueCreate(5, sizeof(app_queue_t));
 
@@ -876,12 +902,13 @@ int main(void) {
 
     printf("GPIO    : Frequency (MHz) : 903Mhz(31), 907Mhz(30), 911Mhz(29),  "
            "915Mhz(28), 919Mhz(23), 923Mhz(14), 927Mhz(9)\r\n");
-    printf("Buttion : Data Rate (Kbps) : 6.25Kpbs(0), 50Kpbs(1), 100Kpbs(2), "
-           "200Kpbs(3), 300Kpbs(4)\r\n");
+    printf("Buttion : Data Rate (Kbps) : 6.25Kpbs(0), 50Kpbs(1), 1Mpbs(2), "
+           "2Mpbs(3), 300Kpbs(4)\r\n");
     printf("GPIO 15 : Tx Mode(1), Rx Mode(0) \r\n");
 
-    if (xTaskCreate(app_main_entry, (char*)"main",
-                    256, NULL, E_TASK_PRIORITY_APP, NULL) != pdPASS) {
+    if (xTaskCreate(app_main_entry, (char*)"main", 256, NULL,
+                    E_TASK_PRIORITY_APP, NULL)
+        != pdPASS) {
         printf("Task create fail....\r\n");
     }
 

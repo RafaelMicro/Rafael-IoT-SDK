@@ -18,6 +18,10 @@
 #ifndef __ZIGBEE_GW_H
 #define __ZIGBEE_GW_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "stdint.h"
 
 #define GW_CMD_APP_CMD_RSP_GEN(id) (id | 0x8000)
@@ -143,4 +147,7 @@ void zigbee_gw_cmd_act(uint32_t cmd_id, uint16_t addr, uint8_t addr_mode,
 // void _zcl_report_attribute_cb(uint16_t cluster_id, uint16_t addr, uint8_t src_endp, uint8_t *pd, uint8_t pd_len);
 // void _zcl_zone_status_change_notificatin_cb(uint16_t cluster_id, uint16_t addr, uint8_t src_endp, uint8_t *pd, uint8_t pd_len);
 
+#ifdef __cplusplus
+}
+#endif
 #endif // __ZIGBEE_GW_H

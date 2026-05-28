@@ -15,9 +15,8 @@ endif()
 # ========================================
 add_definitions(
     -DCONFIG_APP_TASK_UDP_LISTEN_PORT=5678
-    -DCONFIG_APP_TASK_CONTROL_CMD_ENABLE=1
-    -DCONFIG_APP_TASK_CENTRAL_ENABLE=1
     -DCONFIG_APP_TASK_OTA_ENABLE=1
+    -DCONFIG_TEST_TOOL_USE=0
 )
 
 if (CONFIG_BUILD_COMPONENT_ENHANCED_FLASH_DATASET)
@@ -54,9 +53,8 @@ target_sources(app PRIVATE
     ${MIU_COMMON_DIR}/src/app_ota.c
     ${MIU_COMMON_DIR}/src/app_mac_raw.c
     ${MIU_COMMON_DIR}/src/cli_uart.cpp
-    ${MIU_COMMON_DIR}/src/app_control_cmd.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/app_net_mgm.c
     ${CMAKE_CURRENT_LIST_DIR}/src/app_task.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/app_cli_cmd.c
     ${CMAKE_CURRENT_LIST_DIR}/src/ota_download_cmd_handler.c
 )
 
@@ -74,3 +72,8 @@ setup_project(miu-ftd)
 # 7. Link Static Library (miu_port_lib.a)
 # ========================================
 target_link_libraries(app miu_port_lib)
+
+# ========================================
+# 8. Set System Clock
+# ========================================
+sdk_add_compile_options(-DSET_SYS_CLK=2) #0=32Mhz, 1=48Mhz, 2=64Mhz

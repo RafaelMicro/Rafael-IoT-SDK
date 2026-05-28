@@ -485,7 +485,7 @@ static void _zcl_scene_process(uint16_t cmd, uint16_t datalen, uint8_t *pdata, u
         {
             group_id = pdata[0] | (pdata[1] << 8);
             scene_id = pdata[2];
-            uint8_t status, cmdLen;
+            uint8_t cmdLen;
             int valid_scene_idx;
 
 
@@ -823,7 +823,7 @@ static void _zcl_scene_process(uint16_t cmd, uint16_t datalen, uint8_t *pdata, u
         {
             group_id = pdata[0] | (pdata[1] << 8);
             int cur_idx;
-            uint8_t status, cmdLen, cap, scene_cnt;
+            uint8_t cmdLen, cap, scene_cnt;
             uint8_t scene_list[16];
 
 
@@ -1000,7 +1000,7 @@ static void _zcl_scene_process(uint16_t cmd, uint16_t datalen, uint8_t *pdata, u
             group_id = pdata[0] | (pdata[1] << 8);
             scene_id = pdata[2];
             uint16_t scene_trans_time_100ms;
-            uint8_t status, cmdLen;
+            uint8_t cmdLen;
             int valid_scene_idx;
             valid_scene_idx = get_scene_table_idx(group_id, scene_id);
 
@@ -1201,12 +1201,11 @@ static void _zcl_onoff_process(uint16_t cmd, uint16_t datalen, uint8_t *pdata)
 {
     do
     {
-        uint8_t onoff, current_lv;
+        uint8_t onoff, current_lv = get_current_level();
         if (cmd == ZB_ZCL_CMD_ON_OFF_OFF_ID ||
                 cmd == ZB_ZCL_CMD_ON_OFF_ON_ID  ||
                 cmd == ZB_ZCL_CMD_ON_OFF_TOGGLE_ID )
         {
-            current_lv = get_current_level();
             if(cmd == ZB_ZCL_CMD_ON_OFF_OFF_ID) {
                 onoff = 0;
             }

@@ -23,7 +23,8 @@
 #include "miu_ext_mem.h"
 #include "task.h"
 #include "uart_stdio.h"
-#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
+#if defined(CONFIG_RF1301) || defined(CONFIG_RT584H)                           \
+    || defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
 #include "hosal_dpd.h"
 #endif
 
@@ -62,27 +63,11 @@ void vApplicationMallocFailedHook(void) {
     extMemory();
 
     taskDISABLE_INTERRUPTS();
+    NVIC_DisableIRQ(Wdt_IRQn);
     while (1) {}
 }
 
-void wdt_cb(void) {
-    /* show when lock enable, can not change wdt setting*/
-    hosal_wdt_config_mode_t cfg;
-    hosal_wdt_config_tick_t tick;
-
-    cfg.int_enable = 1;
-    cfg.lock_enable = 0;
-    cfg.prescale = HOSAL_WDT_PRESCALE_32;
-    cfg.reset_enable = 0;
-
-    tick.wdt_ticks = 0xFFFFFFFF;
-    tick.wdt_min_ticks = 0;
-    tick.int_ticks = 0xFFFFFFFF - 4000000;
-
-    hosal_wdt_start(cfg, tick, wdt_cb);
-
-    hosal_wdt_kick();
-}
+void wdt_cb(void) { hosal_wdt_kick(); }
 
 void init_wdt_init(void) {
     hosal_wdt_config_mode_t cfg;
@@ -91,11 +76,11 @@ void init_wdt_init(void) {
     cfg.int_enable = 1;
     cfg.lock_enable = 0;
     cfg.prescale = HOSAL_WDT_PRESCALE_32;
-    cfg.reset_enable = 0;
+    cfg.reset_enable = 1;
 
-    tick.wdt_ticks = 0xFFFFFFFF;
+    tick.wdt_ticks = 6000 * 1000;
     tick.wdt_min_ticks = 0;
-    tick.int_ticks = 0xFFFFFFFF - 1000000;
+    tick.int_ticks = 2 * 1000 * 1000; // ≈2s
 
     hosal_wdt_start(cfg, tick, wdt_cb);
     NVIC_EnableIRQ(Wdt_IRQn);
@@ -108,9 +93,6 @@ static void app_task_entry(void* pvParameters) {
     /*falsh Protection Mechanism*/
     enhanced_flash_dataset_init();
 
-    /*sdk cli init*/
-    cli_init();
-
     // common init (ex. RF, PIB)
     app_common_init();
 
@@ -120,7 +102,7 @@ static void app_task_entry(void* pvParameters) {
     vTaskDelete(NULL);
 }
 
-int main(void) {
+int main(void) {    
     /*gpio init*/
     pin_mux_init();
 

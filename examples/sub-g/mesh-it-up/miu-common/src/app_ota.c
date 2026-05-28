@@ -8,9 +8,11 @@
 #include <openthread/platform/misc.h>
 #include <openthread/random_noncrypto.h>
 #include <openthread/thread_ftd.h>
+#include "uart.h"
 
 #include "FreeRTOS.h"
 #include "app_ota.h"
+#include "app_uart.h"
 #include "cli.h"
 #include "fota_define.h"
 #include "hosal_flash.h"
@@ -32,6 +34,9 @@ unsigned int ota_debug_flags = 0;
         if (ota_debug_flags > 0)                                               \
             log_info(args);                                                    \
     } while (0);
+
+#define IS_VALID_PTR(ptr) \
+    ((ptr) != NULL && (ptr) != (void*)0xFFFFFFFF && (((uint32_t)(ptr) & 0x3) == 0))
 
 static void ota_response_table_handler(uint16_t* req_table);
 static void ota_change_state_and_timer(uint8_t state, uint32_t timeout);
@@ -75,24 +80,39 @@ static bool need_reboot = true;
 static uint8_t g_ota_response_k = 2;
 static uint8_t g_ota_response_c = 0;
 static uint16_t g_resp_table[OTA_RESPONSE_TABLE_SIZE];
-#if CONFIG_MIU_DEVICE_TYPE_FTD
-static ota_state_table_t* g_status_table = NULL;
-#endif
 ota_status_report_t g_ota_status_report;
 
-uint32_t crc32checksum(uint32_t flash_addr, uint32_t data_len) {
-    uint16_t k;
-    uint32_t i;
-    uint8_t* buf = ((uint8_t*)flash_addr);
-    uint32_t chkSum = ~0, len = data_len;
-    enter_critical_section();
-    for (i = 0; i < len; i++) {
-        chkSum ^= *buf++;
-        for (k = 0; k < 8; k++) {
-            chkSum = chkSum & 1 ? (chkSum >> 1) ^ 0xedb88320 : chkSum >> 1;
+uint32_t crc32checksum(uint32_t flash_offset, uint32_t data_len) {
+    uint32_t chkSum = ~0;
+    uint8_t page_buf[256] __attribute__((aligned(4)));
+    uint32_t processed_len = 0;
+
+    while (processed_len < data_len) {
+        /* flash_read_page reads 256 bytes from the 256-byte-aligned page
+         * containing the given address. Compute the page base and the byte
+         * offset within that page so we read from the correct position. */
+        uint32_t cur_addr = flash_offset + processed_len;
+        uint32_t page_base = cur_addr & ~0xFFu;
+        uint32_t page_off = cur_addr - page_base;
+        uint32_t available = 256u - page_off;
+        uint32_t read_len = ((data_len - processed_len) > available)
+                                ? available
+                                : (data_len - processed_len);
+
+        if (hosal_flash_read(HOSAL_FLASH_READ_PAGE, page_base, page_buf) != 0) {
+            return 0;
         }
+
+        for (uint32_t i = 0; i < read_len; i++) {
+            chkSum ^= page_buf[page_off + i];
+            for (uint16_t k = 0; k < 8; k++) {
+                chkSum = (chkSum & 1) ? (chkSum >> 1) ^ 0xedb88320
+                                      : (chkSum >> 1);
+            }
+        }
+        processed_len += read_len;
     }
-    leave_critical_section();
+
     return ~chkSum;
 }
 
@@ -109,13 +129,17 @@ uint32_t* ota_bitmap_init(uint32_t lens) {
     bitmap_size *= sizeof(uint32_t);
 
     bitmap = xMalloc(bitmap_size);
+    if (!bitmap) {
+        log_error("[FOTA] bitmap xMalloc failed, size=%u", bitmap_size);
+        return NULL;
+    }
     memset(bitmap, 0x0, bitmap_size);
     return bitmap;
 }
 
 void ota_bitmap_set(uint32_t* bitmap, uint32_t index) {
-    if (NULL == bitmap) {
-        ota_printf("ota_bitmap_set bitmap null ");
+    if (!IS_VALID_PTR(bitmap)) {
+        log_error("[FOTA] Invalid bitmap pointer in set: %p", bitmap);
         return;
     }
     enter_critical_section();
@@ -128,14 +152,19 @@ void ota_bitmap_set(uint32_t* bitmap, uint32_t index) {
 }
 
 void ota_bitmap_delete(uint32_t* bitmap) {
-    if (bitmap) {
-        xFree(bitmap);
+    if (bitmap == NULL) {
+        return;
     }
+    if (!IS_VALID_PTR(bitmap)) {
+        log_error("[FOTA] Invalid bitmap pointer in delete: %p", bitmap);
+        return; 
+    }
+    xFree(bitmap);
 }
 
 uint32_t ota_bitmap_get_bit(uint32_t* bitmap, uint32_t index) {
-    if (NULL == bitmap) {
-        ota_printf("bitmap get fail ");
+    if (!IS_VALID_PTR(bitmap)) {
+        log_error("[FOTA] Invalid bitmap pointer in get_bit: %p", bitmap);
         ota_change_state_and_timer(OTA_IDLE, 0);
         return 0;
     }
@@ -146,8 +175,8 @@ uint32_t ota_bitmap_get_bit(uint32_t* bitmap, uint32_t index) {
 }
 
 uint32_t ota_bitmap_get_remain(uint32_t* bitmap, uint32_t lens) {
-    if (NULL == bitmap) {
-        ota_printf("bitmap get fail ");
+    if (!IS_VALID_PTR(bitmap)) {
+        log_error("[FOTA] Invalid bitmap pointer in get_remain: %p", bitmap);
         ota_change_state_and_timer(OTA_IDLE, 0);
         return 0;
     }
@@ -171,11 +200,15 @@ uint32_t ota_bitmap_get_remain(uint32_t* bitmap, uint32_t lens) {
             }
         }
     }
-
     return remain;
 }
 
 void ota_bitmap_print(uint32_t* bitmap, uint32_t lens) {
+    if (!IS_VALID_PTR(bitmap)) {
+        log_error("[FOTA] Invalid bitmap pointer in print: %p", bitmap);
+        return;
+    }
+
     uint32_t tmp_lens = lens >> 5, i = 0;
     if (lens % 32) {
         ++tmp_lens;
@@ -188,10 +221,8 @@ void ota_bitmap_print(uint32_t* bitmap, uint32_t lens) {
 }
 
 static void ota_change_state_and_timer(uint8_t state, uint32_t timeout) {
-    if (state == OTA_IDLE && timeout == 0) {
-        if (ota_timer != NULL && xTimerIsTimerActive(ota_timer)) {
-            xTimerStop(ota_timer, 0);
-        }
+    xTimerStop(ota_timer, 0);
+    if (state == OTA_IDLE) {
         ota_bitmap_delete(g_ota_bitmap);
         g_ota_bitmap = NULL;
         g_ota_segments_size = 0;
@@ -203,14 +234,11 @@ static void ota_change_state_and_timer(uint8_t state, uint32_t timeout) {
         g_ota_request_last_remain = 0;
         g_ota_last_index = 0;
         have_data_ack = false;
-    } else {
-        if (timeout > 0) {
-            xTimerChangePeriod(ota_timer, pdMS_TO_TICKS(timeout), 0);
-            if (!xTimerIsTimerActive(ota_timer)) {
-                xTimerStart(ota_timer, 0);
-            }
-        }
     }
+    if (timeout > 0) {
+        xTimerChangePeriod(ota_timer, pdMS_TO_TICKS(timeout), 0);
+    }
+
     if (g_ota_state != state) {
         g_ota_state = state;
         if (ota_state_change_cb_signal) {
@@ -239,14 +267,11 @@ uint8_t ota_reset() {
         ota_set_image_version(0);
         ota_set_image_size(0);
         ota_set_image_crc(0);
-        enter_critical_section();
-        for (int i = 0; i < 0x57; i++) {
+        for (int i = 0; i < OTA_MAX_IMAGE_SECTORS; i++) {
             // Page erase (4096 bytes)
             hosal_flash_erase(HOSAL_FLASH_ERASE_SECTOR,
                               (OTA_FLASH_START + (0x1000 * i)));
         }
-        leave_critical_section();
-
     } else {
         ret = 1;
     }
@@ -259,7 +284,7 @@ const char* OtaStateToString(ota_state_t state) {
         "RequestSending", "Done",        "Reboot",
     };
 
-    return ((state > OTA_REBOOT) && (state < OTA_IDLE))
+    return ((state > OTA_REBOOT) || (state < OTA_IDLE))
                ? "invalid"
                : kOtaStateStrings[state - OTA_IDLE];
 }
@@ -267,36 +292,54 @@ const char* OtaStateToString(ota_state_t state) {
 void ota_bootloader_info_check() {
     uint32_t file_ver, crc32;
     fota_information_t t_bootloader_ota_info = {0};
-    memcpy(&t_bootloader_ota_info, (uint8_t*)FOTA_UPDATE_BANK_INFO_ADDRESS,
-           sizeof(t_bootloader_ota_info));
+    hosal_flash_read_n_bytes(FOTA_UPDATE_BANK_INFO_ADDRESS,
+                             (uint8_t*)&t_bootloader_ota_info,
+                             sizeof(t_bootloader_ota_info));
     file_ver = (uint32_t)t_bootloader_ota_info.reserved[0];
 
     do {
         if (t_bootloader_ota_info.fotabank_ready == FOTA_IMAGE_READY) {
             if (t_bootloader_ota_info.fota_result == FOTA_RESULT_SUCCESS) {
                 ota_set_image_version(file_ver);
-                ota_set_image_size(
-                    (t_bootloader_ota_info.fotabank_datalen + 0x20));
+                ota_set_image_size((t_bootloader_ota_info.fotabank_datalen
+                                    + OTA_INFO_HEADER_OFFSET));
                 ota_set_image_crc(t_bootloader_ota_info.fotabank_crc);
-                t_bootloader_ota_info.fotabank_ready = FOTA_IMAGE_READY + 1;
             } else {
-                t_bootloader_ota_info.fotabank_ready = FOTA_IMAGE_READY + 1;
+                log_warn("[FOTA] OTA result: 0x%02X", t_bootloader_ota_info.fota_result);
             }
+            t_bootloader_ota_info.fotabank_ready = FOTA_IMAGE_READY + 1;
+            t_bootloader_ota_info.fotabank_startaddr = 0;
+            t_bootloader_ota_info.fotabank_datalen = 0;
+            t_bootloader_ota_info.fotabank_crc = 0;
         } else {
             if (t_bootloader_ota_info.fotabank_startaddr
-                    == (OTA_FLASH_START + 0x20)
+                    == (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET)
                 && t_bootloader_ota_info.fotabank_datalen
                        <= SIZE_OF_FOTA_BANK_1MB) {
-                crc32 = crc32checksum(t_bootloader_ota_info.fotabank_startaddr,
-                                      t_bootloader_ota_info.fotabank_datalen);
-                if (crc32 == t_bootloader_ota_info.fotabank_crc) {
-                    ota_set_image_version(file_ver);
-                    ota_set_image_size(
-                        (t_bootloader_ota_info.fotabank_datalen + 0x20));
-                    ota_set_image_crc(t_bootloader_ota_info.fotabank_crc);
+                uint32_t first_word = 0xFFFFFFFF;
+                hosal_flash_read_n_bytes(t_bootloader_ota_info.fotabank_startaddr,
+                                         (uint8_t*)&first_word, sizeof(first_word));
+                if (first_word == 0xFFFFFFFF) {
+                    /* OTA buffer was erased (e.g. ISP re-flash) — silent cleanup */
+                    t_bootloader_ota_info.fotabank_startaddr = 0;
+                    t_bootloader_ota_info.fotabank_datalen = 0;
+                    t_bootloader_ota_info.fotabank_crc = 0;
                 } else {
-                    log_error("ota crc fail %04X %04X", crc32,
-                              t_bootloader_ota_info.fotabank_crc);
+                    crc32 = crc32checksum(t_bootloader_ota_info.fotabank_startaddr,
+                                          t_bootloader_ota_info.fotabank_datalen);
+                    if (crc32 == t_bootloader_ota_info.fotabank_crc) {
+                        ota_set_image_version(file_ver);
+                        ota_set_image_size((t_bootloader_ota_info.fotabank_datalen
+                                            + OTA_INFO_HEADER_OFFSET));
+                        ota_set_image_crc(t_bootloader_ota_info.fotabank_crc);
+                    } else {
+                        log_warn("ota crc fail %04X %04X", crc32,
+                                  t_bootloader_ota_info.fotabank_crc);
+                        ota_reset();
+                        t_bootloader_ota_info.fotabank_startaddr = 0;
+                        t_bootloader_ota_info.fotabank_datalen = 0;
+                        t_bootloader_ota_info.fotabank_crc = 0;
+                    }
                 }
                 t_bootloader_ota_info.fotabank_ready = FOTA_IMAGE_READY + 1;
             }
@@ -318,80 +361,98 @@ static void ota_reboot_handler() {
 }
 
 static void ota_bootinfo_ready() {
-    static uint8_t program_data[0x100];
-    static fota_information_t t_bootloader_ota_info = {0};
-    memcpy(&t_bootloader_ota_info, (uint8_t*)FOTA_UPDATE_BANK_INFO_ADDRESS,
-           sizeof(t_bootloader_ota_info));
+    uint32_t program_data_u32[256 / 4] __attribute__((aligned(4)));
+    uint8_t* const program_data = (uint8_t*)program_data_u32;
+    fota_information_t t_bootloader_ota_info = {0};
+
+    hosal_flash_read_n_bytes(FOTA_UPDATE_BANK_INFO_ADDRESS,
+                             (uint8_t*)&t_bootloader_ota_info,
+                             sizeof(t_bootloader_ota_info));
 
     t_bootloader_ota_info.fotabank_ready = FOTA_IMAGE_READY;
 
-    memset(&program_data, 0xFF, 0x100);
-    memcpy(&program_data, (uint8_t*)&t_bootloader_ota_info,
-           sizeof(fota_information_t));
+    memset(program_data, 0xFF, 256);
+    memcpy(program_data, (uint8_t*)&t_bootloader_ota_info, sizeof(fota_information_t));
 
     enter_critical_section();
-    while (flash_check_busy())
-        ;
+    while (flash_check_busy());
     flash_erase(FLASH_ERASE_SECTOR, FOTA_UPDATE_BANK_INFO_ADDRESS);
 
-    while (flash_check_busy())
-        ;
-    flash_write_page((uint32_t)&program_data, FOTA_UPDATE_BANK_INFO_ADDRESS);
-    while (flash_check_busy())
-        ;
+    while (flash_check_busy());
+
+    flash_write_page((uint32_t)program_data, FOTA_UPDATE_BANK_INFO_ADDRESS);
+    while (flash_check_busy());
     leave_critical_section();
 
     ota_printf("bootinfo ready");
 }
 
 void ota_bootinfo_reset() {
-    static uint8_t program_data[0x100];
-    static fota_information_t t_bootloader_ota_info = {0};
-    // memcpy(&t_bootloader_ota_info, (uint8_t *)FOTA_UPDATE_BANK_INFO_ADDRESS, sizeof(t_bootloader_ota_info));
-    t_bootloader_ota_info.fotabank_startaddr = (OTA_FLASH_START + 0x20);
+    uint32_t program_data_u32[256 / 4] __attribute__((aligned(4)));
+    uint8_t* const program_data = (uint8_t*)program_data_u32;
+    fota_information_t t_bootloader_ota_info = {0};
+
+    uint32_t img_size = ota_get_image_size();
+    uint32_t img_ver = ota_get_image_version();
+    uint32_t img_crc = ota_get_image_crc();
+
+    if (img_size == 0xFFFFFFFF || img_ver == 0xFFFFFFFF || img_crc == 0xFFFFFFFF || img_size == 0) {
+        log_error("[FOTA] Core param corrupt! Flash write rejected to prevent bricking. Size:0x%X, Ver:0x%X", 
+                  (unsigned int)img_size, (unsigned int)img_ver);
+        return; 
+    }
+
+    t_bootloader_ota_info.fotabank_startaddr = (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET);
     t_bootloader_ota_info.signature_len = 0;
     t_bootloader_ota_info.target_startaddr = APP_START_ADDRESS;
-    t_bootloader_ota_info.fotabank_datalen = ota_get_image_size() - 0x20;
+    t_bootloader_ota_info.fotabank_datalen = img_size - OTA_INFO_HEADER_OFFSET;
     t_bootloader_ota_info.fota_image_info = FOTA_IMAGE_INFO_COMPRESSED;
-    t_bootloader_ota_info.reserved[0] = ota_get_image_version();
+    t_bootloader_ota_info.reserved[0] = img_ver;
     t_bootloader_ota_info.fota_result = 0xFF;
-    t_bootloader_ota_info.fotabank_crc = ota_get_image_crc();
+    t_bootloader_ota_info.fotabank_crc = img_crc;
 
-    memset(&program_data, 0xFF, 0x100);
-    memcpy(&program_data, (uint8_t*)&t_bootloader_ota_info,
-           sizeof(fota_information_t));
+    memset(program_data, 0xFF, 256);
+    memcpy(program_data, (uint8_t*)&t_bootloader_ota_info, sizeof(fota_information_t));
 
     enter_critical_section();
-    while (flash_check_busy())
-        ;
+    while (flash_check_busy());
     flash_erase(FLASH_ERASE_SECTOR, FOTA_UPDATE_BANK_INFO_ADDRESS);
 
-    while (flash_check_busy())
-        ;
-    flash_write_page((uint32_t)&program_data, FOTA_UPDATE_BANK_INFO_ADDRESS);
-    while (flash_check_busy())
-        ;
+    while (flash_check_busy());
+    flash_write_page((uint32_t)program_data, FOTA_UPDATE_BANK_INFO_ADDRESS);
+    while (flash_check_busy());
     leave_critical_section();
 
-    ota_printf("bootinfo reset");
+    ota_printf("bootinfo reset status success");
 }
 
-static void ota_check_bin_tpye() {
-    const uint8_t* bin_type_ptr = GET_BIN_TYPE_PTR(systeminfo.sysinfo);
-    static uint8_t read_buf[0x100];
+void ota_flash_read_bin_type(uint8_t out_bin_type[12]) {
+    /* Must be 4-byte aligned for DMA (same requirement as ota_download_cmd_handler). */
+    static uint32_t read_buf_u32[OTA_FLASH_SECTOR_SIZE / 4];
+    uint8_t* const read_buf = (uint8_t*)read_buf_u32;
     while (flash_check_busy())
         ;
     flash_read_page((uint32_t)(read_buf), FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB);
     while (flash_check_busy())
         ;
-    const uint8_t* img_bin_type_ptr = read_buf + 4;
-    uint8_t bin_type[12] = {0};
-    if (memcmp(img_bin_type_ptr, bin_type_ptr, 12) != 0
-        && memcmp(img_bin_type_ptr, bin_type, 12) != 0) {
+    memcpy(out_bin_type, read_buf + 4, 12);
+}
+
+static void ota_check_bin_tpye() {
+    const uint8_t* self_bin_type = GET_BIN_TYPE_PTR(systeminfo.sysinfo);
+    uint8_t img_bin_type[12];
+    ota_flash_read_bin_type(img_bin_type);
+
+    uint8_t zero_type[12] = {0};
+    if (memcmp(img_bin_type, self_bin_type, 12) != 0
+        && memcmp(img_bin_type, zero_type, 12) != 0) {
         log_info("bin type different ");
-        log_info_hexdump("self : ", bin_type_ptr, 12);
-        log_info_hexdump("form ota : ", img_bin_type_ptr, 12);
-        ota_change_state_and_timer(OTA_IDLE, OTA_DONE_TIMEOUT);
+        log_info_hexdump("self : ", self_bin_type, 12);
+        log_info_hexdump("form ota : ", img_bin_type, 12);
+        /* ota_reset() only clears version/size/crc when state == OTA_IDLE.
+         * Switch to IDLE first so ota_reset() actually takes effect. */
+        ota_change_state_and_timer(OTA_IDLE, 0);
+        ota_reset();
     } else {
         // wait ota done after reboot
         ota_change_state_and_timer(OTA_DONE, OTA_DONE_TIMEOUT);
@@ -400,104 +461,122 @@ static void ota_check_bin_tpye() {
 
 static void ota_event_queue_push(uint8_t event, uint8_t* data,
                                  uint16_t data_lens, otIp6Address ipv6) {
-    ota_event_data_t event_data;
-    enter_critical_section();
-    event_data.event = event;
-    memcpy(&event_data.data, data, data_lens);
-    event_data.data_lens = data_lens;
-    memcpy((void*)&event_data.ipv6, (void*)&ipv6, sizeof(otIp6Address));
-    if (xQueueSend(ota_event_queue, &event_data, 0) == pdPASS) {
-        ot_app_task_post(ota_event_handler, NULL);
+    ota_event_data_t push_event_data;
+    if (data_lens > OTA_EVENT_DATA_MAX_SIZE) {
+        ota_printf("ota_event_queue_push data_lens exceed %u ", data_lens);
+        leave_critical_section();
+        return;
     }
+    push_event_data.data = xMalloc(data_lens);
+    if (push_event_data.data) {
+        enter_critical_section();
+        push_event_data.event = event;
+        memcpy(push_event_data.data, data, data_lens);
+        push_event_data.data_lens = data_lens;
+        memcpy((void*)&push_event_data.ipv6, (void*)&ipv6,
+               sizeof(otIp6Address));
+        leave_critical_section();
+        if (xQueueSend(ota_event_queue, &push_event_data, 0) == pdPASS) {
+            ot_app_task_post(ota_event_handler, NULL);
+        } else {
+            xFree(push_event_data.data);
+            log_warn("ota_event_queue full, drop packet \r\n");
+        }
+    } else {
+        log_warn("ota_event_queue_push alloc fail \r\n");
+    }
+}
 
-    leave_critical_section();
-    otSysEventSignalPending();
+static uint16_t calc_payload_data_len(uint32_t seq, uint32_t size,
+                                      uint16_t segments) {
+    uint32_t total_num = (size + segments - 1) / segments;
+    uint16_t len = (seq == total_num - 1) ? (uint16_t)(size % segments)
+                                          : segments;
+    return len ? len : segments;
 }
 
 static int ota_data_parse(uint8_t type, uint8_t* payload,
                           uint16_t payloadlength, void* data) {
-    ota_data_t* ota_data = NULL;
-    ota_data_ack_t* ota_data_ack = NULL;
-    ota_request_t* ota_request = NULL;
-    ota_response_t* ota_response = NULL;
-    uint16_t ota_data_lens = 0;
-    uint32_t toatol_num = 0;
+    if (payload == NULL || data == NULL)
+        return 1;
 
     uint8_t* tmp = payload;
+    uint16_t expected_data_lens = 0;
 
-    if (type == OTA_PAYLOAD_TYPE_DATA) {
-        ota_data = (ota_data_t*)data;
-        memcpy(&ota_data->version, tmp, 4);
-        tmp += 4;
-        memcpy(&ota_data->size, tmp, 4);
-        tmp += 4;
-        memcpy(&ota_data->crc, tmp, 4);
-        tmp += 4;
-        memcpy(&ota_data->seq, tmp, 2);
-        tmp += 2;
-        memcpy(&ota_data->segments, tmp, 2);
-        tmp += 2;
-        memcpy(&ota_data->intervel, tmp, 2);
-        tmp += 2;
-        ota_data->is_unicast = *tmp++;
-        toatol_num = (ota_data->size / ota_data->segments);
-        if (ota_data->size % ota_data->segments) {
-            ++toatol_num;
-        }
-        if (ota_data->seq == (toatol_num - 1)) {
-            ota_data_lens = ota_data->size % ota_data->segments;
-        } else {
-            ota_data_lens = ota_data->segments;
-        }
+    switch (type) {
+        case OTA_PAYLOAD_TYPE_DATA: {
+            ota_data_t* dest = (ota_data_t*)data;
+            // 1. Define the header size (excluding the last data array).
+            const uint16_t header_size = offsetof(ota_data_t, data);
+            if (payloadlength < header_size)
+                return 1;
 
-        memcpy(&ota_data->data, tmp, ota_data_lens);
-        tmp += ota_data_lens;
-    } else if (type == OTA_PAYLOAD_TYPE_DATA_ACK) {
-        ota_data_ack = (ota_data_ack_t*)data;
-        ota_data_ack->data_type = *tmp++;
-        memcpy(&ota_data_ack->version, tmp, 4);
-        tmp += 4;
-        memcpy(&ota_data_ack->seq, tmp, 2);
-        tmp += 2;
-    } else if (type == OTA_PAYLOAD_TYPE_REQUEST) {
-        ota_request = (ota_request_t*)data;
-        memcpy(&ota_request->version, tmp, 4);
-        tmp += 4;
-        memcpy(&ota_request->size, tmp, 4);
-        tmp += 4;
-        memcpy(&ota_request->segments, tmp, 2);
-        tmp += 2;
-        memcpy(&ota_request->req_table, tmp, (OTA_REQUEST_TABLE_SIZE * 2));
-        tmp += (OTA_REQUEST_TABLE_SIZE * 2);
-    } else if (type == OTA_PAYLOAD_TYPE_RESPONSE) {
-        ota_response = (ota_response_t*)data;
-        memcpy(&ota_response->version, tmp, 4);
-        tmp += 4;
-        memcpy(&ota_response->size, tmp, 4);
-        tmp += 4;
-        memcpy(&ota_response->crc, tmp, 4);
-        tmp += 4;
-        memcpy(&ota_response->seq, tmp, 2);
-        tmp += 2;
-        memcpy(&ota_response->segments, tmp, 2);
-        tmp += 2;
-        toatol_num = (ota_response->size / ota_response->segments);
-        if (ota_response->size % ota_response->segments) {
-            ++toatol_num;
-        }
-        if (ota_response->seq == (toatol_num - 1)) {
-            ota_data_lens = ota_response->size % ota_response->segments;
-        } else {
-            ota_data_lens = ota_response->segments;
+            // 2. One-time copy of Header
+            memcpy(dest, tmp, header_size);
+            tmp += header_size;
+
+            // 3. Calculate the required data length for this package.
+            expected_data_lens = calc_payload_data_len(dest->seq, dest->size,
+                                                       dest->segments);
+
+            // 4. Copy the remaining payload data
+            if (header_size + expected_data_lens > payloadlength)
+                return 1;
+            memcpy(dest->data, tmp, expected_data_lens);
+            tmp += expected_data_lens;
+            break;
         }
 
-        memcpy(&ota_response->data, tmp, ota_data_lens);
-        tmp += ota_data_lens;
-    } else {
-        ota_printf("unknow parse type %u ", type);
+        case OTA_PAYLOAD_TYPE_DATA_ACK: {
+            const uint16_t ack_size = sizeof(ota_data_ack_t); // 7 bytes
+            if (payloadlength < ack_size)
+                return 1;
+            memcpy(data, tmp, ack_size);
+            tmp += ack_size;
+            break;
+        }
+
+        case OTA_PAYLOAD_TYPE_REQUEST: {
+            ota_request_t* dest = (ota_request_t*)data;
+            const uint16_t req_header_size = offsetof(
+                ota_request_t, req_table); // version(4)+size(4)+segments(2)
+            if (payloadlength
+                < (req_header_size + (OTA_REQUEST_TABLE_SIZE * 2)))
+                return 1;
+
+            memcpy(dest, tmp, req_header_size);
+            tmp += req_header_size;
+            memcpy(dest->req_table, tmp, (OTA_REQUEST_TABLE_SIZE * 2));
+            tmp += (OTA_REQUEST_TABLE_SIZE * 2);
+            break;
+        }
+
+        case OTA_PAYLOAD_TYPE_RESPONSE: {
+            ota_response_t* dest = (ota_response_t*)data;
+            const uint16_t res_header_size = offsetof(ota_response_t,
+                                                      data); // no data[0]
+            if (payloadlength < res_header_size)
+                return 1;
+
+            memcpy(dest, tmp, res_header_size);
+            tmp += res_header_size;
+
+            expected_data_lens = calc_payload_data_len(dest->seq, dest->size,
+                                                       dest->segments);
+
+            if (res_header_size + expected_data_lens > payloadlength)
+                return 1;
+            memcpy(dest->data, tmp, expected_data_lens);
+            tmp += expected_data_lens;
+            break;
+        }
+
+        default: ota_printf("unknown parse type %u", type); return 1;
     }
-    if ((tmp - payload) != payloadlength) {
-        ota_printf("parse fail %u (%u/%u)", type, (tmp - payload),
+
+    // payloadlength check
+    if ((uint16_t)(tmp - payload) != payloadlength) {
+        ota_printf("parse len mismatch: %u/%u", (uint16_t)(tmp - payload),
                    payloadlength);
         return 1;
     }
@@ -506,87 +585,60 @@ static int ota_data_parse(uint8_t type, uint8_t* payload,
 
 static void ota_data_piece(uint8_t type, uint8_t* payload,
                            uint16_t* payloadlength, void* data) {
-    ota_data_t* ota_data = NULL;
-    ota_data_ack_t* ota_data_ack = NULL;
-    ota_request_t* ota_request = NULL;
-    ota_response_t* ota_response = NULL;
-    uint16_t ota_data_lens = 0;
-    uint32_t toatol_num = 0;
+    if (payload == NULL || data == NULL || payloadlength == NULL)
+        return;
 
     uint8_t* tmp = payload;
+    uint16_t data_lens = 0;
 
-    if (type == OTA_PAYLOAD_TYPE_DATA) {
-        ota_data = (ota_data_t*)data;
-        memcpy(tmp, &ota_data->version, 4);
-        tmp += 4;
-        memcpy(tmp, &ota_data->size, 4);
-        tmp += 4;
-        memcpy(tmp, &ota_data->crc, 4);
-        tmp += 4;
-        memcpy(tmp, &ota_data->seq, 2);
-        tmp += 2;
-        memcpy(tmp, &ota_data->segments, 2);
-        tmp += 2;
-        memcpy(tmp, &ota_data->intervel, 2);
-        tmp += 2;
-        *tmp++ = ota_data->is_unicast;
-        toatol_num = (ota_data->size / ota_data->segments);
-        if (ota_data->size % ota_data->segments) {
-            ++toatol_num;
-        }
-        if (ota_data->seq == (toatol_num - 1)) {
-            ota_data_lens = ota_data->size % ota_data->segments;
-        } else {
-            ota_data_lens = ota_data->segments;
+    switch (type) {
+        case OTA_PAYLOAD_TYPE_DATA: {
+            ota_data_t* src = (ota_data_t*)data;
+            const uint16_t header_size = offsetof(ota_data_t, data);
+
+            memcpy(tmp, src, header_size);
+            tmp += header_size;
+
+            data_lens = calc_payload_data_len(src->seq, src->size,
+                                              src->segments);
+            memcpy(tmp, src->data, data_lens);
+            tmp += data_lens;
+            break;
         }
 
-        memcpy(tmp, &ota_data->data, ota_data_lens);
-        tmp += ota_data_lens;
-    } else if (type == OTA_PAYLOAD_TYPE_DATA_ACK) {
-        ota_data_ack = (ota_data_ack_t*)data;
-        *tmp++ = ota_data_ack->data_type;
-        memcpy(tmp, &ota_data_ack->version, 4);
-        tmp += 4;
-        memcpy(tmp, &ota_data_ack->seq, 2);
-        tmp += 2;
-    } else if (type == OTA_PAYLOAD_TYPE_REQUEST) {
-        ota_request = (ota_request_t*)data;
-        memcpy(tmp, &ota_request->version, 4);
-        tmp += 4;
-        memcpy(tmp, &ota_request->size, 4);
-        tmp += 4;
-        memcpy(tmp, &ota_request->segments, 2);
-        tmp += 2;
-        memcpy(tmp, &ota_request->req_table, (OTA_REQUEST_TABLE_SIZE * 2));
-        tmp += (OTA_REQUEST_TABLE_SIZE * 2);
-    } else if (type == OTA_PAYLOAD_TYPE_RESPONSE) {
-        ota_response = (ota_response_t*)data;
-        memcpy(tmp, &ota_response->version, 4);
-        tmp += 4;
-        memcpy(tmp, &ota_response->size, 4);
-        tmp += 4;
-        memcpy(tmp, &ota_response->crc, 4);
-        tmp += 4;
-        memcpy(tmp, &ota_response->seq, 2);
-        tmp += 2;
-        memcpy(tmp, &ota_response->segments, 2);
-        tmp += 2;
-        toatol_num = (ota_response->size / ota_response->segments);
-        if (ota_response->size % ota_response->segments) {
-            ++toatol_num;
-        }
-        if (ota_response->seq == (toatol_num - 1)) {
-            ota_data_lens = ota_response->size % ota_response->segments;
-        } else {
-            ota_data_lens = ota_response->segments;
+        case OTA_PAYLOAD_TYPE_DATA_ACK: {
+            memcpy(tmp, data, sizeof(ota_data_ack_t));
+            tmp += sizeof(ota_data_ack_t);
+            break;
         }
 
-        memcpy(tmp, &ota_response->data, ota_data_lens);
-        tmp += ota_data_lens;
-    } else {
-        ota_printf("unknow piece type %u ", type);
+        case OTA_PAYLOAD_TYPE_REQUEST: {
+            ota_request_t* src = (ota_request_t*)data;
+            const uint16_t req_header_size = offsetof(ota_request_t, req_table);
+            memcpy(tmp, src, req_header_size);
+            tmp += req_header_size;
+            memcpy(tmp, src->req_table, (OTA_REQUEST_TABLE_SIZE * 2));
+            tmp += (OTA_REQUEST_TABLE_SIZE * 2);
+            break;
+        }
+
+        case OTA_PAYLOAD_TYPE_RESPONSE: {
+            ota_response_t* src = (ota_response_t*)data;
+            const uint16_t res_header_size = offsetof(ota_response_t, data);
+            memcpy(tmp, src, res_header_size);
+            tmp += res_header_size;
+
+            data_lens = calc_payload_data_len(src->seq, src->size,
+                                              src->segments);
+            memcpy(tmp, src->data, data_lens);
+            tmp += data_lens;
+            break;
+        }
+
+        default: ota_printf("unknown piece type %u", type); break;
     }
-    *payloadlength = (tmp - payload);
+
+    *payloadlength = (uint16_t)(tmp - payload);
 }
 
 /*coap proccess*/
@@ -668,126 +720,50 @@ static void ota_coap_data_proccess(void* aContext, otMessage* aMessage,
     }
 }
 
+static void ota_coap_generic_process(otMessage* aMessage,
+                                     const otMessageInfo* aMessageInfo,
+                                     uint8_t event_type) {
+    uint16_t length = otMessageGetLength(aMessage)
+                      - otMessageGetOffset(aMessage);
+    if (length > 0) {
+        uint8_t* buf = xMalloc(length);
+        if (buf != NULL) {
+            otMessageRead(aMessage, otMessageGetOffset(aMessage), buf, length);
+
+            ota_event_queue_push(event_type, buf, length,
+                                 aMessageInfo->mPeerAddr);
+
+            xFree(buf);
+        } else {
+            log_warn("CoAP process xMalloc fail\r\n");
+        }
+    }
+}
+
 static void ota_coap_request_proccess(void* aContext, otMessage* aMessage,
                                       const otMessageInfo* aMessageInfo) {
-    char string[OT_IP6_ADDRESS_STRING_SIZE];
-    uint8_t* buf = NULL;
-    uint16_t length;
-    otIp6AddressToString(&aMessageInfo->mPeerAddr, string, sizeof(string));
-    length = otMessageGetLength(aMessage) - otMessageGetOffset(aMessage);
-    do {
-        if (length > 0) {
-            buf = xMalloc(length);
-            if (NULL != buf) {
-                otMessageRead(aMessage, otMessageGetOffset(aMessage), buf,
-                              length);
-                ota_event_queue_push(OTA_REQUEST_RECEIVE_EVENT, buf, length,
-                                     aMessageInfo->mPeerAddr);
-            }
-        }
-    } while (0);
-
-    if (buf) {
-        xFree(buf);
-    }
+    ota_coap_generic_process(aMessage, aMessageInfo, OTA_REQUEST_RECEIVE_EVENT);
 }
 
 static void ota_coap_response_proccess(void* aContext, otMessage* aMessage,
                                        const otMessageInfo* aMessageInfo) {
-    char string[OT_IP6_ADDRESS_STRING_SIZE];
-    uint8_t* buf = NULL;
-    uint16_t length;
-    otIp6AddressToString(&aMessageInfo->mPeerAddr, string, sizeof(string));
-    length = otMessageGetLength(aMessage) - otMessageGetOffset(aMessage);
-    do {
-        if (length > 0) {
-            buf = xMalloc(length);
-            if (NULL != buf) {
-                otMessageRead(aMessage, otMessageGetOffset(aMessage), buf,
-                              length);
-                ota_event_queue_push(OTA_RESPONSE_RECEIVE_EVENT, buf, length,
-                                     aMessageInfo->mPeerAddr);
-            }
-        }
-    } while (0);
-
-    if (buf) {
-        xFree(buf);
-    }
+    ota_coap_generic_process(aMessage, aMessageInfo,
+                             OTA_RESPONSE_RECEIVE_EVENT);
 }
 
 static void ota_coap_rxmode_proccess(void* aContext, otMessage* aMessage,
                                      const otMessageInfo* aMessageInfo) {
-    char string[OT_IP6_ADDRESS_STRING_SIZE];
-    uint8_t* buf = NULL;
-    uint16_t length;
-    otIp6AddressToString(&aMessageInfo->mPeerAddr, string, sizeof(string));
-    length = otMessageGetLength(aMessage) - otMessageGetOffset(aMessage);
-    do {
-        if (length > 0) {
-            buf = xMalloc(length);
-            if (NULL != buf) {
-                otMessageRead(aMessage, otMessageGetOffset(aMessage), buf,
-                              length);
-                ota_event_queue_push(OTA_RXMODE_RECEIVE_EVENT, buf, length,
-                                     aMessageInfo->mPeerAddr);
-            }
-        }
-    } while (0);
-
-    if (buf) {
-        xFree(buf);
-    }
+    ota_coap_generic_process(aMessage, aMessageInfo, OTA_RXMODE_RECEIVE_EVENT);
 }
 
 static void ota_coap_status_proccess(void* aContext, otMessage* aMessage,
                                      const otMessageInfo* aMessageInfo) {
-    char string[OT_IP6_ADDRESS_STRING_SIZE];
-    uint8_t* buf = NULL;
-    uint16_t length;
-    otIp6AddressToString(&aMessageInfo->mPeerAddr, string, sizeof(string));
-    length = otMessageGetLength(aMessage) - otMessageGetOffset(aMessage);
-
-    do {
-        if (length > 0) {
-            buf = xMalloc(length);
-            if (NULL != buf) {
-                otMessageRead(aMessage, otMessageGetOffset(aMessage), buf,
-                              length);
-                ota_event_queue_push(OTA_STATUS_RECEIVE_EVENT, buf, length,
-                                     aMessageInfo->mPeerAddr);
-            }
-        }
-    } while (0);
-
-    if (buf) {
-        xFree(buf);
-    }
+    ota_coap_generic_process(aMessage, aMessageInfo, OTA_STATUS_RECEIVE_EVENT);
 }
 
 static void ota_coap_execute_proccess(void* aContext, otMessage* aMessage,
                                       const otMessageInfo* aMessageInfo) {
-    char string[OT_IP6_ADDRESS_STRING_SIZE];
-    uint8_t* buf = NULL;
-    uint16_t length;
-    otIp6AddressToString(&aMessageInfo->mPeerAddr, string, sizeof(string));
-    length = otMessageGetLength(aMessage) - otMessageGetOffset(aMessage);
-
-    do {
-        if (length > 0) {
-            buf = xMalloc(length);
-            if (NULL != buf) {
-                otMessageRead(aMessage, otMessageGetOffset(aMessage), buf,
-                              length);
-                ota_event_queue_push(OTA_EXECUTE_RECEIVE_EVENT, buf, length,
-                                     aMessageInfo->mPeerAddr);
-            }
-        }
-    } while (0);
-
-    if (buf) {
-        xFree(buf);
-    }
+    ota_coap_generic_process(aMessage, aMessageInfo, OTA_EXECUTE_RECEIVE_EVENT);
 }
 
 static void ota_coap_ack_process(void* aContext, otMessage* aMessage,
@@ -895,7 +871,7 @@ static void ota_data_send_handler() {
     ota_data_t ota_data;
     uint8_t* payload = NULL;
     uint16_t payloadlength = 0, ota_data_lens = 0, i = 0;
-    uint32_t* temp_addr = NULL;
+    uint32_t start_addr;
     bool is_unicst = false;
     do {
         if (g_ota_total_num == 0) {
@@ -947,9 +923,11 @@ static void ota_data_send_handler() {
         ota_data.intervel = g_ota_data_intervel;
         ota_data.is_unicast = is_unicst;
         enter_critical_section();
-        temp_addr = (uint32_t*)(OTA_FLASH_START
-                                + (ota_data.seq * ota_data.segments));
-        memcpy(&ota_data.data, temp_addr, ota_data_lens);
+        start_addr = (OTA_FLASH_START + (ota_data.seq * ota_data.segments));
+        for (int i = 0; i < ota_data_lens; i++) {
+            hosal_flash_read(HOSAL_FLASH_READ_BYTE, (start_addr + i),
+                             &ota_data.data[i]);
+        }
         leave_critical_section();
 
         payload = xMalloc(sizeof(ota_data_t));
@@ -983,7 +961,7 @@ static void ota_response_send_handler() {
     uint16_t resp_table_num = 0, i = 0;
     ota_response_t ota_response;
     uint16_t payloadlength = 0, ota_response_data_lens = 0;
-    uint32_t* temp_addr = NULL;
+    uint32_t start_addr;
     uint32_t toatol_num = (g_ota_image_size / g_ota_segments_size);
     if (g_ota_image_size % g_ota_segments_size) {
         ++toatol_num;
@@ -1040,10 +1018,13 @@ static void ota_response_send_handler() {
             ota_response_data_lens = g_ota_image_size % g_ota_segments_size;
         }
         enter_critical_section();
-        temp_addr = (uint32_t*)(OTA_FLASH_START
-                                + (ota_response.seq * g_ota_segments_size));
+        start_addr = (OTA_FLASH_START
+                      + (ota_response.seq * g_ota_segments_size));
 
-        memcpy(&ota_response.data, temp_addr, ota_response_data_lens);
+        for (int i = 0; i < ota_response_data_lens; i++) {
+            hosal_flash_read(HOSAL_FLASH_READ_BYTE, (start_addr + i),
+                             &ota_response.data[i]);
+        }
         leave_critical_section();
 
         payload = xMalloc(sizeof(ota_response_t));
@@ -1053,8 +1034,8 @@ static void ota_response_send_handler() {
                            &ota_response);
             ota_event_queue_push(OTA_RESPONSE_SEND_EVENT, payload,
                                  payloadlength, ota_invalid_addr);
-            ota_printf("[s] ota response %u %u %x ", random_index,
-                       ota_response.seq, temp_addr);
+            ota_printf("[s] ota response %u %u %08x ", random_index,
+                       ota_response.seq, start_addr);
             g_resp_table[random_index] = 0xFFFF;
         }
 
@@ -1183,8 +1164,8 @@ static void ota_request_handler() {
             }
         } while (0);
     } else {
-        crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                              (g_ota_image_size - 0x20));
+        crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+                              (g_ota_image_size - OTA_INFO_HEADER_OFFSET));
         if (crc32 != g_ota_image_crc) {
             ota_printf("ota request upgrade fail %X %X", crc32,
                        g_ota_image_crc);
@@ -1274,8 +1255,8 @@ static void ota_image_received_handler() {
                (((toatol_num - remain) * 100) / (toatol_num - 1)));
 
     if (remain == 0) {
-        crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                              (g_ota_image_size - 0x20));
+        crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+                              (g_ota_image_size - OTA_INFO_HEADER_OFFSET));
         if (crc32 != g_ota_image_crc) {
             ota_printf("ota data upgrade fail ");
             ota_change_state_and_timer(OTA_IDLE, 0);
@@ -1302,8 +1283,8 @@ static void ota_unicast_received_handler() {
                ((remain * 100) / (toatol_num - 1)));
 
     if (remain == 0) {
-        crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                              (g_ota_image_size - 0x20));
+        crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+                              (g_ota_image_size - OTA_INFO_HEADER_OFFSET));
         if (crc32 != g_ota_image_crc) {
             ota_printf("ota data upgrade fail ");
             ota_change_state_and_timer(OTA_IDLE, 0);
@@ -1437,8 +1418,8 @@ static void ota_data_received_event_handler(uint8_t* data, uint16_t lens) {
 
         if (ota_get_state() == OTA_IDLE
             && ota_get_image_version() == ota_data.version) {
-            crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                                  (ota_data.size - 0x20));
+            crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+                                  (ota_data.size - OTA_INFO_HEADER_OFFSET));
             if (crc32 == ota_get_image_crc()) {
                 // Initiator bitmap set all
                 if (g_ota_bitmap) {
@@ -1446,6 +1427,11 @@ static void ota_data_received_event_handler(uint8_t* data, uint16_t lens) {
                     g_ota_bitmap = NULL;
                 }
                 g_ota_bitmap = ota_bitmap_init(toatol_num);
+                if (!g_ota_bitmap) {
+                    log_error("[FOTA] bitmap init failed (line ~1429)");
+                    ota_change_state_and_timer(OTA_IDLE, 0);
+                    break;
+                }
                 for (i = 0; i < toatol_num; i++) {
                     ota_bitmap_set(g_ota_bitmap, i);
                 }
@@ -1495,26 +1481,35 @@ static void ota_data_received_event_handler(uint8_t* data, uint16_t lens) {
             g_ota_data_intervel = ota_data.intervel;
             ota_bootinfo_reset();
             g_ota_bitmap = ota_bitmap_init(toatol_num);
+            if (!g_ota_bitmap) {
+                log_error("[FOTA] bitmap init failed");
+                ota_change_state_and_timer(OTA_IDLE, 0);
+                break;
+            }
             if (ota_data.is_unicast == true) {
                 ota_change_state_and_timer(OTA_UNICAST_RECEIVING, timeout);
             } else {
                 ota_change_state_and_timer(OTA_DATA_RECEIVING, timeout);
             }
-            enter_critical_section();
-            for (i = 0; i < 0x57; i++) {
-                // Page erase (4096 bytes)
+            /* Erase outside critical section: each sector takes ~10-20 ms.
+             * Holding all IRQs for 87 sectors (~1.7 s) breaks Thread connectivity. */
+            for (i = 0; i < OTA_MAX_IMAGE_SECTORS; i++) {
                 while (flash_check_busy())
                     ;
                 flash_erase(FLASH_ERASE_SECTOR, OTA_FLASH_START + (0x1000 * i));
                 while (flash_check_busy())
                     ;
             }
-            leave_critical_section();
         }
 
         ota_printf("[R] ota data seq %u remain %u", ota_data.seq,
                    ota_bitmap_get_remain(g_ota_bitmap, toatol_num));
 
+        if (ota_data.seq >= toatol_num) {
+            ota_printf("[R] seq %u out of range (total %u), drop", ota_data.seq,
+                       toatol_num);
+            break;
+        }
         ota_bitmap_set(g_ota_bitmap, ota_data.seq);
 
         enter_critical_section();
@@ -1529,17 +1524,16 @@ static void ota_data_received_event_handler(uint8_t* data, uint16_t lens) {
         leave_critical_section();
 
         if (0 == ota_bitmap_get_remain(g_ota_bitmap, toatol_num)) {
-            crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                                  (ota_data.size - 0x20));
+            crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+                                  (ota_data.size - OTA_INFO_HEADER_OFFSET));
             if (crc32 != ota_data.crc) {
                 ota_printf("ota data upgrade fail %X %X", crc32, ota_data.crc);
                 ota_change_state_and_timer(OTA_IDLE, 0);
             } else {
-                if (ota_data.is_unicast == true) {
+                ota_check_bin_tpye();
+                if (ota_get_state() == OTA_DONE) {
                     ota_bootinfo_ready();
                     ota_change_state_and_timer(OTA_REBOOT, 1);
-                } else {
-                    ota_check_bin_tpye();
                 }
             }
             break;
@@ -1571,8 +1565,9 @@ static void ota_request_received_event_handler(uint8_t* data, uint16_t lens) {
 
         if (ota_get_state() == OTA_IDLE) {
             if (ota_get_image_version() == ota_request.version) {
-                crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                                      (ota_request.size - 0x20));
+                crc32 = crc32checksum(
+                    (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+                    (ota_request.size - OTA_INFO_HEADER_OFFSET));
                 if (crc32 == ota_get_image_crc()) {
                     // Initiator bitmap set all
                     ota_printf("same version and idle ");
@@ -1581,6 +1576,11 @@ static void ota_request_received_event_handler(uint8_t* data, uint16_t lens) {
                         g_ota_bitmap = NULL;
                     }
                     g_ota_bitmap = ota_bitmap_init(toatol_num);
+                    if (!g_ota_bitmap) {
+                        log_error("[FOTA] bitmap init failed");
+                        ota_change_state_and_timer(OTA_IDLE, 0);
+                        break;
+                    }
                     for (i = 0; i < toatol_num; i++) {
                         ota_bitmap_set(g_ota_bitmap, i);
                     }
@@ -1650,8 +1650,9 @@ static void ota_response_received_event_handler(uint8_t* data, uint16_t lens) {
         if (g_ota_state == OTA_IDLE) {
             ota_printf("ota response %s", OtaStateToString(g_ota_state));
             if (ota_get_image_version() == ota_response.version) {
-                crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                                      (ota_response.size - 0x20));
+                crc32 = crc32checksum(
+                    (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+                    (ota_response.size - OTA_INFO_HEADER_OFFSET));
                 if (crc32 == ota_get_image_crc()) {
                     // Initiator bitmap set all
                     ota_printf("response same version and idle ");
@@ -1660,6 +1661,11 @@ static void ota_response_received_event_handler(uint8_t* data, uint16_t lens) {
                         g_ota_bitmap = NULL;
                     }
                     g_ota_bitmap = ota_bitmap_init(toatol_num);
+                    if (!g_ota_bitmap) {
+                        log_error("[FOTA] bitmap init failed");
+                        ota_change_state_and_timer(OTA_IDLE, 0);
+                        break;
+                    }
                     for (i = 0; i < toatol_num; i++) {
                         ota_bitmap_set(g_ota_bitmap, i);
                     }
@@ -1674,11 +1680,16 @@ static void ota_response_received_event_handler(uint8_t* data, uint16_t lens) {
                         g_ota_bitmap = NULL;
                     }
                     g_ota_bitmap = ota_bitmap_init(toatol_num);
+                    if (!g_ota_bitmap) {
+                        log_error("[FOTA] bitmap init failed");
+                        ota_change_state_and_timer(OTA_IDLE, 0);
+                        break;
+                    }
                     g_ota_total_num = toatol_num;
                     g_ota_segments_size = ota_response.segments;
                     ota_bootinfo_reset();
                     enter_critical_section();
-                    for (i = 0; i < 0x57; i++) {
+                    for (i = 0; i < OTA_MAX_IMAGE_SECTORS; i++) {
                         // Page erase (4096 bytes)
                         while (flash_check_busy())
                             ;
@@ -1760,8 +1771,9 @@ static void ota_response_received_event_handler(uint8_t* data, uint16_t lens) {
             }
             leave_critical_section();
             if (0 == ota_bitmap_get_remain(g_ota_bitmap, toatol_num)) {
-                crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                                      (ota_response.size - 0x20));
+                crc32 = crc32checksum(
+                    (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+                    (ota_response.size - OTA_INFO_HEADER_OFFSET));
                 if (crc32 != ota_response.crc) {
                     ota_printf("ota response upgrade fail %X %X", crc32,
                                ota_response.crc);
@@ -1793,7 +1805,7 @@ static void ota_rxmode_received_event_handler(uint8_t* data, uint16_t lens) {
             }
             if (childInfo.mRxOnWhenIdle == false) {
                 otIp6Address dst_ipaddr = *otThreadGetRloc(otrGetInstance());
-                dst_ipaddr.mFields.m8[14] |= childInfo.mRloc16 & 0xff00 >> 0;
+                dst_ipaddr.mFields.m8[14] = (childInfo.mRloc16 >> 8) & 0xff;
                 dst_ipaddr.mFields.m8[15] = childInfo.mRloc16 & 0xff;
                 ota_rxmode_sended_event_handler(dst_ipaddr, data, lens);
                 ++sleep_node;
@@ -1803,17 +1815,13 @@ static void ota_rxmode_received_event_handler(uint8_t* data, uint16_t lens) {
     } else
 #endif
     {
-        if (ota_get_image_version() != 0 && rxmode->version != 0
-            && ota_get_image_version() == rxmode->version) {
-            ota_printf("ota_rxmode_received same version %x %x ",
-                       rxmode->version, ota_get_image_version());
-            return;
-        }
         if (ota_get_state() != OTA_IDLE) {
             ota_printf("ota_rxmode_received state %s ",
                        OtaStateToString(ota_get_state()));
             return;
         }
+        /* Wake / sleep the radio first, regardless of version.
+           Same-version check only applies to actual data download, not wake-up. */
         if (rxmode->OnWhenIdle == true) {
             if (otThreadGetLinkMode(otrGetInstance()).mRxOnWhenIdle == false) {
                 ota_printf("wake up ");
@@ -1840,6 +1848,12 @@ static void ota_rxmode_received_event_handler(uint8_t* data, uint16_t lens) {
                     ota_printf("go to sleep set fail");
                 }
             }
+        }
+        if (ota_get_image_version() != 0 && rxmode->version != 0
+            && ota_get_image_version() == rxmode->version) {
+            ota_printf("ota_rxmode_received same version %x %x ",
+                       rxmode->version, ota_get_image_version());
+            return;
         }
     }
 }
@@ -1878,10 +1892,14 @@ static void ota_status_received_event_handler(uint8_t* data, uint16_t lens,
                 g_ota_status_report.rxmode =
                     otThreadGetLinkMode(otrGetInstance()).mRxOnWhenIdle;
                 g_ota_status_report.state = ota_get_state();
+                memcpy(g_ota_status_report.bin_type,
+                       GET_BIN_TYPE_PTR(systeminfo.sysinfo), 12);
                 memcpy(&g_ota_status_report.dstipv6.mFields.m8,
                        &src_ipv6.mFields.m8, OT_IP6_ADDRESS_SIZE);
 
-                if (ota_get_state() == OTA_IDLE) {
+                if (ota_get_state() == OTA_IDLE
+                    || g_ota_segments_size == 0
+                    || !IS_VALID_PTR(g_ota_bitmap)) {
                     g_ota_status_report.progress_bar = 0;
                 } else {
                     uint32_t toatol_num = (g_ota_image_size
@@ -1892,7 +1910,8 @@ static void ota_status_received_event_handler(uint8_t* data, uint16_t lens,
                     uint32_t remain = ota_bitmap_get_remain(g_ota_bitmap,
                                                             toatol_num);
                     g_ota_status_report.progress_bar =
-                        (((toatol_num - remain) * 100) / (toatol_num - 1));
+                        (toatol_num <= 1) ? 0
+                        : (((toatol_num - remain) * 100) / (toatol_num - 1));
                 }
                 leave_critical_section();
                 uint16_t random_time = otRandomNonCryptoGetUint16InRange(
@@ -1911,57 +1930,11 @@ static void ota_status_received_event_handler(uint8_t* data, uint16_t lens,
         ota_status_report_t* ota_status_report = (ota_status_report_t*)data;
         char string[OT_IP6_ADDRESS_STRING_SIZE];
         otIp6AddressToString(&src_ipv6, string, sizeof(string));
-        log_info("formipv6    : %s", string);
-        log_info("version     : %x", ota_status_report->version);
-        log_info("rxmode      : %d", ota_status_report->rxmode);
-        log_info("state       : %d", ota_status_report->state);
-        log_info("progressbar : %d %%", ota_status_report->progress_bar);
-#if CONFIG_MIU_DEVICE_TYPE_FTD
-        if (g_status_table) {
-            int i = 0;
-            for (i = 0; i < OTA_STATUS_TABLE_MAX_SIZE; i++) {
-                if ((g_status_table[i].used_state & 0x80)
-                    && memcmp(&g_status_table[i].ipv6, &src_ipv6.mFields.m8[8],
-                              OT_IP6_IID_SIZE)
-                           == 0) {
-                    enter_critical_section();
-                    g_status_table[i].version = ota_status_report->version;
-                    g_status_table[i].used_state =
-                        (g_status_table[i].used_state & 0x80)
-                        | (ota_status_report->state & 0x7F);
-                    g_status_table[i].rxmode_progress = 0;
-                    if (ota_status_report->rxmode) {
-                        g_status_table[i].rxmode_progress |= 0x80;
-                    }
-                    g_status_table[i].rxmode_progress |=
-                        (ota_status_report->progress_bar & 0x7F);
-                    leave_critical_section();
-                    break;
-                }
-            }
-
-            if (i >= OTA_STATUS_TABLE_MAX_SIZE) {
-                for (i = 0; i < OTA_STATUS_TABLE_MAX_SIZE; i++) {
-                    if (!(g_status_table[i].used_state & 0x80)) {
-                        enter_critical_section();
-                        memcpy(&g_status_table[i].ipv6, &src_ipv6.mFields.m8[8],
-                               OT_IP6_IID_SIZE);
-                        g_status_table[i].version = ota_status_report->version;
-                        g_status_table[i].used_state =
-                            (ota_status_report->state & 0x7F) | 0x80;
-                        g_status_table[i].rxmode_progress = 0;
-                        if (ota_status_report->rxmode) {
-                            g_status_table[i].rxmode_progress |= 0x80;
-                        }
-                        g_status_table[i].rxmode_progress |=
-                            (ota_status_report->progress_bar & 0x7F);
-                        leave_critical_section();
-                        break;
-                    }
-                }
-            }
-        }
-#endif
+        log_info("OTA_STATUS|%s|%08x|%s|%u|%u%%|%.12s", string,
+                 ota_status_report->version,
+                 OtaStateToString(ota_status_report->state),
+                 ota_status_report->rxmode, ota_status_report->progress_bar,
+                 ota_status_report->bin_type);
     } else {
         ota_printf("unknow ota staus flag");
     }
@@ -1970,10 +1943,14 @@ static void ota_status_received_event_handler(uint8_t* data, uint16_t lens,
 static void ota_execute_received_event_handler(uint8_t* data, uint16_t lens,
                                                otIp6Address src_ipv6) {
     ota_execute_t* ota_execute = (ota_execute_t*)data;
+    if (lens < sizeof(ota_execute_t)) {
+        return;
+    }
     if (ota_execute->flag == OTA_EXECUTE_REBOOT) {
         if (ota_get_state() == OTA_DONE) {
-            uint32_t crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                                           (g_ota_image_size - 0x20));
+            uint32_t crc32 = crc32checksum(
+                (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+                (g_ota_image_size - OTA_INFO_HEADER_OFFSET));
             if (crc32 != g_ota_image_crc) {
                 ota_printf("ota request upgrade fail %X %X", crc32,
                            g_ota_image_crc);
@@ -1981,18 +1958,19 @@ static void ota_execute_received_event_handler(uint8_t* data, uint16_t lens,
             } else {
                 ota_bootinfo_ready();
                 ota_change_state_and_timer(OTA_REBOOT, ota_execute->time);
-                ota_printf("%u s after reboot", ota_execute->time);
+                ota_printf("%u ms after reboot", ota_execute->time);
             }
         } else {
             ota_printf("state is not done");
         }
     } else if (ota_execute->flag == OTA_EXECUTE_STOP) {
-        if (ota_get_state() != OTA_IDLE) {
-            ota_printf("%u s after stop", ota_execute->time);
-            ota_change_state_and_timer(OTA_IDLE, ota_execute->time);
-        } else {
-            ota_printf("is Idle");
-        }
+        /* Always erase OTA flash on stop, even if already Idle.
+         * Without this, a device that naturally timed out from OTA_DONE back
+         * to OTA_IDLE retains the image in flash — the version stays non-zero
+         * and the next TC's same-version pre-check would incorrectly skip OTA. */
+        ota_change_state_and_timer(OTA_IDLE, 0);
+        ota_reset();
+        ota_printf("stop+erase done");
     } else {
         ota_printf("unknow ota staus flag");
     }
@@ -2048,11 +2026,19 @@ void ota_event_handler() {
                 break;
             default: ota_printf("unknow event %u", event_data.event); break;
         }
+        if (event_data.data) {
+            xFree(event_data.data);
+            event_data.data = NULL;
+        }
     } while (0);
 }
 
 void ota_start(uint16_t segments_size, uint16_t intervel) {
     otError error = OT_ERROR_NONE;
+    if (g_ota_state == OTA_DONE) {
+        // Allow restarting from DONE without broadcasting stop to network
+        ota_change_state_and_timer(OTA_IDLE, 0);
+    }
     if (g_ota_state != OTA_IDLE) {
         log_info("ota in progress %u ", g_ota_state);
         return;
@@ -2084,13 +2070,19 @@ void ota_start(uint16_t segments_size, uint16_t intervel) {
     }
     // Initiator bitmap set all
     g_ota_bitmap = ota_bitmap_init(g_ota_total_num);
+    if (!g_ota_bitmap) {
+        log_error("[FOTA] bitmap init failed");
+        ota_change_state_and_timer(OTA_IDLE, 0);
+        return;
+    }
     for (uint32_t i = 0; i < g_ota_total_num; i++) {
         ota_bitmap_set(g_ota_bitmap, i);
     }
 
     ota_printf("ota_toatol_num %u ", g_ota_total_num);
-    uint32_t crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                                   (ota_get_image_size() - 0x20));
+    uint32_t crc32 = crc32checksum(
+        (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+        (ota_get_image_size() - OTA_INFO_HEADER_OFFSET));
     if (crc32 != ota_get_image_crc()) {
         log_info("crc fail %x %x ", crc32, ota_get_image_crc());
         return;
@@ -2106,6 +2098,13 @@ void ota_start(uint16_t segments_size, uint16_t intervel) {
 
 void ota_send(char* ipaddr_str) {
     otError error = OT_ERROR_NONE;
+    if (g_ota_state == OTA_DONE) {
+        ota_change_state_and_timer(OTA_IDLE, 0);
+    }
+    if (g_ota_state != OTA_IDLE) {
+        log_info("ota in progress %u ", g_ota_state);
+        return;
+    }
     error = otIp6AddressFromString(ipaddr_str, &ota_sender_addr);
     if (OT_ERROR_NONE == error) {
         g_ota_segments_size = 255;
@@ -2121,8 +2120,9 @@ void ota_send(char* ipaddr_str) {
             return;
         }
         ota_printf("ota_toatol_num %u ", g_ota_total_num);
-        uint32_t crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                                       (ota_get_image_size() - 0x20));
+        uint32_t crc32 = crc32checksum(
+            (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+            (ota_get_image_size() - OTA_INFO_HEADER_OFFSET));
         if (crc32 != ota_get_image_crc()) {
             log_info("crc fail %x %x ", crc32, ota_get_image_crc());
             return;
@@ -2187,10 +2187,10 @@ void ota_send_status_get(otIp6Address dst_ipaddr, uint8_t status_type,
 
 void ota_send_execute(otIp6Address dst_ipaddr, uint8_t execute_flag,
                       uint16_t time) {
-    otError error = OT_ERROR_NONE;
     ota_execute_t ota_execute;
     ota_execute.flag = execute_flag;
     ota_execute.time = time;
+    memset(ota_execute.bin_type, 0, sizeof(ota_execute.bin_type));
 
     ota_execute_sended_event_handler(dst_ipaddr, (uint8_t*)&ota_execute,
                                      sizeof(ota_execute_t));
@@ -2199,8 +2199,8 @@ void ota_send_execute(otIp6Address dst_ipaddr, uint8_t execute_flag,
 void ota_stop() { ota_change_state_and_timer(OTA_IDLE, 0); }
 
 void ota_update_self() {
-    uint32_t crc32 = crc32checksum((OTA_FLASH_START + 0x20),
-                                   (g_ota_image_size - 0x20));
+    uint32_t crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
+                                   (g_ota_image_size - OTA_INFO_HEADER_OFFSET));
     if (crc32 != g_ota_image_crc) {
         ota_printf("ota request upgrade fail %X %X", crc32, g_ota_image_crc);
         ota_change_state_and_timer(OTA_IDLE, 0);
@@ -2211,6 +2211,8 @@ void ota_update_self() {
 }
 
 void ota_debug_level(unsigned int level) { ota_debug_flags = level; }
+
+uint32_t ota_debug_level_get() { return ota_debug_flags; }
 
 otError ota_init(otInstance* aInstance,
                  void (*ota_state_change_cb)(uint8_t state)) {
@@ -2284,7 +2286,7 @@ otError ota_init(otInstance* aInstance,
         error = otIp6AddressFromString(peer_addr, &ota_sender_addr);
 
         /* Init rx done queue*/
-        ota_event_queue = xQueueCreate(5, sizeof(ota_event_data_t));
+        ota_event_queue = xQueueCreate(10, sizeof(ota_event_data_t));
 
         ota_state_change_cb_signal = ota_state_change_cb;
 
@@ -2293,177 +2295,4 @@ otError ota_init(otInstance* aInstance,
     return error;
 }
 
-static void ota_print_help(cb_shell_out_t log_out) {
-    log_out("ota start <segments> <interval> \r\n");
-    log_out("ota send <ipv6> \r\n");
-    log_out("ota stop  \r\n");
-    log_out("ota self \r\n");
-    log_out("ota debug <level> \r\n");
-    log_out("ota erase \r\n");
-    log_out("ota rxmode <on/off> \r\n");
-#if CONFIG_MIU_DEVICE_TYPE_FTD
-    log_out(
-        "ota status <ipv6> <ftd/mtd/all> <report timeout(ms)> *(get version "
-        "and rxmode)\r\n");
-    log_out("ota status table <reset> *(Query ota version)\r\n");
-#endif
-    log_out("ota execute reboot <ipv6> <time(ms)> \r\n");
-    log_out("ota download *(Change to hex mode)\r\n");
-}
-
-static int _cli_cmd_app_ota(int argc, char** argv, cb_shell_out_t log_out,
-                            void* pExtra) {
-    int ret = 0;
-
-    if (!strncmp(argv[1], "help", 4)) {
-        ota_print_help(log_out);
-    } else if (!strncmp(argv[1], "start", 5)) {
-        if (argc < 4) {
-            log_out("Too few parameters \r\n");
-            return -1;
-        }
-        uint16_t segments = 255;
-        uint16_t interval = 1500;
-        segments = utility_strtol(argv[2], 0);
-        interval = utility_strtol(argv[3], 0);
-        log_out("segments_size %u ,interval %u \r\n", segments, interval);
-        ota_start(segments, interval);
-    } else if (!strncmp(argv[1], "send", 4)) {
-        if (argc < 3) {
-            log_out("Too few parameters \r\n");
-            return -1;
-        }
-        ota_send(argv[2]);
-    } else if (!strncmp(argv[1], "self", 4)) {
-        ota_update_self();
-    } else if (!strncmp(argv[1], "stop", 4)) {
-        ota_stop();
-        otIp6Address dst_addr;
-        char dst_addr_str[] = "ff03::1";
-        otIp6AddressFromString(dst_addr_str, &dst_addr);
-        ota_send_execute(dst_addr, OTA_EXECUTE_STOP, 0);
-    } else if (!strncmp(argv[1], "debug", 5)) {
-        if (argc > 2) {
-            unsigned int level = 0;
-            level = utility_strtol(argv[2], 0);
-            ota_debug_level(level);
-        } else {
-            log_out("Ota debug level %d \r\n", ota_debug_flags);
-        }
-    } else if (!strncmp(argv[1], "erase", 5)) {
-        ota_reset();
-    } else if (!strncmp(argv[1], "rxmode", 6)) {
-        if (argc < 3) {
-            log_out("Too few parameters \r\n");
-            return -1;
-        }
-        if (!strncmp(argv[2], "on", 2)) {
-            ota_send_rxmode(true);
-        } else {
-            ota_send_rxmode(false);
-        }
-    } else if (!strncmp(argv[1], "status", 6)) {
-#if CONFIG_MIU_DEVICE_TYPE_FTD
-        if (!strncmp(argv[2], "table", 5)) {
-            if (!strncmp(argv[3], "reset", 5)) {
-                log_out("table reset \r\n");
-                if (g_status_table) {
-                    xFree(g_status_table);
-                    g_status_table = NULL;
-                }
-            } else {
-                if (g_status_table) {
-                    log_out("ipv6 / version / rxmode / state / progress bar "
-                            "\r\n");
-                    log_out(
-                        "----------------------------------------------------- "
-                        "\r\n");
-                    for (int i = 0; i < OTA_STATUS_TABLE_MAX_SIZE; i++) {
-                        if (g_status_table[i].used_state & 0x80) {
-                            for (uint8_t j = 0; j < 8; j++) {
-                                log_out("%02x", g_status_table[i].ipv6[j]);
-                            }
-                            log_out(" /%08x / ", g_status_table[i].version);
-                            log_out("%d / ",
-                                    (g_status_table[i].rxmode_progress & 0x80)
-                                        >> 7);
-                            log_out("%s / ",
-                                    OtaStateToString(
-                                        g_status_table[i].used_state & 0x7F));
-                            log_out("%03d %% \r\n",
-                                    (g_status_table[i].rxmode_progress & 0x7F));
-                        }
-                    }
-                    log_out(
-                        "----------------------------------------------------- "
-                        "\r\n");
-                }
-            }
-        } else {
-            if (argc < 5) {
-                log_out("Too few parameters \r\n");
-                return -1;
-            }
-            otIp6Address dst_addr;
-            otIp6AddressFromString(argv[2], &dst_addr);
-            uint16_t report_timeout = utility_strtol(argv[4], 0);
-            log_out("report tiemout %d \r\n", report_timeout);
-            if (g_status_table == NULL) {
-                g_status_table = xMalloc(OTA_STATUS_TABLE_MAX_SIZE
-                                         * sizeof(ota_state_table_t));
-                memset(g_status_table, 0x0,
-                       (OTA_STATUS_TABLE_MAX_SIZE * sizeof(ota_state_table_t)));
-            }
-            if (g_status_table) {
-                if (!strncmp(argv[3], "ftd", 3)) {
-                    ota_send_status_get(dst_addr, OTA_STATUS_TYPE_FTD,
-                                        report_timeout);
-                } else if (!strncmp(argv[3], "mtd", 3)) {
-                    ota_send_status_get(dst_addr, OTA_STATUS_TYPE_MTD,
-                                        report_timeout);
-                } else {
-                    ota_send_status_get(dst_addr, OTA_STATUS_TYPE_ALL,
-                                        report_timeout);
-                }
-            } else {
-                log_out("no table save \r\n");
-            }
-        }
-#endif
-    } else if (!strncmp(argv[1], "execute", 7)) {
-        if (!strncmp(argv[2], "reboot", 6)) {
-            if (argc < 5) {
-                log_out("Too few parameters \r\n");
-                return -1;
-            }
-            otIp6Address dst_addr;
-            otIp6AddressFromString(argv[3], &dst_addr);
-            uint16_t time = utility_strtol(argv[4], 0);
-            log_out("reboot time %d \r\n", time);
-            ota_send_execute(dst_addr, OTA_EXECUTE_REBOOT, time);
-        }
-    } else if (!strncmp(argv[1], "download", 6)) {
-        cli_mode_switch_function(UART0_MODE_HEX_RX);
-        log_set_level(LOG_LEVEL_NEVER);
-    } else {
-        log_out("ota state : %s \r\n", OtaStateToString(ota_get_state()));
-        log_out("ota image version : 0x%08x \r\n", ota_get_image_version());
-        log_out("ota image size : 0x%08x \r\n", ota_get_image_size());
-        log_out("ota image crc : 0x%08x \r\n", ota_get_image_crc());
-        log_out("current bin version : 0x%08x \r\n",
-                GET_BIN_VERSION(systeminfo.sysinfo));
-    }
-
-    if (ret == 0) {
-        log_out("Done \r\n");
-    }
-    return ret;
-}
-
-const sh_cmd_t g_cli_cmd_app_ota STATIC_CLI_CMD_ATTRIBUTE = {
-    .pCmd_name = "ota",
-    .pDescription = "Miu APP OTA Command : see ota help",
-    .cmd_exec = _cli_cmd_app_ota,
-};
-
-#endif // DCONFIG_APP_TASK_OTA_ENABLE
+#endif // CONFIG_APP_TASK_OTA_ENABLE

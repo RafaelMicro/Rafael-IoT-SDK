@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "app_led.h"
 #include "hosal_dma.h"
 #include "hosal_status.h"
 #include "hosal_uart.h"
@@ -94,17 +95,6 @@ static hosal_uart_dma_cfg_t ncp_uart_dam_tx_cfg = {
     .dma_buf_size = sizeof(g_tx_buf),
 };
 
-static TaskHandle_t ot_ncp_utask_handle = NULL;
-
-static void ot_ncp_uart_signal(void) {
-    if (xPortIsInsideInterrupt()) {
-        BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
-        vTaskNotifyGiveFromISR(ot_ncp_utask_handle, &pxHigherPriorityTaskWoken);
-    } else {
-        xTaskNotifyGive(ot_ncp_utask_handle);
-    }
-}
-
 static int ncp_uart_rx_read(uint8_t* p_data, uint32_t p_data_len) {
     if (p_data == NULL || p_data_len == 0) {
         return -1; // Prevent invalid reads
@@ -186,37 +176,31 @@ static int ncp_uart_rx_callback(void* p_arg) {
     return 0;
 }
 
-void app_ncp_uart_rx_cb_timeout_callback(TimerHandle_t xTimer) {
-    ot_ncp_uart_signal();
-}
-
 static int NcpSend(const uint8_t* aBuf, uint16_t aBufLength) {
     // log_info_hexdump("send", ncp_uart_dam_tx_cfg.dma_buf,
     //                  ncp_uart_dam_tx_cfg.dma_buf_size);
+    app_set_led0_on();
     hosal_uart_send(&ncp_uart_dev, aBuf, aBufLength);
+    hosal_uart_send_complete(&ncp_uart_dev);
     otNcpHdlcSendDone();
+    app_set_led0_off();
     return aBufLength;
 }
 
 void otAppNcpInit(otInstance* aInstance) { otNcpHdlcInit(aInstance, NcpSend); }
 
-static void ot_ncp_task_loop(void* parameters_ptr) {
+static void ot_ncp_task() {
     static uint8_t uart_packet[OT_NCP_UART_DATA_CACHE_SIZE];
     uint32_t data_len = 0;
+    memset(uart_packet, 0x00, sizeof(uart_packet));
+    data_len = ncp_uart_rx_read(uart_packet, OT_NCP_UART_DATA_CACHE_SIZE);
+    // log_info_hexdump("read", uart_packet, data_len);
+    // log_info("read");
+    otNcpHdlcReceive(uart_packet, data_len);
+}
 
-    otInstance* instance = otrGetInstance();
-    if (instance) {
-        otAppNcpInit(instance);
-    }
-
-    for (;;) {
-        memset(uart_packet, 0x00, sizeof(uart_packet));
-        data_len = ncp_uart_rx_read(uart_packet, OT_NCP_UART_DATA_CACHE_SIZE);
-        // log_info_hexdump("read", uart_packet, data_len);
-        // log_info("read");
-        otNcpHdlcReceive(uart_packet, data_len);
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    }
+void app_ncp_uart_rx_cb_timeout_callback(TimerHandle_t xTimer) {
+    ot_app_task_post(ot_ncp_task, NULL);
 }
 
 void ncpInitUser() {
@@ -228,13 +212,6 @@ void ncpInitUser() {
         app_ncp_rx_cb_time = xTimerCreate(
             "app_ncp_rx_cb_time", 5, pdFALSE, NULL,
             (TimerCallbackFunction_t)app_ncp_uart_rx_cb_timeout_callback);
-    }
-
-    xReturned = xTaskCreate(ot_ncp_task_loop, "ncp_uart", 512, NULL,
-                            (configMAX_PRIORITIES - 4), &ot_ncp_utask_handle);
-    if (xReturned != pdPASS) {
-        log_error("task create fail\n");
-        return;
     }
 
     NVIC_SetPriority(OT_NCP_UART_IRQn, 5);
@@ -249,7 +226,12 @@ void ncpInitUser() {
     hosal_uart_callback_set(&ncp_uart_dev, HOSAL_UART_RX_CALLBACK,
                             ncp_uart_rx_callback, &ncp_uart_dev);
 
-    log_info("ncpInitUser \r\n");
+    log_info("NCP UART TX PIN   : %d ",
+             CONFIG_APP_OT_NCP_OPERATION_UART_TX_PIN);
+    log_info("NCP UART RX PIN   : %d ",
+             CONFIG_APP_OT_NCP_OPERATION_UART_RX_PIN);
+    log_info("NCP UART BAUDRATE : %d ",
+             CONFIG_APP_OT_NCP_OPERATION_UART_BAUDRATE);
     /* Configure UART to interrupt mode */
     hosal_uart_ioctl(&ncp_uart_dev, HOSAL_UART_MODE_SET,
                      (void*)HOSAL_UART_MODE_INT_RX);

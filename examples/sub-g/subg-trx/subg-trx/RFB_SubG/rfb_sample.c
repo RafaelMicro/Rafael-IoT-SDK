@@ -36,7 +36,7 @@
 #include "log.h"
 #include "mac_frame_gen.h"
 #include "lpm.h"
-
+#include "project_config.h"
 /*subg use*/
 #include "subg_ctrl.h"
 
@@ -66,13 +66,16 @@
 #define PHY_MIN_LENGTH          (3)
 #define PRBS9_LENGTH            (255)
 #if (SUBG_MAC)
+/* 15.4 MAC Parameters Setting 
+   Users could modify MAC parameters in the following lines 
+*/
 #define A_TURNAROUND_TIMR             1000;
 #define A_UNIT_BACKOFF_PERIOD         320;
 #define MAC_ACK_WAIT_DURATION         16000 // For OQPSK mode; FSK: 2000 non-beacon mode; 864 for beacon mode
 #define MAC_MAX_BE                    5
 #define MAC_MAX_FRAME_TOTAL_WAIT_TIME 16416
 #define MAC_MAX_FRAME_RETRIES         3
-#define MAC_MAX_CSMACA_BACKOFFS       4
+#define MAC_MAX_CSMACA_BACKOFFS       2
 #define MAC_MIN_BE                    3
 #endif
 /**************************************************************************************************
@@ -108,14 +111,19 @@ uint8_t              g_prbs9_buf[FSK_RX_LENGTH];
 /* TX length for TX transmit test*/
 uint16_t             g_tx_len;
 
-static subg_ctrl_modulation_t modem_type = SUBG_CTRL_MODU_FSK;
-static hosal_rf_tx_power_t sPhyPowerStage = {
-    .band_type = HOSAL_RF_BAND_SUBG_915M,
-    .power_index = 30,
-};
+/* RF Parameters Setting 
+   Users could modify RF parameters in the following lines 
+*/
+static band_type_t band = HOSAL_RF_BAND_SUBG_915M;             //HOSAL_RF_BAND_SUBG_915M; HOSAL_RF_BAND_SUBG_868M; HOSAL_RF_BAND_SUBG_433M
+static uint8_t RF1301_high_power_table = 1;                    //1: 20dBm; 0: 14dBm, only effective when using RF1301
+static subg_ctrl_modulation_t modem_type = SUBG_CTRL_MODU_FSK; //SUBG_CTRL_MODU_FSK; SUBG_CTRL_MODU_OPQSK
+static uint8_t data_rate = SUBG_CTRL_DATA_RATE_300K;           //SUBG_CTRL_DATA_RATE_50K; SUBG_CTRL_DATA_RATE_100K; SUBG_CTRL_DATA_RATE_300K, etc.
+static subg_ctrl_fsk_mod_t mod_idx = SUBG_CTRL_FSK_MOD_1;      //SUBG_CTRL_FSK_MOD_0P5; SUBG_CTRL_FSK_MOD_1
+
+static hosal_rf_tx_power_t sPhyPowerStage;
 
 /* frequency lists*/
-uint32_t             g_freq_support[10] = {920000, 920500, 921000, 921500, 922000, 922500, 923000, 923500, 924000, 924500};
+uint32_t             g_freq_support[6] = {915000, 0, 868000, 433000, 315000, 470000};
 
 static rtc_time_t current_time, alarm_tm;
 static uint32_t alarm_mode;
@@ -187,7 +195,7 @@ static void subg_rx_done(uint16_t ruci_packet_length, uint8_t *rx_data_address, 
     {
         g_crc_fail_count ++;
     }
-    printf("RX (len:%d) done, Success:%d Fail:%d\n", rx_data_len, g_crc_success_count, g_crc_fail_count);
+    printf("RX (len:%d)(rssi:%d) done, Success:%d Fail:%d\n", rx_data_len, rssi, g_crc_success_count, g_crc_fail_count);
 }
 
 void rfb_rx_timeout(void)
@@ -334,27 +342,68 @@ void app_rx_process(void) {
 }
 
 /* TRX initialization */
-void rfb_trx_init(uint32_t rx_timeout_timer, bool rx_continuous)
+void rfb_trx_init(subg_ctrl_modulation_t modem, uint8_t data_rate)
 {
     /*Set RF State to Idle*/
     subg_ctrl_idle_set();
-
-    /*Set TX config*/
-    subg_ctrl_modem_config_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_100K, SUBG_CTRL_FSK_MOD_1);
-    subg_ctrl_mac_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_CRC_TYPE_16, SUBG_CTRL_WHITEN_ENABLE);
-    subg_ctrl_preamble_set(SUBG_CTRL_MODU_FSK, 8);
-    subg_ctrl_sfd_set(SUBG_CTRL_MODU_FSK, 0x00007209);
-    subg_ctrl_filter_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_FILTER_TYPE_FSK);
 
     /*
     * Set channel frequency :
     * For band is subg, units is kHz
     * For band is 2.4g, units is mHz
     */
+    subg_ctrl_frequency_set(g_freq_support[band]);
 
-    subg_ctrl_frequency_set(g_freq_support[0]);
+    /* TX power parameters */
+    sPhyPowerStage.modem = (modem == SUBG_CTRL_MODU_FSK) ? HOSAL_RF_MODEM_FSK : HOSAL_RF_MODEM_SUBG_OQPSK;
+    sPhyPowerStage.band_type = band;
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+    sPhyPowerStage.power_index = 30; //7 ~ 30(20dBm)
+#else
+    if (RF1301_high_power_table)
+    {
+        sPhyPowerStage.power_index = 127; //76 ~ 127(20dBm)
+    }
+    else
+    {
+        sPhyPowerStage.power_index = 63; //15 ~ 63(14dBm)
+    }
+#endif
 
-    sPhyPowerStage.modem = (modem_type == SUBG_CTRL_MODU_FSK) ? HOSAL_RF_MODEM_FSK : HOSAL_RF_MODEM_SUBG_OQPSK;
+    /*Set TRX config*/
+    if (modem == SUBG_CTRL_MODU_FSK)
+    {
+        if (data_rate <= SUBG_CTRL_DATA_RATE_1M)
+        {
+            subg_ctrl_modem_config_set(modem, data_rate, SUBG_CTRL_FSK_MOD_0P5);
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+            subg_ctrl_ble_mac_set(0x71764129, SUBG_CTRL_WHITEN_ENABLE);
+            sPhyPowerStage.band_type = HOSAL_RF_BAND_2P4G; //special case for 58x 1M/2M data rate
+#else
+            subg_ctrl_sfd_set(modem, 0x71764129);
+#endif
+        }
+        else
+        {
+            subg_ctrl_modem_config_set(modem, data_rate, mod_idx);
+            subg_ctrl_sfd_set(modem, 0x00007209);
+        }
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+        if (data_rate > SUBG_CTRL_DATA_RATE_1M)
+#endif
+        {
+            subg_ctrl_filter_set(modem, SUBG_CTRL_FILTER_TYPE_FSK);
+            subg_ctrl_mac_set(modem, SUBG_CTRL_CRC_TYPE_16, SUBG_CTRL_WHITEN_ENABLE);
+            subg_ctrl_preamble_set(modem, 8);
+        }
+    }
+    else
+    {
+        subg_ctrl_modem_config_set(modem, data_rate, SUBG_CTRL_FSK_MOD_UNDEF);
+        subg_ctrl_mac_set(modem, SUBG_CTRL_CRC_TYPE_16, SUBG_CTRL_WHITEN_ENABLE);
+    }
+
+    /* Set TX power */
     hosal_rf_ioctl(HOSAL_RF_IOCTL_TX_PWR_SET, &sPhyPowerStage);
 
     g_tx_len = PHY_MIN_LENGTH;
@@ -373,6 +422,58 @@ void data_gen(uint8_t *pbuf, uint16_t len)
     }
 }
 
+#if INTERNAL_TEST_MODE
+void gpio_parameters_chek() {
+    uint32_t pin31_value, pin30_value, pin29_value, pin28_value, pin23_value,
+        pin14_value, pin9_value;
+
+    hosal_gpio_pin_get(31, &pin31_value);
+    hosal_gpio_pin_get(30, &pin30_value);
+    hosal_gpio_pin_get(29, &pin29_value);
+    hosal_gpio_pin_get(28, &pin28_value);
+    hosal_gpio_pin_get(23, &pin23_value);
+    hosal_gpio_pin_get(14, &pin14_value);
+    hosal_gpio_pin_get(9, &pin9_value);
+
+    if (pin31_value == 0) {
+        band = HOSAL_RF_BAND_SUBG_433M;
+        printf("RF Band: 433MHz\r\n");
+    } else if (pin30_value == 0) {
+        band = HOSAL_RF_BAND_SUBG_868M;
+        printf("RF Band: 868MHz\r\n");
+    } else {
+        band = HOSAL_RF_BAND_SUBG_915M;
+        printf("RF Band: 915MHz\r\n");
+    }
+
+    if (pin29_value == 0) {
+        data_rate = SUBG_CTRL_DATA_RATE_100K;
+        printf("Data rate: 100kbps\r\n");
+    } else if (pin28_value == 0) {
+        data_rate = SUBG_CTRL_DATA_RATE_50K;
+        printf("Data rate: 50kbps\r\n");
+    } else {
+        data_rate = SUBG_CTRL_DATA_RATE_300K;
+        printf("Data rate: 300kbps\r\n");
+    }
+#if (defined(CONFIG_RF1301) || defined(CONFIG_RT584H) || defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L))
+    if (pin23_value == 0) {
+        RF1301_high_power_table = 0;
+        printf("RF1301 will use 14dBm TX power table\r\n");
+    } else {
+        RF1301_high_power_table = 1;
+        printf("RF1301 will use 20dBm TX power table\r\n");
+    }
+#endif
+    if (pin9_value == 0) {
+        mod_idx = SUBG_CTRL_FSK_MOD_0P5;
+        printf("FSK modulation index: 0.5\r\n");
+    } else {
+        mod_idx = SUBG_CTRL_FSK_MOD_1;
+        printf("FSK modulation index: 1\r\n");
+    }
+}
+#endif
 /**************************************************************************************************
  *    GLOBAL FUNCTIONS
  *************************************************************************************************/
@@ -409,9 +510,32 @@ void rfb_sample_init(uint8_t RfbPciTestCase)
     uint8_t is_coordinator = true;
     uint8_t mac_promiscuous_mode = false;
 #endif
+
     hosal_rf_init(HOSAL_RF_MODE_RUCI_CMD);
 
-    lmac15p4_init(LMAC15P4_SUBG_FSK, HOSAL_RF_BAND_SUBG_915M);
+#if INTERNAL_TEST_MODE
+    gpio_parameters_chek();
+#endif
+    if (modem_type == SUBG_CTRL_MODU_FSK)
+    {
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+        if (data_rate <= SUBG_CTRL_DATA_RATE_1M)
+        {
+            lmac15p4_init(LMAC15P4_SUBG_BLE, band);
+        }
+        else
+#endif
+        {
+            lmac15p4_init(LMAC15P4_SUBG_FSK, band);
+        }
+    }
+    else
+    {
+        lmac15p4_init(LMAC15P4_SUBG_OQPSK, band);
+    }
+
+    /* Set test parameters*/
+    rfb_trx_init(modem_type, data_rate);
 
     /* Register rfb interrupt event */
     lmac15p4_callback_t mac_cb;
@@ -447,8 +571,6 @@ void rfb_sample_init(uint8_t RfbPciTestCase)
 
     data_gen(&g_prbs9_buf[0], FSK_RX_LENGTH);
 
-    /* Set test parameters*/
-    rfb_trx_init(0, true);
     if (RfbPciTestCase == SUBG_RX_TEST)
     {
 #if (SUBG_MAC)

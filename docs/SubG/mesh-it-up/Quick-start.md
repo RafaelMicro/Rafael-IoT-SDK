@@ -89,9 +89,9 @@ UDP PORT           : 0x162e
 ### 3.5 Verification: If you observe similar output, congratulations! Your development environment is correctly set up, and your first MIU example is running successfully.
 
 
-## 4. Standard Operating Procedure (SOP) for Network Setup ( Enable (`CONFIG_APP_TASK_CENTRAL_ENABLE=1`, `CONFIG_APP_TASK_CENTRAL_ENABLE=1`) for network management)
+## 4. Standard Operating Procedure (SOP) for Network Setup
 
-This section guides you through the process of establishing a **Leader-Router-MTD** network from scratch using three EVK boards, and verifying the entire system's functionality.
+This section guides you through the process of establishing a **Leader-Router-Child** network from scratch using three EVK boards.
 
 ### 4.1 Device Preparation and Flashing
 
@@ -99,105 +99,74 @@ Prepare 3 EVK development boards (assumed as EVK #1, #2, #3).
 
 | Device | Firmware to Flash | Network Role | Notes |
 | :--- | :--- | :--- | :--- |
-| **EVK #1** | `miu-ftd.bin` | Leader | **Critical:** Ensure **GPIO 22 is physically grounded** (Low level). |
-| **EVK #2** | `miu-ftd.bin` | Router | Wait for provisionig windows start to join the network. |
-| **EVK #3** | `miu-mtd.bin` | MTD (Child) | Wait for provisionig windows start to join the network. |
-
-> ❗ **Leader Device Requirement (EVK #1):** The MIU SDK enforces that the device assuming the Thread Leader role must have its **GPIO 22 grounded** (Low Level).
+| **EVK #1** | `miu-ftd.bin` | Leader | Automatically promotes to Leader after power-on. |
+| **EVK #2** | `miu-ftd.bin` | Router/Child | Automatically attaches to the existing network. |
+| **EVK #3** | `miu-mtd.bin` | Child | Automatically attaches to the existing network. |
 
 ### 4.2 Network Formation and Initialization
 
-1.  **Factory Reset:** To ensure a clean start, it is recommended to factory reset all devices (or perform a clean flash).
+1.  **Factory Reset:** To ensure a clean start, it is recommended to factory reset the FTD devices (EVK #1 and EVK #2) before forming the network. On each FTD CLI terminal, run:
     ```bash
-    ot factoryreset
+    factoryreset
     ```
-### 4.3 Ledader open provisioning windows
+    > **Note:** EVK #3 (MTD) has no CLI interface and cannot run `factoryreset`. To reset its stored credentials, perform a clean reflash of the firmware.
+### 4.3 Leader Initialization (EVK #1)
 1.  **Power On Leader (EVK #1):**
-    * After power-on, the Leader will automatically scan and form a new Thread network.
+    When no existing Thread network is detected, EVK #1 will automatically form a new network and promote itself to Leader. This may take up to 1 minute.
 2.  **Verify Leader State:**
     * In the CLI terminal for EVK #1, input:
         ```bash
-        ot state
+        state
         ```
     * **Expected Output:** `leader`
-3.  **Open the provisioning windows and allow the road network:**
-    * In the CLI terminal for EVK #1, input:
+    * If the device is still `detached` after 1 minute, you can manually force it:
         ```bash
-        app provisioner start 120
+        state leader
         ```
-### 4.4 Router and MTD Automatic Join
+### 4.4 Router and MTD Automatic Attach
 
 1.  **Power On Router (EVK #2) and MTD (EVK #3).**
-2.  The Router and MTD will automatically scan and join the network established by EVK #1.
+2.  Both devices will automatically scan and join the network established by EVK #1 using default parameters.
 3.  **Verify States:**
-    * In the CLI terminal for EVK #2, input `ot state`. **Expected Output:** `router`
-    * In the CLI terminal for EVK #3, input `ot state`. **Expected Output:** `child`
+    * In the CLI terminal for EVK #2, input `state`. **Expected Output:** `router`
+    * EVK #3 (MTD) has no CLI. Verify attachment by observing the UART boot log — it will print `Current role : child` once it joins.
 
 ---
 
 ## 5. Network Functionality Verification
 
-### 5.1 LED Status Verification
-
-Observe the LED indicators on each device to confirm the network state.
-LED 0 : (gpio20, gpio 15)
-LED 1 : (gpio21, gpio 14)
-
-| Network State |Leader LED Behavior |
-| :--- | :--- |
-| **Out-of-Network** | All LED Off |
-| **Change to Leader** | Slow Blinking 2 LED (e.g., 1s on/off)|
-
-| Network State |  Other Device LED Behavior |
-| :--- | :--- |
-| **Out-of-Network** | Slow LED 0 Blinking  (e.g., 1s on/off) |
-| **Network enrolling** | Fast LED 0 Blinking (e.g., 100ms on/off) |
-| **Enrolling success** | Slow LED 1 Blinking (e.g., 1s on/off) |
-
-> 💡 **LED GPIO Pinout Reference:** For the specific GPIO pin used for the LED on each device and the underlying code logic, please refer to the current layout board.
-
-### 5.2 Application Layer Communication Test
-
-We will use the Leader to send a remote control command to the MTD, verifying end-to-end application layer connectivity.
+We will verify application-layer connectivity using UDP and Ping commands from the Leader.
 
 1.  **Get MTD's Mesh Local EID:**
-    * In the MTD (EVK #3) CLI terminal, input:
-        ```bash
-        ot ipaddr mleid
+    * EVK #3 (MTD) has no CLI. Its Mesh Local EID is printed in the UART boot log after attaching:
         ```
-    * **Example Output:** `fd00:db8:0:0:a0b4:c3d2:5e67:890a` (This is the MTD's unique IP address in the Mesh network).
-
-2.  **Send Control Command from Leader:**
-    * Return to the Leader (EVK #1) CLI terminal and input the `app ctrl` command.
-    * **Command Format:** `app ctrl <Target EID/RLOC IPv6> <Command Code>`
-    * **Example:** Assuming the Command Code `0x03` is defined as **TOGGLE LED**.
-        ```bash
-        app ctrl fd00:db8:0:0:a0b4:c3d2:5e67:890a 0x03
+        Mesh IPv6 Address  : fd00:db8:0:0:200:0:0:0
         ```
-    * **Expected Result:** The LED on the MTD (EVK #3) should **change its state** (e.g., ON to OFF or vice versa).
+    * Use this address as the target in the following commands.
 
-2.  **Send ping Command from Leader:**
-    * Return to the Leader (EVK #1) CLI terminal and input the `ot ping` command.
-    * **Command Format:** `ot ping <Target EID/RLOC IPv6> <Size> <Count>`
+2.  **Send UDP Command from Leader:**
+    * Return to the Leader (EVK #1) CLI terminal and input the `app udp` command.
+    * **Command Format:** `app udp send <Target EID/RLOC IPv6> -x <Hex Data>`
     * **Example:**
         ```bash
-        ot ping fd00:db8:0:0:a0b4:c3d2:5e67:890a 64 1
+        app udp send fd00:db8:0:0:a0b4:c3d2:5e67:890a -x 123456
+        ```
+    * **Expected Result:** The MTD (EVK #3) should show 
+        ```bash
+        123456
+        ```
+3.  **Send ping Command from Leader:**
+    * Return to the Leader (EVK #1) CLI terminal and input the `ping` command.
+    * **Command Format:** `ping <Target EID/RLOC IPv6> <Size> <Count>`
+    * **Example:**
+        ```bash
+        ping fd00:db8:0:0:a0b4:c3d2:5e67:890a 64 1
         ```
     * **Expected Result:**
         ```bash
         72 bytes from fd00:db8:0:0:a0b4:c3d2:5e67:890a: icmp_seq=1 hlim=64 time=39ms
         1 packets transmitted, 1 packets received. Packet loss = 0.0%. Round-trip min/avg/max = 39/39.0/39 ms.
         ```
-        
-### 5.3 Topology Visualization Verification
-
-1.  **Launch Topology Tool:** Run the Topology Tool software and establish a connection to the Leader (EVK #1).
-2.  **Confirm Topology Structure:** The software interface should display a three-node network topology:
-    * **Leader** (EVK #1)
-    * **Router** (EVK #2)
-    * **Child/MTD** (EVK #3)
-
-> 🔗 **Detailed Instructions:** For utilising the Topology Tool, please refer to the dedicated [`Topology-Tool-guide.md`](Topology-Tool-guide.md).
 
 ---
 
@@ -212,4 +181,3 @@ You have successfully built and verified the MIU Mesh network. Please refer to t
     * [`miu-sniffer Example Guide`](example/miu-sniffer-guide.md)
 * **Advanced Features (To be completed):**
     * [`OTA Guide`](OTA-guide.md)
-    * [`Topology Tool Guide`](Topology-Tool-Guide.md)

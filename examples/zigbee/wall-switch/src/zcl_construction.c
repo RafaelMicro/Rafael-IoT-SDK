@@ -226,11 +226,11 @@ zb_zcl_cluster_desc_t g_zigbee_cluster_ota_list[] =
 //=============================================================================
 //                Simple desc definitions
 //=============================================================================
-ZB_DECLARE_SIMPLE_DESC(3, 3);
+ZB_DECLARE_SIMPLE_DESC(3, 4);
 ZB_DECLARE_SIMPLE_DESC(0, 1);
 
 
-ZB_AF_SIMPLE_DESC_TYPE(3, 3) simple_desc_wall_switch_ep =
+ZB_AF_SIMPLE_DESC_TYPE(3, 4) simple_desc_wall_switch_ep =
 {
     WALL_SWITCH_EP,                                  /* Endpoint */
     ZB_AF_HA_PROFILE_ID,                           /* Application profile identifier */
@@ -238,7 +238,7 @@ ZB_AF_SIMPLE_DESC_TYPE(3, 3) simple_desc_wall_switch_ep =
     1,                                              /* Application device version */
     0,                                  /* Reserved */
     3,                  /* Application input cluster count */
-    3,                 /* Application output cluster count */
+    4,                 /* Application output cluster count */
     /* Application input and output cluster list */
     {
         ZB_ZCL_CLUSTER_ID_BASIC,

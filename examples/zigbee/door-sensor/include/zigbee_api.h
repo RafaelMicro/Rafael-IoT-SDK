@@ -18,6 +18,10 @@
 #ifndef __ZIGBEE_API_H
 #define __ZIGBEE_API_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <zigbee_platform.h>
 #include "fota_define.h"
@@ -32,11 +36,11 @@
 #define DOOR_SENSOR_EP 1
 
 #define ZIGBEE_APP_NOTIFY_ISR(ebit)                                            \
-    (g_zb_app_evt_var |= ebit);                                                \
+    (g_zb_app_evt_var = (zb_app_event_t)(g_zb_app_evt_var | (ebit)));         \
     zb_app_signal()
 #define ZIGBEE_APP_NOTIFY(ebit)                                                \
     vPortEnterCritical();                                                      \
-    g_zb_app_evt_var |= ebit;                                                  \
+    g_zb_app_evt_var = (zb_app_event_t)(g_zb_app_evt_var | (ebit));           \
     vPortExitCritical();                                                       \
     zb_app_signal()
 #define ZIGBEE_APP_GET_NOTIFY(ebit)                                            \
@@ -56,7 +60,7 @@ typedef enum {
     ZB_APP_EVENT_ALL = 0xffffffff,
 } zb_app_event_t;
 
-zb_app_event_t g_zb_app_evt_var;
+extern zb_app_event_t g_zb_app_evt_var;
 extern zb_af_device_ctx_t simple_desc_door_sensor_ctx;
 void zigbee_app_init(void);
 void app_main_loop(void* parameters_ptr);
@@ -73,4 +77,7 @@ void z_set_file_version(uint32_t ver);
 void z_set_OTA_status(uint8_t ver);
 void z_set_OTA_downloaded_file_version(uint32_t ver);
 void z_set_OTA_downloaded_file_offset(uint32_t ver);
+#ifdef __cplusplus
+}
+#endif
 #endif // __ZIGBEE_API_H

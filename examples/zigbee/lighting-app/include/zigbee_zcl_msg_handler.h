@@ -16,10 +16,17 @@
 #ifndef __ZIGBEE_ZCL_MSG_HANDLER_H__
 #define __ZIGBEE_ZCL_MSG_HANDLER_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "zb_common.h"
 #include "zb_mac_globals.h"
 #include "zboss_api.h"
 
 zb_uint8_t zigbee_zcl_msg_handler(zb_uint8_t param);
 
+#ifdef __cplusplus
+}
+#endif
 #endif // __ZIGBEE_ZCL_MSG_HANDLER_H__

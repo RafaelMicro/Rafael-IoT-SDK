@@ -1,0 +1,40 @@
+sdk_add_compile_options(
+-fms-extensions
+-ffunction-sections
+-fdata-sections
+-fmessage-length=0
+-Wno-error=unused-function
+-Wno-error=unused-but-set-variable
+-Wno-error=unused-variable
+-Wno-error=deprecated-declarations
+-Wextra
+-Wno-unused-parameter -Wno-sign-compare
+-Wno-address-of-packed-member
+-fstrict-volatile-bitfields
+-fshort-enums
+-MMD
+-fstack-usage
+)
+
+sdk_add_link_options(
+-Wl,--gc-sections
+-Wl,-static
+-Wl,--start-group
+-Wl,--end-group
+-Wl,-EL
+-Wl,-t
+-lm
+-Wl,--cref 
+-nostartfiles 
+-nostdlib 
+-nodefaultlibs 
+-nolibc
+
+)
+
+sdk_add_link_libraries(c m)
+sdk_add_compile_options_ifdef(CONFIG_DEBUGGER "${CONFIG_COMPILE_OPTIMIZATION} -g3")
+sdk_add_compile_options(
+-DUSE_FREERTOS
+-DCRYPTO_SECP256R1_ENABLE=1
+)

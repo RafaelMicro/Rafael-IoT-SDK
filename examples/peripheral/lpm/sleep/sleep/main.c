@@ -147,10 +147,25 @@ void gpio_init(void) {
     hosal_gpio_int_enable(PWR_LEVEL2_KEY);                                  /*enable PWR_LEVEL2_KEY pin for interrupt source*/
     hosal_gpio_debounce_enable(PWR_LEVEL2_KEY);
     #else
+    /*
+     * RT584 series power down mode 
+     */
+    pin_cfg2.param = NULL;
+    pin_cfg2.pin_int_mode = HOSAL_GPIO_PIN_INT_EDGE_FALLING;
+    pin_cfg2.usr_cb = pwr_level2_int_callback;
+    hosal_pin_set_mode(PWR_LEVEL4_KEY,HOSAL_MODE_GPIO);                      /*Select PWR_LEVEL4_KEY as GPIO mode*/
+    hosal_pin_set_pullopt(PWR_LEVEL4_KEY,HOSAL_PULL_UP_100K);                /*Configure PWR_LEVEL4_KEY 100K pull-up*/
+    hosal_gpio_cfg_input(PWR_LEVEL4_KEY, pin_cfg2);
+    hosal_gpio_int_enable(PWR_LEVEL4_KEY);                                  /*enable PWR_LEVEL4_KEY pin for interrupt source*/
+    hosal_gpio_debounce_enable(PWR_LEVEL4_KEY);
 
 
     #endif
 
+    /*
+     * RT58x sleep mode 1
+     * RT584 series deep sleep mode 
+     */
     pin_cfg1.param = NULL;
     pin_cfg1.pin_int_mode = HOSAL_GPIO_PIN_INT_EDGE_FALLING;
     pin_cfg1.usr_cb = pwr_level1_int_callback;
@@ -160,7 +175,11 @@ void gpio_init(void) {
     hosal_gpio_int_enable(PWR_LEVEL1_KEY);                                  /*enable PWR_LEVEL1_KEY pin for interrupt source*/
     hosal_gpio_debounce_enable(PWR_LEVEL1_KEY);
 
-
+    
+    /*
+     * RT58x sleep mode 0
+     * RT584 series sleep mode 
+     */
     pin_cfg0.param = NULL;
     pin_cfg0.pin_int_mode = HOSAL_GPIO_PIN_INT_EDGE_FALLING;
     pin_cfg0.usr_cb = pwr_level0_int_callback;
@@ -184,15 +203,7 @@ void gpio_init(void) {
     NVIC_EnableIRQ(Gpio_IRQn);
     #else
 
-    pin_cfg2.param = NULL;
-    pin_cfg2.pin_int_mode = HOSAL_GPIO_PIN_INT_EDGE_FALLING;
-    pin_cfg2.usr_cb = pwr_level2_int_callback;
-    hosal_pin_set_mode(PWR_LEVEL4_KEY,HOSAL_MODE_GPIO);                      /*Select PWR_LEVEL2_KEY as GPIO mode*/
-    hosal_pin_set_pullopt(PWR_LEVEL4_KEY,HOSAL_PULL_UP_100K);                /*Configure PWR_LEVEL2_KEY 100K pull-up*/
-    hosal_gpio_cfg_input(PWR_LEVEL4_KEY, pin_cfg2);
-    hosal_gpio_int_enable(PWR_LEVEL4_KEY);                                  /*enable PWR_LEVEL2_KEY pin for interrupt source*/
-    hosal_gpio_debounce_enable(PWR_LEVEL4_KEY);
-
+    
     #endif    
 
     NVIC_EnableIRQ(Gpio_IRQn);
@@ -221,7 +232,6 @@ int main(void) {
     printf("press PWR_BTN4_KEY to enter power down mode\r\n");
     printf("press PWR_BTN1_KEY to enter deep sleep mode\r\n");
     printf("press PWR_BTN0_KEY to enter sleep mode \r\n");
-    printf("press WAKEUP_KEY can wake up these power saving modes\r\n");
     #endif
 
 

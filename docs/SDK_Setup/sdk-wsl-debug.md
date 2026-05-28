@@ -410,14 +410,15 @@ shutdown command invoked
 ### 7.1 Set Execute Permission
 
 ```bash
-chmod +x openocd_rt58x.sh
+chmod +x ./tools/Debugger/OpenOCD/bin/linux/oepnocd
+chmod +x ./tools/Debugger/OpenOCD/script/openocd_rt58x.sh
 ```
 
 ### 7.2 Start OpenOCD
 
 ```bash
 # Method 1: Execute script directly
-./openocd_rt58x.sh
+/tools/Debugger/OpenOCD/script/openocd_rt58x.sh (rt581/rt582/rt583/rt584h/rt584l/rt584ha4/rf1301)
 
 ```
 

@@ -10,14 +10,13 @@
 #include <string.h>
 #include <task.h>
 #include <timers.h>
-#include "app_control_cmd.h"
 #include "app_led.h"
 #include "app_mac_raw.h"
 #include "app_miu_config.h"
-#include "app_net_mgm.h"
 #include "app_task.h"
 #include "app_udp.h"
 #include "cli.h"
+#include "hosal_lpm.h"
 #include "hosal_rf.h"
 #include "lmac15p4.h"
 #include "log.h"
@@ -26,11 +25,20 @@
 #include "miu_ext_mem.h"
 #include "subg_ctrl.h"
 #include "util_string.h"
+#if CONFIG_APP_TASK_OTA_ENABLE
+#include "app_ota.h"
+#endif
 
 #include <openthread/logging.h>
 #include <openthread/random_noncrypto.h>
 
-#define BIN_TYPE_ARR 'm', 'i', 'u', '-', 'm', 't', 'd', 't', 'y', 'p', 'e', '-'
+#if defined(CONFIG_RF1301)
+#define BIN_TYPE_ARR 'm', 'i', 'u', '-', 'm', 't', 'd', '-', '1', '3', '0', '1'
+#elif defined(CONFIG_RT581) || defined(CONFIG_RT582)
+#define BIN_TYPE_ARR 'm', 'i', 'u', '-', 'm', 't', 'd', '-', 'r', '5', '8', '1'
+#else
+#error "Unknown IC type, please define BIN_TYPE_ARR"
+#endif
 const sys_information_t systeminfo = SYSTEMINFO_INIT(BIN_TYPE_ARR);
 
 #define PHY_PIB_TURNAROUND_TIMER  1000
@@ -43,8 +51,8 @@ const sys_information_t systeminfo = SYSTEMINFO_INIT(BIN_TYPE_ARR);
 #define MAC_PIB_MAC_MAX_FRAME_TOTAL_WAIT_TIME 82080 // for 50 kbps-data rate
 #define MAC_PIB_MAC_MAX_FRAME_RETRIES         4
 #define MAC_PIB_MAC_MAX_CSMACA_BACKOFFS       2
-#define MAC_PIB_MAC_MAX_BE                    5
-#define MAC_PIB_MAC_MIN_BE                    4
+#define MAC_PIB_MAC_MAX_BE                    3
+#define MAC_PIB_MAC_MIN_BE                    2
 static uint16_t cca_duration_table[] = {0, 0, 0, 380, 700, 1140, 260, 480};
 static uint32_t frame_total_wait_time_table[] = {0,      0,      0,     70000,
                                                  100000, 150080, 55000, 80000};
@@ -53,7 +61,7 @@ static const char* const data_rate_str[] = {
 static const char* const band_str[] = {"SubG_915M", "2P4G",      "SubG_868M",
                                        "SubG_433M", "SubG_315M", "SubG_470M"};
 uint16_t cca_duration = 0;
-uint16_t frame_total_wait_time = 0;
+uint32_t frame_total_wait_time = 0;
 uint32_t backof_period = 0;
 /*set subg frequencydatarate*/
 #if CONFIG_SUBG_FREQUENCY_BAND_915
@@ -83,16 +91,6 @@ static uint8_t sPhyDataRate = HOSAL_RF_PHY_DATA_RATE_25K;
 static uint8_t sPhyDataRate = HOSAL_RF_PHY_DATA_RATE_300K;
 #endif
 
-#define CONFIG_APP_JOINER_BACKOFF_MAX      30000
-#define CONFIG_APP_JOINER_BACKOFF_INTERVAL 5000
-
-static uint8_t g_app_joiner_attempt = 0;
-
-static SemaphoreHandle_t appSemHandle = NULL;
-static TimerHandle_t sJoinRetryTimer = NULL;
-
-static QueueHandle_t appEventQueue;
-
 typedef struct {
     char networkName[OT_NETWORK_NAME_MAX_SIZE + 1];
     uint8_t extPanId[OT_EXT_PAN_ID_SIZE];
@@ -102,13 +100,6 @@ typedef struct {
     uint8_t channel;
     uint16_t panId;
 } __attribute__((packed)) AppNetworkConfig;
-
-void app_evt_single(void* data, app_event_id_t id) {
-    app_event_t evt;
-    evt.data = data;
-    evt.id = id;
-    xQueueSendFromISR(appEventQueue, &evt, NULL);
-}
 
 static void ot_stateChangeCallback(uint32_t flags, void* p_context) {
     otInstance* instance = (otInstance*)p_context;
@@ -149,7 +140,6 @@ static void ot_stateChangeCallback(uint32_t flags, void* p_context) {
             otIp6AddressToString(otThreadGetLinkLocalIp6Address(instance),
                                  string, sizeof(string));
             log_info("local IPv6 Address : %s", string);
-            app_evt_single(NULL, APP_EVENT_CHANGE_ROLE);
         }
     }
 }
@@ -168,48 +158,12 @@ static void otsleepInit(otInstance* instance) {
     mode.mRxOnWhenIdle = true;
 #endif
     otThreadSetLinkMode(instance, mode);
-}
+    /* low power mode init */
 
-uint8_t join_start_channel = 0;
-static uint8_t next_channel = 0;
-
-void app_join_send(otInstance* instance) {
-    uint8_t channel_min = 0;
-    uint8_t channel_max = 0;
-    uint8_t dstAddr[8] = {0xff, 0xff, 0xff, 0xff,
-                          0xff, 0xff, 0xff, 0xff}; // broadcast
-    otRadioChRange_t range;
-    otPlatRadioGetChannelRange(&range);
-    otLinkSetChannel(instance, next_channel);
-    app_ctrl_send_cmd(dstAddr, CMD_ID_NETWORK_JOIN_REQUEST, FLAG_MAC, NULL, 0,
-                      0xffff, otLinkGetChannel(instance));
-    log_info("[Network] >> Join Request (channel: %d)",
-             otLinkGetChannel(instance));
-    next_channel++;
-    if (next_channel > range.maxChannel) {
-        next_channel -= range.maxChannel;
-    }
-    if (next_channel == join_start_channel) {
-        otLinkSetChannel(instance, join_start_channel);
-        app_evt_single(NULL, APP_EVENT_JOIN_FAILED);
-    } else {
-        xTimerStart(sJoinRetryTimer, 0);
-    }
-}
-
-void appJoinRetryTimerCallback(TimerHandle_t xTimer) {
-    app_evt_single(NULL, APP_EVENT_RETRY_JOIN_NOW);
-}
-
-void app_start_join(otInstance* instance) {
-    join_start_channel = otLinkGetChannel(instance);
-    next_channel = join_start_channel;
-    if (sJoinRetryTimer == NULL) {
-        sJoinRetryTimer = xTimerCreate(
-            "sJoinRetryTimer", pdMS_TO_TICKS(1500), pdFALSE, NULL,
-            (TimerCallbackFunction_t)appJoinRetryTimerCallback);
-    }
-    xTimerStart(sJoinRetryTimer, 0);
+    hosal_lpm_ioctrl(HOSAL_LPM_ENABLE_WAKE_UP_SOURCE,
+                     LOW_POWER_WAKEUP_SLOW_TIMER);
+    hosal_lpm_ioctrl(HOSAL_LPM_ENABLE_WAKE_UP_SOURCE, LOW_POWER_WAKEUP_UART_RX);
+    hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LPM_SLEEP);
 }
 
 static void otnetworkinfo(otInstance* instance) {
@@ -263,7 +217,37 @@ static void otdatasetInit(otInstance* instance) {
     otOperationalDataset app_dataset;
     bool load_default_config = false;
     const char* const desired_network_name = "Rafael Miu";
+#if CONFIG_TEST_TOOL_USE
+    /* Fixed test-only dataset — must NOT match production default. */
+    AppNetworkConfig netconfig = {
+        .networkName = "RafaelMiuTest",
+        .extPanId = {0x54, 0x45, 0x53, 0x54, 0x00, 0x00, 0x00, 0x01},
+        .networkKey = {0xFA, 0xCE, 0xB0, 0x0C, 0xDE, 0xAD, 0xBE, 0xEF, 0x01,
+                       0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF},
+        .meshLocalPrefix = {0xfd, 0x00, 0x54, 0x45, 0x53, 0x54, 0x00, 0x00},
+        .pskc = {0x54, 0x45, 0x53, 0x54, 0x74, 0x6f, 0x6f, 0x6c, 0x00, 0x00,
+                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+        .channel = 2,
+        .panId = 0x5A5A};
+#else
+    AppNetworkConfig netconfig = {
+        .networkName = "Rafael Miu",
+        .extPanId = {0x00, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00},
+        .networkKey = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                       0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f},
+        .meshLocalPrefix = {0xfd, 0x00, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00},
+        .pskc = {0x74, 0x68, 0x72, 0x65, 0x61, 0x64, 0x6a, 0x70, 0x61, 0x6b,
+                 0x65, 0x74, 0x65, 0x73, 0x74, 0x00},
+        .channel = 2,
+        .panId = 0xabcd};
+#endif
 
+#if CONFIG_TEST_TOOL_USE
+    /* Test tool mode: always use the fixed dataset above, ignore flash.
+     * Guarantees all FTD/MTD share the same key/channel/panid on every boot. */
+    load_default_config = true;
+    (void)desired_network_name;
+#else
     if (otDatasetGetActiveTlvs(instance, &app_dataset_tlv) != OT_ERROR_NONE) {
         log_warn("APP Dataset flash is Null, setting default value.");
         load_default_config = true;
@@ -286,6 +270,7 @@ static void otdatasetInit(otInstance* instance) {
             load_default_config = true;
         }
     }
+#endif
 
     /* set extaddr to equal eui64*/
     otExtAddress extAddress;
@@ -298,24 +283,82 @@ static void otdatasetInit(otInstance* instance) {
     otIp6SetMeshLocalIid(instance, &iid);
 
     if (load_default_config) {
-        app_start_join(instance);
-    } else {
+        memset(&app_dataset, 0, sizeof(app_dataset));
+        memset(&app_dataset_tlv, 0, sizeof(app_dataset_tlv));
+        /* Set activetimestamp */
         app_dataset.mActiveTimestamp.mSeconds = 0;
         app_dataset.mActiveTimestamp.mTicks = 0;
         app_dataset.mActiveTimestamp.mAuthoritative = false;
         app_dataset.mComponents.mIsActiveTimestampPresent = true;
 
+        /* Set Channel */
+        app_dataset.mChannel = netconfig.channel;
+        app_dataset.mComponents.mIsChannelPresent = true;
+
+        /* Set Pan ID */
+        app_dataset.mPanId = (otPanId)netconfig.panId;
+        app_dataset.mComponents.mIsPanIdPresent = true;
+
+        /* Set Wake-up Channel */
+        app_dataset.mWakeupChannel = netconfig.channel;
+        app_dataset.mComponents.mIsWakeupChannelPresent = true;
+
+        /* Set Extended Pan ID */
+        memcpy(app_dataset.mExtendedPanId.m8, netconfig.extPanId,
+               OT_EXT_PAN_ID_SIZE);
+        app_dataset.mComponents.mIsExtendedPanIdPresent = true;
+
+        /* Set network key */
+        memcpy(app_dataset.mNetworkKey.m8, netconfig.networkKey,
+               OT_NETWORK_KEY_SIZE);
+        app_dataset.mComponents.mIsNetworkKeyPresent = true;
+
+        /* Set pskc */
+        memcpy(app_dataset.mPskc.m8, netconfig.pskc, OT_PSKC_MAX_SIZE);
+        app_dataset.mComponents.mIsPskcPresent = true;
+
+        /* Set Network Name */
+        size_t length = strlen(netconfig.networkName);
+        memcpy(app_dataset.mNetworkName.m8, netconfig.networkName, length);
+        app_dataset.mComponents.mIsNetworkNamePresent = true;
+
+        memcpy(app_dataset.mMeshLocalPrefix.m8, netconfig.meshLocalPrefix,
+               OT_MESH_LOCAL_PREFIX_SIZE);
+        app_dataset.mComponents.mIsMeshLocalPrefixPresent = true;
+
         otDatasetUpdateTlvs(&app_dataset, &app_dataset_tlv);
 
-        otDatasetSetActiveTlvs(instance, &app_dataset_tlv);
+        if (otDatasetSetActiveTlvs(instance, &app_dataset_tlv)
+            != OT_ERROR_NONE) {
+            log_info("Failed to set Active Dataset TLVs");
+        }
+    }
 
-        otThreadSetEnabled(instance, true);
+    log_info("Active Timestamp   : %lld",
+             (unsigned long long)app_dataset.mActiveTimestamp.mSeconds);
+    otnetworkinfo(instance);
+}
 
-        log_info("Active Timestamp   : %lld",
-                 (unsigned long long)app_dataset.mActiveTimestamp.mSeconds);
-        otnetworkinfo(instance);
+#if CONFIG_APP_TASK_OTA_ENABLE
+void ota_state_change_cb(uint8_t state) {
+    switch (state) {
+        case OTA_IDLE: log_info("change to ota idle state "); break;
+        case OTA_DATA_SENDING: log_info("change to ota sending state "); break;
+        case OTA_DATA_RECEIVING:
+            log_info("change to ota receiving state");
+            break;
+        case OTA_UNICAST_RECEIVING:
+            log_info("change to ota unicase receiving state");
+            break;
+        case OTA_REQUEST_SENDING:
+            log_info("change to ota request sending state");
+            break;
+        case OTA_DONE: log_info("change to ota done state"); break;
+        case OTA_REBOOT: log_info("change to ota reboot state"); break;
+        default: break;
     }
 }
+#endif
 
 void otrInitUser(otInstance* instance) {
 
@@ -333,121 +376,27 @@ void otrInitUser(otInstance* instance) {
     /*led pin init*/
     app_led_pin_init();
 
-    otIp6SetEnabled(instance, true);
+#if CONFIG_APP_TASK_OTA_ENABLE
+    ota_bootloader_info_check();
+    ota_init(instance, ota_state_change_cb);
+#endif
 
     otdatasetInit(instance);
-#if CONFIG_APP_TASK_CENTRAL_ENABLE
-    net_mgm_init(instance);
-#endif
-}
 
-void app_join_response_handler(uint16_t panid, uint8_t* net_key) {
-    otInstance* instance = otrGetInstance();
-    uint32_t role = otThreadGetDeviceRole(instance);
-    if (role != OT_DEVICE_ROLE_DISABLED) {
-        return;
-    }
-    otNetworkKey key;
+    otIp6SetEnabled(instance, true);
 
-    memcpy(&key.m8, net_key, sizeof(key));
-    log_info("join panid: %04x", panid);
-    log_info_hexdump("join key", key.m8, sizeof(key.m8));
-
-    /* Set Pan ID */
-    otLinkSetPanId(instance, (otPanId)panid);
-
-    /* Set network key */
-    otThreadSetNetworkKey(instance, &key);
-
-    log_info("channel             : %d ", otLinkGetChannel(instance));
-    log_info("PAN ID              : %x ", otLinkGetPanId(instance));
-    otNetworkKey networkKey;
-    otThreadGetNetworkKey(instance, &networkKey);
-    log_info_hexdump("networkkey          : ", networkKey.m8,
-                     OT_NETWORK_KEY_SIZE);
-
-    app_evt_single(NULL, APP_EVENT_JOIN_SUCCESS);
+    otThreadSetEnabled(instance, true);
 }
 
 void app_task(void) {
-    app_event_t evt;
-    appEventQueue = xQueueCreate(10, sizeof(app_event_t));
-
     while (true) {
-        if (xQueueReceive(appEventQueue, &evt, portMAX_DELAY)) {
-            OT_THREAD_SAFE(
-                otInstance* instance = otrGetInstance(); if (instance) {
-                    uint32_t role = otThreadGetDeviceRole(instance);
-                    switch (evt.id) {
-                        case APP_EVENT_JOIN_SUCCESS:
-                            log_info("Proceeding to attach...");
-                            otnetworkinfo(instance);
-                            otThreadSetEnabled(instance, true);
-                            if (sJoinRetryTimer) {
-                                xTimerDelete(sJoinRetryTimer, 0);
-                                sJoinRetryTimer = NULL;
-                            }
-                            break;
-                        case APP_EVENT_RETRY_JOIN_NOW:
-                        case APP_EVENT_JOIN_FAILED:
-                            if (role != OT_DEVICE_ROLE_DISABLED) {
-                                log_info("not join state ");
-                                break;
-                            }
-                            if (evt.id == APP_EVENT_RETRY_JOIN_NOW) {
-                                app_join_send(instance);
-                                break;
-                            }
-                            g_app_joiner_attempt++;
-                            const uint32_t kStepCount =
-                                CONFIG_APP_JOINER_BACKOFF_MAX
-                                / CONFIG_APP_JOINER_BACKOFF_INTERVAL;
-                            const uint32_t kPeriodCount = kStepCount * 2 - 1;
-                            const uint32_t kStepSize =
-                                CONFIG_APP_JOINER_BACKOFF_INTERVAL;
-                            uint16_t backoff_time_max = 0;
-                            uint32_t phase = (g_app_joiner_attempt - 1)
-                                             % kPeriodCount;
-
-                            if (phase < kStepCount) {
-                                backoff_time_max = (phase + 1) * kStepSize;
-                            } else {
-                                backoff_time_max = (kPeriodCount - phase)
-                                                   * kStepSize;
-                            }
-
-                            int retry_delay = otRandomNonCryptoGetUint16InRange(
-                                200, backoff_time_max);
-
-                            log_info("Retrying join in %d milliseconds...",
-                                     retry_delay);
-                            vTaskDelay(pdMS_TO_TICKS(retry_delay));
-                            // otInstanceErasePersistentInfo(otrGetInstance());
-                            app_start_join(instance);
-                            break;
-                        case APP_EVENT_CHANGE_ROLE:
-#if CONFIG_APP_TASK_CENTRAL_ENABLE
-                            if (role == OT_DEVICE_ROLE_CHILD) {
-                                enroll_send_time = 0;
-                                enroll_send_try = 0;
-                                enroll_done = false;
-                            }
-#endif
-                            break;
-#if CONFIG_APP_TASK_CENTRAL_ENABLE
-                        case APP_EVENT_NET_MGM_ENROLL_REQ_SEND:
-                            net_mgm_enroll_req_send(instance);
-                            break;
-                        case APP_EVENT_NET_MGM_ENROLL_REQ_SEND_TRYOUT:
-                            otThreadSetEnabled(instance, false);
-                            otThreadSetEnabled(instance, true);
-                            break;
-#endif
-
-                        default: break;
-                    }
-                })
+        otInstance* instance = NULL;
+        /* Always wrap OpenThread API calls in OT_THREAD_SAFE to prevent race conditions with the radio task. */
+        OT_THREAD_SAFE(instance = otrGetInstance();)
+        if (instance) {
+            /*start ...*/
         }
+        ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
     }
 }
 
@@ -512,8 +461,8 @@ void app_common_init() {
     log_info("Channel Range     : %d ~ %d",
              OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MIN,
              OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MAX);
-    log_info("Channel Frequency : %d MHz", OPENTHREAD_CONFIG_CHANNEL_FREQUENCY);
-    log_info("Channel Spacing   : %d MHz", OPENTHREAD_CONFIG_CHANNEL_SPACING);
+    log_info("Channel Frequency : %d ", OPENTHREAD_CONFIG_CHANNEL_FREQUENCY);
+    log_info("Channel Spacing   : %d ", OPENTHREAD_CONFIG_CHANNEL_SPACING);
     otRadioChRange_t radiochrange;
     radiochrange.minChannel =
         OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MIN;
@@ -526,137 +475,3 @@ void app_common_init() {
     /*mesh it up task start*/
     miuStart();
 }
-
-static void print_help(cb_shell_out_t log_out) {
-    log_out("app udp send <ipv6> -x <hex data> \r\n");
-    log_out("app udp send <ipv6> -c <string data> \r\n");
-    log_out("app udp port \r\n");
-    log_out("app led <on/off/toggle/flash> \r\n");
-}
-
-static int handle_udp_send(int argc, char** argv, cb_shell_out_t log_out) {
-    if (argc < 6) {
-        log_out("Too few parameters \r\n");
-        return -1;
-    }
-
-    otIp6Address dst_addr;
-    if (otIp6AddressFromString(argv[3], &dst_addr) != OT_ERROR_NONE) {
-        log_out("Invalid IPv6 address \r\n");
-        return -1;
-    }
-
-    uint8_t* data = NULL;
-    uint16_t data_lens = 0;
-
-    if (!strncmp(argv[4], "-x", 2)) {
-        // Send hex data
-        data_lens = (strlen(argv[5]) + 1) / 2;
-        data = xMalloc(data_lens);
-        if (!data)
-            return -1;
-
-        for (uint16_t i = 0; i < data_lens; i++) {
-            data[i] = (utility_strtox(argv[5] + i * 2, 0, 2) & 0xFF);
-        }
-    } else if (!strncmp(argv[4], "-c", 2)) {
-        // Send string data
-        for (uint8_t i = 5; i < argc; i++) {
-            data_lens += strlen(argv[i]) + 1;
-        }
-
-        data = xMalloc(data_lens);
-        if (!data)
-            return -1;
-
-        uint16_t offset = 0;
-        for (uint8_t i = 5; i < argc; i++) {
-            size_t len = strlen(argv[i]);
-            memcpy(&data[offset], argv[i], len);
-            offset += len;
-            data[offset++] = 0x20;
-        }
-
-        if (offset > 0)
-            offset--; // remove last space
-        data_lens = offset;
-    } else {
-        log_out("Unknown send format. Use -x or -c.\r\n");
-        return -1;
-    }
-
-    app_udpSend(dst_addr, data, data_lens, false);
-    if (data)
-        xFree(data);
-    return 0;
-}
-
-static int handle_led_command(int argc, char** argv, cb_shell_out_t log_out) {
-    if (argc < 3) {
-        log_out("Too few parameters \r\n");
-        return -1;
-    }
-
-    if (!strncmp(argv[2], "on", 2)) {
-        app_set_led0_on();
-    } else if (!strncmp(argv[2], "off", 3)) {
-        app_set_led0_off();
-    } else if (!strncmp(argv[2], "toggle", 6)) {
-        app_set_led0_toggle();
-    } else if (!strncmp(argv[2], "flash", 5)) {
-        app_set_led0_flash();
-    } else {
-        log_out("Unknown LED command\r\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-static int _cli_cmd_miu_app(int argc, char** argv, cb_shell_out_t log_out,
-                            void* pExtra) {
-    int ret = -1;
-
-    if (argc < 2) {
-        log_out("Too few parameters \r\n");
-        return ret;
-    }
-
-    if (!strncmp(argv[1], "help", 4)) {
-        print_help(log_out);
-        ret = 0;
-    } else if (!strncmp(argv[1], "udp", 3)) {
-        if (argc < 3) {
-            log_out("Too few parameters \r\n");
-            return -1;
-        }
-
-        if (!strncmp(argv[2], "send", 4)) {
-            ret = handle_udp_send(argc, argv, log_out);
-        } else if (!strncmp(argv[2], "port", 4)) {
-            log_out("app udp port: %d \r\n", CONFIG_APP_TASK_UDP_LISTEN_PORT);
-            ret = 0;
-        } else {
-            log_out("Unknown udp subcommand\r\n");
-        }
-    } else if (!strncmp(argv[1], "led", 3)) {
-        ret = handle_led_command(argc, argv, log_out);
-    } else if (!strncmp(argv[1], "mem", 3)) {
-        extMemory();
-        ret = 0;
-    } else {
-        print_help(log_out);
-    }
-
-    if (ret == 0) {
-        log_out("+Ok \r\n");
-    }
-
-    return ret;
-}
-
-const sh_cmd_t g_cli_cmd_miu_app STATIC_CLI_CMD_ATTRIBUTE = {
-    .pCmd_name = "app",
-    .pDescription = "Miu APP Command : see app help",
-    .cmd_exec = _cli_cmd_miu_app,
-};

@@ -10,7 +10,7 @@
   "cortex-debug.openocdPath.linux": "${workspaceFolder}/tools/Debugger/OpenOCD/bin/linux/openocd",
   "cortex-debug.openocdPath.osx": "${workspaceFolder}/tools/Debugger/OpenOCD/bin/osx/openocd",
   "debug.enableDebugHover": false,
-  "editor.hover.enabled": false,
+  "editor.hover.enabled": "off",
   "showDevDebugOutput": "raw",
   // Debug for RT584
   "cmake.debugConfig.RT58x": {
@@ -100,5 +100,5 @@
     "random_noncrypto.h": "c",
     "__locale": "c",
     "expected": "c"
-  }
+  },
 }

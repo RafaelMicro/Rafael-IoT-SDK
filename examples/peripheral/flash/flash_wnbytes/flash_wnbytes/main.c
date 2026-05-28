@@ -63,6 +63,7 @@ int main(void) {
     while(hosal_flash_ioctrl(HOSAL_FLASH_BUSY,NULL));
    
 
+
     printf("  Read %d Btyes \r\n",len);
     status = hosal_flash_read_n_bytes(flash_operation_address, buf2,len);
     while(hosal_flash_ioctrl(HOSAL_FLASH_BUSY,NULL));

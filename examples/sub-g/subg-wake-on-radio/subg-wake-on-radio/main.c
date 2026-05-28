@@ -12,6 +12,7 @@
 #include <task.h>
 #include <timers.h>
 #include "cli.h"
+#include "dump_boot_info.h"
 #include "hosal_dma.h"
 #include "hosal_gpio.h"
 #include "hosal_lpm.h"
@@ -22,10 +23,11 @@
 #include "lmac15p4.h"
 #include "log.h"
 #include "mac_frame_gen.h"
+#include "shell.h"
 
 /*subg use*/
-#include "subg_ctrl.h"
 #include "app_hooks.h"
+#include "subg_ctrl.h"
 #include "uart_stdio.h"
 
 #define GPIO_LED_0 20
@@ -102,7 +104,7 @@ typedef struct {
 static uint16_t g_rx_time = 0;
 
 xQueueHandle app_msg_q;
-static SemaphoreHandle_t appSemHandle = NULL;
+// static SemaphoreHandle_t appSemHandle = NULL;
 
 static subg_ctrl_modulation_t modem_type = SUBG_CTRL_MODU_FSK;
 
@@ -131,8 +133,8 @@ void led_off(uint32_t led) { hosal_gpio_pin_write(led, 1); }
 
 uint32_t gpio_frequency_get() {
     uint32_t freq;
-    uint32_t pin31_value, pin30_value, pin29_value, pin28_value, 
-             pin23_value, pin14_value, pin9_value;
+    uint32_t pin31_value, pin30_value, pin29_value, pin28_value, pin23_value,
+        pin14_value, pin9_value;
 
     hosal_gpio_pin_get(31, &pin31_value);
     hosal_gpio_pin_get(30, &pin30_value);
@@ -163,8 +165,8 @@ uint32_t gpio_frequency_get() {
 }
 
 void gpio_frequency_chek() {
-    uint32_t pin31_value, pin30_value, pin29_value, pin28_value, 
-             pin23_value, pin14_value, pin9_value;
+    uint32_t pin31_value, pin30_value, pin29_value, pin28_value, pin23_value,
+        pin14_value, pin9_value;
 
     hosal_gpio_pin_get(31, &pin31_value);
     hosal_gpio_pin_get(30, &pin30_value);
@@ -270,19 +272,6 @@ void subg_cfg_set(subg_ctrl_modulation_t mode, uint8_t data_rate) {
     lmac15p4_src_match_ctrl(0, true);
 
     gpio_frequency_chek();
-
-#if CONFIG_HOSAL_SOC_IDLE_SLEEP
-    hosal_rf_wake_on_radio_t wake_on_radio;
-
-    g_rx_time = 3;
-    wake_on_radio.frequency = gpio_frequency_get();
-    wake_on_radio.rx_on_time = g_rx_time;
-    wake_on_radio.sleep_time = SUBG_RX_ON_RADIO_SLEEP_TIME;
-    hosal_lpm_ioctrl(HOSAL_LPM_UNMASK, HOSAL_LOW_POWER_MASK_BIT_RVD27);
-    hosal_rf_ioctl(HOSAL_RF_IOCTL_WAKE_ON_RADIO_SET, &wake_on_radio);
-    log_info("300K RX on radio start: sleep %d ms ,rx %d ms \r\n",
-             wake_on_radio.sleep_time, wake_on_radio.rx_on_time);
-#endif
 }
 
 #if !CONFIG_HOSAL_SOC_IDLE_SLEEP
@@ -295,8 +284,8 @@ static void subg_data_transmission(uint16_t rx_on_radio_time) {
     log_info("mac tx start \r\n");
     if (mac_tx_data) {
         uint32_t curr = xTaskGetTickCount();
+        led_on(GPIO_LED_1);
         while ((curr + (rx_on_radio_time * 1000)) > xTaskGetTickCount()) {
-            led_on(GPIO_LED_1);
             /* Generate IEEE802.15.4 MAC Header and append data */
             subg_mac_broadcast_hdr_gen(mac_tx_data, &mac_tx_data_lens, dsn);
             memcpy(&mac_tx_data[mac_tx_data_lens], wakeup_data,
@@ -305,9 +294,8 @@ static void subg_data_transmission(uint16_t rx_on_radio_time) {
             lmac15p4_tx_data_send(0, mac_tx_data, mac_tx_data_lens, tx_control,
                                   dsn);
             dsn++;
-            led_off(GPIO_LED_1);
-            vTaskDelay(5);
         }
+        led_off(GPIO_LED_1);
         vPortFree(mac_tx_data);
     }
     log_info("mac tx end\r\n");
@@ -356,10 +344,9 @@ static void button_cb(uint32_t pin, void* isr_param) {
             t_app_q.event = APP_BUTTON_EVT;
             t_app_q.data = pin;
 
-            if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) 
-            {
+            if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
                 xQueueSendToBackFromISR(app_msg_q, &t_app_q, &context_switch);
-                xSemaphoreGiveFromISR(appSemHandle, &context_switch);
+                // xSemaphoreGiveFromISR(appSemHandle, &context_switch);
             }
             break;
 
@@ -466,8 +453,8 @@ static void app_main_task(void) {
     app_queue_t app_q;
 
     for (;;) {
-        xSemaphoreTake(appSemHandle, portMAX_DELAY);
-        while (xQueueReceive(app_msg_q, &app_q, 0) == pdTRUE) {
+        // xSemaphoreTake(appSemHandle, portMAX_DELAY);
+        while (xQueueReceive(app_msg_q, &app_q, portMAX_DELAY) == pdTRUE) {
             switch (app_q.event) {
                 case APP_BUTTON_EVT: app_button_process(app_q.data); break;
                 case APP_TX_DONE_EVT: app_tx_done_process(app_q.data); break;
@@ -505,7 +492,7 @@ static void subg_mac_tx_done(uint32_t tx_status) {
     t_app_q.data = tx_status;
 
     xQueueSendToBackFromISR(app_msg_q, &t_app_q, &context_switch);
-    xSemaphoreGiveFromISR(appSemHandle, &context_switch);
+    // xSemaphoreGiveFromISR(appSemHandle, &context_switch);
 }
 
 static void subg_mac_rx_done(uint16_t packet_length, uint8_t* rx_data_address,
@@ -527,8 +514,9 @@ static void subg_mac_rx_done(uint16_t packet_length, uint8_t* rx_data_address,
 
         t_app_q.event = APP_RX_DONE_EVT;
         t_app_q.data = rx_data_len;
+        printf("rx_data_len = %d\r\n", rx_data_len);
         xQueueSendToBackFromISR(app_msg_q, &t_app_q, &context_switch);
-        xSemaphoreGiveFromISR(appSemHandle, &context_switch);
+        // xSemaphoreGiveFromISR(appSemHandle, &context_switch);
     }
 }
 
@@ -538,96 +526,30 @@ void subg_config_init() {
 
     /*rf init */
     hosal_rf_init(HOSAL_RF_MODE_RUCI_CMD);
-#if 0
-    /*Choose the frequency band you want */
-    lmac15p4_init(LMAC15P4_SUBG_FSK, HOSAL_RF_BAND_SUBG_915M);
 
-    /* Register rfb interrupt event */
-    lmac15p4_callback_t mac_cb;
-    mac_cb.rx_cb = subg_mac_rx_done;
-    mac_cb.tx_cb = subg_mac_tx_done;
-    lmac15p4_cb_set(0, &mac_cb);
-
-    subg_ctrl_sleep_set(false);
-
-    subg_ctrl_idle_set();
-
-    subg_ctrl_modem_config_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_DATA_RATE_300K,
-                               SUBG_CTRL_FSK_MOD_1);
-
-    subg_ctrl_mac_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_CRC_TYPE_16,
-                      SUBG_CTRL_WHITEN_DISABLE);
-
-    subg_ctrl_preamble_set(SUBG_CTRL_MODU_FSK, 8);
-
-    subg_ctrl_sfd_set(SUBG_CTRL_MODU_FSK, 0x00007209);
-
-    subg_ctrl_filter_set(SUBG_CTRL_MODU_FSK, SUBG_CTRL_FILTER_TYPE_FSK);
-
-    /* PHY PIB Parameters */
-    lmac15p4_phy_pib_set(SUBG_PHY_TURNAROUND_TIMER, SUBG_PHY_CCA_DETECT_MODE,
-                         SUBG_PHY_CCA_THRESHOLD, SUBG_PHY_CCA_DETECTED_TIME);
-
-    /* MAC PIB Parameters */
-    lmac15p4_mac_pib_set(SUBG_MAC_UNIT_BACKOFF_PERIOD,
-                         SUBG_MAC_MAC_ACK_WAIT_DURATION, SUBG_MAC_MAC_MAX_BE,
-                         SUBG_MAC_MAC_MAX_CSMACA_BACKOFFS,
-                         SUBG_MAC_MAC_MAX_FRAME_TOTAL_WAIT_TIME,
-                         SUBG_MAC_MAC_MAX_FRAME_RETRIES, SUBG_MAC_MAC_MIN_BE);
-
-    uint16_t short_addr = SUBG_MAC_SHORT_ADDR;
-
-    uint32_t long_addr_0 = (SUBG_MAC_LONG_ADDR >> 32);
-
-    uint32_t long_addr_1 = SUBG_MAC_LONG_ADDR & 0xFFFFFFFF;
-
-    uint16_t pnaid = 0x1AAA;
-
-    lmac15p4_address_filter_set(0, false, short_addr, long_addr_0, long_addr_1,
-                                pnaid, true);
-
-    /* AUTO ACK Enable Flag */
-    lmac15p4_auto_ack_set(true);
-
-    /* Frame Pending Bit */
-    lmac15p4_ack_pending_bit_set(0, true);
-
-    /* Auto State */
-    lmac15p4_auto_state_set(false);
-
-    lmac15p4_src_match_ctrl(0, true);
-
-    gpio_frequency_chek();
-
+    test_auto_state_set(false);
 #if CONFIG_HOSAL_SOC_IDLE_SLEEP
-    hosal_rf_wake_on_radio_t wake_on_radio;
-
-    g_rx_time = 3;
-    wake_on_radio.frequency = gpio_frequency_get();
-    wake_on_radio.rx_on_time = g_rx_time;
-    wake_on_radio.sleep_time = SUBG_RX_ON_RADIO_SLEEP_TIME;
-    hosal_lpm_ioctrl(HOSAL_LPM_UNMASK, HOSAL_LOW_POWER_MASK_BIT_RVD27);
-    hosal_rf_ioctl(HOSAL_RF_IOCTL_WAKE_ON_RADIO_SET, &wake_on_radio);
-    log_info("300K RX on radio start: sleep %d ms ,rx %d ms \r\n",
-             wake_on_radio.sleep_time, wake_on_radio.rx_on_time);
-#endif
+    /* low power mode init */
+    hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LPM_SLEEP);
 #endif
 }
 
-static void app_main_entry(void* pvParameters)
-{
+static void app_main_entry(void* pvParameters) {
     /* initil SubG*/
     subg_config_init();
     app_main_task();
 
-    while (1) {
-    }
+    while (1) {}
 }
 
 int main(void) {
     pin_init();
     uart_stdio_init();
     vHeapRegionsInt();
+
+    /*boot information dump*/
+    _dump_boot_info();
+
     /* led init */
     hosal_gpio_cfg_output(GPIO_LED_0);
     hosal_gpio_cfg_output(GPIO_LED_1);
@@ -641,26 +563,30 @@ int main(void) {
     log_info("SubG Wakeup on radio Sleep\r\n");
 #else
     log_info("SubG Wakeup on radio Tx\r\n");
-    cli_init();
+
 #endif
+    // cli_init();
 
     /* initil Button*/
     button_init();
-    
+
     /* event queue*/
     app_msg_q = xQueueCreate(5, sizeof(app_queue_t));
-    appSemHandle = xSemaphoreCreateBinary();
+    // appSemHandle = xSemaphoreCreateBinary();
 
-    log_printk("GPIO : Frequency (kHz) : ");
+    log_info("GPIO : Frequency (kHz) : [");
     for (int i = 0; i < SUBG_FREQ_PIN_MAX; i++) {
         log_printk("%d : %d(khz), ", g_freq_gpio[i], g_freq_support[i]);
     }
-    log_printk("\r\n");
-    log_info("Buttion : Data Rate (Kbps) : 6.25Kpbs(0), 50Kpbs(1), 100Kpbs(2), "
-             "200Kpbs(3), 300Kpbs(4) ");
+    log_printk("]\r\n");
+    log_info("Buttion : Data Rate (Kbps) : [");
+    log_printk(
+        " 0 : 6.25Kbps, 1 : 50Kbps, 2 : 100Kbps, 3 : 200Kbps, 4 : 300Kbps");
+    log_printk("]\r\n");
 
-    if (xTaskCreate(app_main_entry, (char*)"main",
-                    256, NULL, E_TASK_PRIORITY_APP, NULL) != pdPASS) {
+    if (xTaskCreate(app_main_entry, (char*)"main", 512, NULL,
+                    E_TASK_PRIORITY_APP, NULL)
+        != pdPASS) {
         printf("Task create fail....\r\n");
     }
 

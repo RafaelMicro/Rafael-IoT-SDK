@@ -50,6 +50,7 @@ sdk_add_include_directories(
 # ========================================
 target_sources(app PRIVATE
     ${MIU_COMMON_DIR}/src/cli_uart.cpp
+    ${MIU_COMMON_DIR}/src/app_led.c
     ${CMAKE_CURRENT_LIST_DIR}/src/app_task.c
     ${CMAKE_CURRENT_LIST_DIR}/src/app_ncp.c
 )
@@ -68,3 +69,8 @@ setup_project(miu-sniffer)
 # 7. Link Static Library (miu_port_lib.a)
 # ========================================
 target_link_libraries(app miu_port_lib)
+
+# ========================================
+# 8. Set System Clock
+# ========================================
+sdk_add_compile_options(-DSET_SYS_CLK=2) #0=32Mhz, 1=48Mhz, 2=64Mhz

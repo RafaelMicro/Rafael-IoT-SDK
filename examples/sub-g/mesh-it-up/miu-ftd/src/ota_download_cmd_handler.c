@@ -1,12 +1,14 @@
 
 #include "ota_download_cmd_handler.h"
 #include "app_ota.h"
+#include "app_uart.h"
 #include "cli.h"
 #include "fota_define.h"
 #include "hosal_flash.h"
 #include "log.h"
 #include "main.h"
 #include "miu_ext_mem.h"
+#include "uart.h"
 
 #include <string.h>
 #include "uart_stdio.h"
@@ -63,7 +65,7 @@ static uint8_t _gateway_checksum_calc(uint8_t* pBuf, uint8_t len) {
 
 void ota_download_cmd_send(uint32_t cmd_id, uint16_t addr, uint8_t addr_mode,
                            uint8_t src_endp, uint8_t* pParam, uint32_t len) {
-    uint8_t* ota_download_cmd_pkt;
+    uint8_t* ota_download_cmd_pkt = NULL;
     uint32_t pkt_len;
     uint8_t idx = 0;
 
@@ -126,7 +128,7 @@ void ota_download_cmd_send(uint32_t cmd_id, uint16_t addr, uint8_t addr_mode,
 
         log_debug(
             "------------------------      GW >>>> ------------------------");
-        log_debug_hexdump("  ", ota_download_cmd_pkt, pkt_len);
+        log_info_hexdump("  ", ota_download_cmd_pkt, pkt_len);
         uart_stdio_write(ota_download_cmd_pkt, pkt_len);
         if (ota_download_cmd_pkt) {
             xFree(ota_download_cmd_pkt);
@@ -151,25 +153,34 @@ static void ota_download_handle(uint32_t cmd_id, uint8_t* pBuf) {
 
     int i;
     uint32_t status = 0;
-    static uint8_t* p_tmp_buf;
-    static uint32_t recv_cnt = 0;
-    static uint32_t flash_addr = FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB, tmp_len = 0;
-    uint32_t crc32 = 0, poffset;
+    static uint32_t flash_addr = FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB;
+
+    // Use a static 256-byte buffer instead of a 4KB dynamic allocation to save RAM
+    static uint32_t page_buf_u32[64]; /* 4-byte aligned for DMA */
+    uint8_t* const page_buf = (uint8_t*)page_buf_u32;
+    static uint32_t buf_len = 0;
+
+    uint32_t crc32 = 0;
     ota_img_info_t* upg_data;
 
-    // erase
+    // Erase command
     if (cmd_id == 0xF0000000) {
-        for (i = 0; i < 0x57; i++) {
-            // Page erase (4096 bytes)
+        for (i = 0; i < OTA_MAX_IMAGE_SECTORS; i++) {
+            // Page erase (4096 bytes per sector)
             hosal_flash_erase(
                 HOSAL_FLASH_ERASE_SECTOR,
                 (FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB + (0x1000 * i)));
             flush_cache();
         }
+        // Send ACK for erase completion
         ota_download_cmd_send(0xF0008000, 0, 0, 0, (uint8_t*)&status, 4);
+
     } else if (cmd_id == 0xF0000001) {
+        // Write data command
         do {
             upg_data = (ota_img_info_t*)pBuf;
+
+            // Initialization on the first packet
             if (upg_data->cur_pkt == 0) {
                 memcpy((uint8_t*)&gt_img_info, pBuf, sizeof(gt_img_info));
 
@@ -178,120 +189,124 @@ static void ota_download_handle(uint32_t cmd_id, uint8_t* pBuf) {
                          gt_img_info.manufacturer_code);
                 log_info("File Version: 0x%X", gt_img_info.file_version);
                 log_info("File Size: 0x%X", gt_img_info.image_size);
+
+                // Reset buffer length and set default flash erased state (0xFF)
+                buf_len = 0;
+                memset(page_buf, 0xFF, 256);
                 flash_addr = FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB;
             }
 
-            if (NULL == gp_ota_imgae_cache) {
-                gp_ota_imgae_cache = xMalloc(0x1000);
-            }
-            if (gp_ota_imgae_cache) {
-                log_info("block %d / %d", upg_data->cur_pkt,
-                         (gt_img_info.total_pkt - 1));
-                if (upg_data->cur_pkt == 0) {
-                    recv_cnt = 0;
-                    memset(&gp_ota_imgae_cache[recv_cnt], 0x0, 0x1000);
+            log_info("block %d / %d", upg_data->cur_pkt,
+                     (gt_img_info.total_pkt - 1));
+
+            // Process the currently received packet payload
+            uint32_t remain_pkt_len = upg_data->pkt_len;
+            uint8_t* p_pkt_data = upg_data->pkt;
+
+            // Stream incoming data into the 256-byte flash page buffer
+            while (remain_pkt_len > 0) {
+                uint32_t copy_len = 256 - buf_len;
+                if (copy_len > remain_pkt_len) {
+                    copy_len = remain_pkt_len;
                 }
-                if (upg_data->pkt_len + recv_cnt >= 0x1000) {
-                    memcpy(&gp_ota_imgae_cache[recv_cnt], upg_data->pkt,
-                           0x1000 - recv_cnt);
-                    tmp_len = upg_data->pkt_len - (0x1000 - recv_cnt);
-                    p_tmp_buf = xMalloc(tmp_len);
-                    if (p_tmp_buf) {
 
-                        memset(p_tmp_buf, 0x0, tmp_len);
-                        memcpy(p_tmp_buf, &upg_data->pkt[0x1000 - recv_cnt],
-                               tmp_len);
+                // Copy data to the buffer
+                memcpy(&page_buf[buf_len], p_pkt_data, copy_len);
+                buf_len += copy_len;
+                p_pkt_data += copy_len;
+                remain_pkt_len -= copy_len;
 
-                        // page program (256 bytes)
-                        for (i = 0; i < 0x10; i++) {
-                            while (flash_check_busy())
-                                ;
-                            flash_write_page(
-                                (uint32_t)
-                                    & ((uint8_t*)gp_ota_imgae_cache)[i * 0x100],
-                                flash_addr);
-                            flash_addr += 0x100;
-                        }
-                        recv_cnt = 0;
-                        memcpy(&gp_ota_imgae_cache[recv_cnt], p_tmp_buf,
-                               tmp_len);
-                        recv_cnt += tmp_len;
+                // Once the buffer is full (256 bytes), write it to flash immediately
+                if (buf_len == 256) {
+                    while (flash_check_busy())
+                        ;
+                    flash_write_page((uint32_t)page_buf, flash_addr);
+                    while (flash_check_busy())
+                        ;
+                    flush_cache();
+                    flash_addr += 256;
 
-                        xFree(p_tmp_buf);
-                    } else {
-                        status = 0xFFFFFFFF;
-                        cli_mode_switch_function(UART0_MODE_CLI);
-                        log_set_level(LOG_LEVEL_INFO);
-                        log_info("alloc fail ");
-                        break;
-                    }
+                    // Reset the buffer and fill with 0xFF for the next chunk
+                    buf_len = 0;
+                    memset(page_buf, 0xFF, 256);
+                }
+            }
+
+            // Handle the final packet
+            if (upg_data->cur_pkt == (gt_img_info.total_pkt - 1)) {
+                // Force write any remaining data in the buffer (less than 256 bytes)
+                if (buf_len > 0) {
+                    while (flash_check_busy())
+                        ;
+                    flash_write_page((uint32_t)page_buf, flash_addr);
+                    while (flash_check_busy())
+                        ;
+                    flush_cache();
+                    flash_addr += 256;
+                }
+                while (flash_check_busy())
+                    ;
+
+                // Verify the downloaded image via CRC check (4-byte aligned for DMA)
+                static uint32_t read_buf_u32[64];
+                uint8_t* read_buf = (uint8_t*)read_buf_u32;
+                hosal_flash_read(HOSAL_FLASH_READ_PAGE,
+                                 FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB,
+                                 read_buf);
+
+                uint32_t img_size = SWAP_UINT32(*(uint32_t*)(read_buf + 24))
+                                    + 0x20;
+                uint32_t img_ver = SWAP_UINT32(*(uint32_t*)read_buf);
+                uint32_t img_crc = SWAP_UINT32(*(uint32_t*)(read_buf + 16));
+
+                if (img_size == gt_img_info.image_size) {
+                    crc32 = crc32checksum(
+                        (FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB + 0x20),
+                        (img_size - 0x20));
                 } else {
-                    memcpy(&gp_ota_imgae_cache[recv_cnt], upg_data->pkt,
-                           upg_data->pkt_len);
-                    recv_cnt += upg_data->pkt_len;
+                    // Size mismatch error
+                    status = 0xFFFFFFED;
+                    break; // Exit do-while loop
                 }
-                if (upg_data->cur_pkt == (gt_img_info.total_pkt - 1)) {
-                    for (i = 0; i < 0x10; i++) {
-                        hosal_flash_write(
-                            HOSAL_FLASH_WRITE_PAGE, flash_addr,
-                            (uint8_t*)&gp_ota_imgae_cache[i * 0x100]);
-                        flash_addr += 0x100;
-                    }
 
-                    static uint8_t read_buf[0x100];
-                    hosal_flash_read(HOSAL_FLASH_READ_PAGE,
-                                     FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB,
-                                     (uint8_t*)&read_buf);
-                    uint32_t img_size = SWAP_UINT32(*(uint32_t*)(read_buf + 24))
-                                        + 0x20;
-                    uint32_t img_ver = SWAP_UINT32(*(uint32_t*)read_buf);
-                    uint32_t img_crc = SWAP_UINT32(*(uint32_t*)(read_buf + 16));
-                    if (img_size == gt_img_info.image_size) {
-                        crc32 = crc32checksum(
-                            (FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB + 0x20),
-                            (img_size - 0x20));
-                    } else {
-                        log_info("size fail 0x%08x 0x%08x ", img_size,
-                                 gt_img_info.image_size);
-                        uint32_t size_error = 0xFFFFFFEE;
-                        ota_download_cmd_send(0xF0009000, 0, 0, 0,
-                                              (uint8_t*)&size_error, 4);
-                    }
-                    if (crc32 == SWAP_UINT32(*(uint32_t*)(read_buf + 16))) {
-                        /*ota use*/
-                        ota_set_image_size(img_size);
-                        ota_set_image_version(img_ver);
-                        ota_set_image_crc(img_crc);
-                        log_info("ota setting succuss ");
-                        ota_bootinfo_reset();
-                    } else {
-                        log_info("crc fail 0x%08x 0x%08x ", crc32, img_crc);
-                        ota_download_cmd_send(0xF0009000, 0, 0, 0,
-                                              (uint8_t*)&crc32, 4);
-                    }
-
-                    if (gp_ota_imgae_cache) {
-                        xFree(gp_ota_imgae_cache);
-                    }
-                    gp_ota_imgae_cache = NULL;
+                if (crc32 == SWAP_UINT32(*(uint32_t*)(read_buf + 16))) {
+                    // CRC matched, update OTA boot information
+                    ota_set_image_size(img_size);
+                    ota_set_image_version(img_ver);
+                    ota_set_image_crc(img_crc);
+                    ota_bootinfo_reset();
+                } else {
+                    // CRC mismatch error
+                    status = 0xFFFFFFEE;
+                    break; // Exit do-while loop
                 }
-                status = upg_data->cur_pkt;
-            } else {
-                status = 0xFFFFFFFF;
-                cli_mode_switch_function(UART0_MODE_CLI);
-                log_set_level(LOG_LEVEL_INFO);
-                log_info("cache alloc fail ");
             }
+
+            // If no errors occurred, update status to the current packet number
+            status = upg_data->cur_pkt;
+
         } while (0);
 
-        upg_data = (ota_img_info_t*)pBuf;
-        status = upg_data->cur_pkt;
+        // Send ACK/NACK status back to the sender
+        // This is outside the final-packet check to ensure every packet gets an ACK
+        if (status != upg_data->cur_pkt) {
+            // Send error status
+            ota_download_cmd_send(0xF0009000, 0, 0, 0, (uint8_t*)&status, 4);
+            app_uart0_disable();
+            otPlatUartEnable();
+            log_set_level(LOG_LEVEL_INFO);
+        } else {
+            // Send success status
+            ota_download_cmd_send(0xF0008000, 0, 0, 0, (uint8_t*)&status, 4);
+        }
+
+    } else if (cmd_id == 0xF0000002) {
+        // UART 0 back to CLI command
         ota_download_cmd_send(0xF0008000, 0, 0, 0, (uint8_t*)&status, 4);
-    } else if (cmd_id == 0xF0000002) //uart 0 back to CLI command
-    {
-        cli_mode_switch_function(UART0_MODE_CLI);
+        app_uart0_disable();
+        otPlatUartEnable();
         log_set_level(LOG_LEVEL_INFO);
-        ota_download_cmd_send(0xF0008000, 0, 0, 0, (uint8_t*)&status, 4);
+
     }
 }
 
@@ -305,12 +320,12 @@ void ota_download_cmd_proc(uint8_t* pBuf, uint32_t len) {
 
         log_debug(
             "------------------------ >>>> GW      ------------------------");
-        log_debug_hexdump("  ", pBuf, len);
+        log_info_hexdump("  ", pBuf, len);
 
         cmd_index = cmdID;
         ota_download_cmd_pd* pt_pd = (ota_download_cmd_pd*)&pBuf[5];
 
-        if (cmd_index >= 0xF0000000 & cmd_index < 0xF0000003) {
+        if (cmd_index >= 0xF0000000 && cmd_index <= 0xF0000002) {
             ota_download_handle(cmd_index, pt_pd->parameter);
         }
     }
@@ -326,7 +341,6 @@ uart_handler_data_sts_t ota_download_cmd_parser(uint8_t* pBuf, uint16_t plen,
     //+-------------+-----------+---------------+------------+-----------------+--------------+--------+
     uart_handler_data_sts_t t_return = UART_DATA_INVALID;
 
-    uint16_t i = 0;
     uint16_t idx = 0;
     uint8_t cs = 0;
 
@@ -340,20 +354,19 @@ uart_handler_data_sts_t ota_download_cmd_parser(uint8_t* pBuf, uint16_t plen,
         return t_return;
     }
 
-    for (i = 0; i <= (plen - 4); i++) {
-        if ((pBuf[i] == 0xFF) && (pBuf[i + 1] == 0xFC) && (pBuf[i + 2] == 0xFC)
-            && (pBuf[i + 3] == 0xFF)) {
-            if (offset) {
-                idx = i;
-            }
-            find = 1;
-            break;
-        }
+    if ((pBuf[0] == 0xFF) && (pBuf[1] == 0xFC) && (pBuf[2] == 0xFC)
+        && (pBuf[3] == 0xFF)) {
+        idx = 0;
+        find = 1;
     }
 
-    if (!find
-        || (plen - idx) < (sizeof(ota_download_cmd_hdr)
-                           + sizeof(ota_download_cmd_end))) {
+    if (!find) {
+        /* 4+ bytes present but header is wrong — buffer is corrupt, flush */
+        return (plen >= 4) ? UART_DATA_CS_ERROR : t_return;
+    }
+
+    if ((plen - idx) < (sizeof(ota_download_cmd_hdr)
+                        + sizeof(ota_download_cmd_end))) {
         return t_return;
     }
 

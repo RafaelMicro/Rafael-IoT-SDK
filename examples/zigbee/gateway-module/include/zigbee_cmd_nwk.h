@@ -18,6 +18,10 @@
 #ifndef __ZIGBEE_CMD_NWK_H
 #define __ZIGBEE_CMD_NWK_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "stdint.h"
 
 typedef enum {
@@ -87,4 +91,7 @@ typedef void (*zigbee_cmd_func)(zigbee_cmd_req_t* pt_cmd_req);
 void zigbee_cmd_request(uint16_t dst_addr, uint32_t t_index, uint32_t u32_len,
                         uint8_t* pu8_value);
 
+#ifdef __cplusplus
+}
+#endif
 #endif // __ZIGBEE_CMD_NWK_H

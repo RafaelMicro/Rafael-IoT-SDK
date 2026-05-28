@@ -18,6 +18,10 @@
 #ifndef __DEVICE_API_H
 #define __DEVICE_API_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "EnhancedFlashDataset.h"
 #include "zigbee_api.h"
 
@@ -26,4 +30,7 @@
 void pwm_ctl_init(void);
 void pwm_ctl_set_level(uint8_t duty);
 
+#ifdef __cplusplus
+}
+#endif
 #endif // __DEVICE_API_H

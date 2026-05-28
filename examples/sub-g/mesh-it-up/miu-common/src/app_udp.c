@@ -4,23 +4,24 @@
  * SPDX-License-Identifier: LicenseRef-RafaelMicro-Proprietary-1.0
  *
  */
+#include <config/ip6.h>
 #include <miu_port.h>
 #include <openthread/ip6.h>
 #include <openthread/thread.h>
 #include <openthread/udp.h>
 #include "FreeRTOS.h"
-#include "openthread-core-config.h"
 
 #include <main.h>
-#include "app_control_cmd.h"
 #include "cli.h"
 #include "log.h"
 #include "queue.h"
 #include "string.h"
 #include "util_string.h"
 
-#define THREAD_UDP_EVENT_SEND     0x1
-#define THREAD_UDP_EVENT_RECEIVED 0x2
+typedef enum {
+    THREAD_UDP_EVENT_SEND = 0x01,
+    THREAD_UDP_EVENT_RECEIVED = 0x02,
+} udp_event_id_t;
 
 typedef struct {
     uint8_t event;
@@ -29,21 +30,13 @@ typedef struct {
     uint16_t lens;
 } app_udp_msg_t;
 
-static app_udp_msg_t app_udp_msg;
 static xQueueHandle app_udp_msg_queue;
 static otUdpSocket appSock;
 static uint16_t appUdpPort = CONFIG_APP_TASK_UDP_LISTEN_PORT;
 
 void app_udpReceived_task(uint8_t* data, uint16_t data_lens,
                           otIp6Address src_ipv6) {
-#if CONFIG_APP_TASK_CONTROL_CMD_ENABLE
-    if (app_ctrl_received((void*)&src_ipv6, data, data_lens) == 0) {
-        // log_info("app_ctrl_received success");
-    } else
-#endif
-    {
-        log_info_hexdump("UDP", data, data_lens);
-    }
+    log_info_hexdump("UDP", data, data_lens);
 }
 
 void app_udpSend_task(uint8_t* data, uint16_t data_lens,
@@ -57,7 +50,7 @@ void app_udpSend_task(uint8_t* data, uint16_t data_lens,
 
     memcpy(messageInfo.mPeerAddr.mFields.m8, &dst_ipv6.mFields.m8,
            OT_IP6_ADDRESS_SIZE);
-    messageInfo.mSockAddr = *otThreadGetMeshLocalEid(otrGetInstance());
+    // messageInfo.mSockAddr = *otThreadGetMeshLocalEid(otrGetInstance());
     messageInfo.mPeerPort = appUdpPort;
     messageInfo.mHopLimit = 255;
     messageInfo.mAllowZeroHopLimit = false;
@@ -72,7 +65,7 @@ void app_udpSend_task(uint8_t* data, uint16_t data_lens,
 }
 
 void app_udp_task(void* arg) {
-
+    app_udp_msg_t app_udp_msg;
     if (xQueueReceive(app_udp_msg_queue, &app_udp_msg, 0) == pdPASS) {
 
         if (app_udp_msg.event == THREAD_UDP_EVENT_SEND) {
@@ -87,47 +80,47 @@ void app_udp_task(void* arg) {
 
 static void otUdpReceive_handler(void* aContext, otMessage* aMessage,
                                  const otMessageInfo* aMessageInfo) {
-    memset((void*)&app_udp_msg, 0, sizeof(app_udp_msg_t));
-    app_udp_msg.event = THREAD_UDP_EVENT_RECEIVED;
-    app_udp_msg.lens = otMessageGetLength(aMessage)
-                       - otMessageGetOffset(aMessage);
+    app_udp_msg_t rx_udp_msg;
+    rx_udp_msg.event = THREAD_UDP_EVENT_RECEIVED;
+    rx_udp_msg.lens = otMessageGetLength(aMessage)
+                      - otMessageGetOffset(aMessage);
     /*copy source ip*/
-    memcpy((void*)&app_udp_msg.ipv6, (void*)&aMessageInfo->mPeerAddr,
+    memcpy((void*)&rx_udp_msg.ipv6, (void*)&aMessageInfo->mPeerAddr,
            sizeof(otIp6Address));
 
-    if (app_udp_msg.lens < (OPENTHREAD_CONFIG_IP6_MAX_DATAGRAM_LENGTH + 1)) {
+    if (rx_udp_msg.lens < (OPENTHREAD_CONFIG_IP6_MAX_DATAGRAM_LENGTH + 1)) {
         /*copy msg*/
-        otMessageRead(aMessage, otMessageGetOffset(aMessage), app_udp_msg.buf,
-                      app_udp_msg.lens);
-        if (xQueueSend(app_udp_msg_queue, &app_udp_msg, 0) == pdPASS) {
+        otMessageRead(aMessage, otMessageGetOffset(aMessage), rx_udp_msg.buf,
+                      rx_udp_msg.lens);
+        if (xQueueSend(app_udp_msg_queue, &rx_udp_msg, 0) == pdPASS) {
             ot_app_task_post(app_udp_task, NULL);
         }
 
     } else {
-        log_info("App Recv len %u/%u to big ", app_udp_msg.lens,
+        log_info("App Recv len %u/%u to big ", rx_udp_msg.lens,
                  (OPENTHREAD_CONFIG_IP6_MAX_DATAGRAM_LENGTH + 1));
     }
 }
 
 int app_udpSend(otIp6Address dstaddr, uint8_t* p, uint16_t len, bool fromISR) {
     otError error = OT_ERROR_BUSY;
-    memset((void*)&app_udp_msg, 0, sizeof(app_udp_msg_t));
-    app_udp_msg.event = THREAD_UDP_EVENT_SEND;
-    app_udp_msg.lens = len;
-    memcpy(&app_udp_msg.ipv6.mFields.m8, &dstaddr.mFields.m8,
+    app_udp_msg_t tx_udp_msg;
+    tx_udp_msg.event = THREAD_UDP_EVENT_SEND;
+    tx_udp_msg.lens = len;
+    memcpy(&tx_udp_msg.ipv6.mFields.m8, &dstaddr.mFields.m8,
            OT_IP6_ADDRESS_SIZE);
-    if (app_udp_msg.lens < (OPENTHREAD_CONFIG_IP6_MAX_DATAGRAM_LENGTH + 1)) {
-        memcpy(app_udp_msg.buf, p, app_udp_msg.lens);
+    if (tx_udp_msg.lens < (OPENTHREAD_CONFIG_IP6_MAX_DATAGRAM_LENGTH + 1)) {
+        memcpy(tx_udp_msg.buf, p, tx_udp_msg.lens);
         if (fromISR) {
             BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
-            if (xQueueSendFromISR(app_udp_msg_queue, &app_udp_msg,
+            if (xQueueSendFromISR(app_udp_msg_queue, &tx_udp_msg,
                                   &pxHigherPriorityTaskWoken)
                 == pdPASS) {
                 ot_app_task_post(app_udp_task, NULL);
                 error = OT_ERROR_NONE;
             }
         } else {
-            if (xQueueSend(app_udp_msg_queue, &app_udp_msg, 0) == pdPASS) {
+            if (xQueueSend(app_udp_msg_queue, &tx_udp_msg, 0) == pdPASS) {
                 ot_app_task_post(app_udp_task, NULL);
                 error = OT_ERROR_NONE;
             }

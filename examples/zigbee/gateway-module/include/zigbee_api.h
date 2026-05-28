@@ -18,6 +18,10 @@
 #ifndef __ZIGBEE_API_H
 #define __ZIGBEE_API_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <zigbee_platform.h>
 #include "fota_define.h"
@@ -34,11 +38,11 @@
 #define ADDR_LIST_GROUP_SIZE 10
 
 #define ZIGBEE_APP_NOTIFY_ISR(ebit)                                            \
-    (g_zb_app_evt_var |= ebit);                                                \
+    (g_zb_app_evt_var = (zb_app_event_t)(g_zb_app_evt_var | (ebit)));         \
     zb_app_signal()
 #define ZIGBEE_APP_NOTIFY(ebit)                                                \
     vPortEnterCritical();                                                      \
-    g_zb_app_evt_var |= ebit;                                                  \
+    g_zb_app_evt_var = (zb_app_event_t)(g_zb_app_evt_var | (ebit));           \
     vPortExitCritical();                                                       \
     zb_app_signal()
 #define ZIGBEE_APP_GET_NOTIFY(ebit)                                            \
@@ -92,8 +96,6 @@ typedef struct __attribute__((packed)) {
 } addr_list_by_group_id_t;
 
 extern zb_app_event_t g_zb_app_evt_var;
-
-zb_app_event_t g_zb_app_evt_var;
 extern zb_af_device_ctx_t simple_desc_gateway_ctx;
 void zigbee_app_init(void);
 void app_main_loop(void* parameters_ptr);
@@ -115,4 +117,7 @@ uint32_t get_gw_time(void);
 void zigbee_app_mac_ed_scan_command(void);
 void zigbee_app_addr_table_update(void);
 void zigbee_app_get_address_by_group_idx(uint8_t group);
+#ifdef __cplusplus
+}
+#endif
 #endif // __ZIGBEE_API_H

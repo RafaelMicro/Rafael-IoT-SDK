@@ -49,13 +49,15 @@ Please download and install the following tools:
 * **Wireshark**
   [https://www.wireshark.org/download.html](https://www.wireshark.org/download.html)
 
-Install `pyspinel` using pip:
+### Environment Setup
 
-```bash
-pip3 install pyspinel
-```
+Instead of manually installing dependencies and copying files, you can use the provided automated script:
 
-Then copy `extcap_ot.py` and `extcap_ot.bat` (from [https://github.com/RafaelMicro/pyspinel.git](https://github.com/RafaelMicro/pyspinel.git)) into Wireshark's extcap directory. Refer to the illustration below for the correct path.
+1. Clone or download the repository from [https://github.com/RafaelMicro/pyspinel.git](https://github.com/RafaelMicro/pyspinel.git).
+2. Inside the cloned repository, run `install_sniffer.bat` (Windows). Double-click the file or run it from a Command Prompt. This script will automatically:
+    - Verify your Python and Wireshark environment.
+    - Install the `pyspinel` library.
+    - Deploy `extcap_ot.py` and other necessary files into the correct Wireshark `extcap` directory.
 
 ### Figure 1: Extcap Directory
   <p align="center">
@@ -73,11 +75,18 @@ After setup, restart Wireshark and check if the "sniffer" interface appears. If 
 
 ## 4. Wireshark Options Settings
 
-1. Set the **Channel** to your desired value.
-2. Check **IEEE 802.15.4 TAP** to ensure channel information is included in the pcap output and visible in the Wireshark GUI.
-3. Check **Save parameters on capture start** to retain these settings for future use (unless a channel change is needed).
-4. Click **Start** to begin capturing.
-  
+Click the **Gear icon** next to the "OpenThread Sniffer" interface to open the configuration menu:
+
+1. **Min/Max Channel**: Set the boundary according to your compiled Sub-GHz frequency band (e.g., set Min to `1` and Max to `10` for 915MHz).
+2. **Channel**: Select your desired capture channel. Ensure it falls within the Min/Max limits.
+3. **Baudrate**: The interface automatically detects the baudrate (defaulting to 2Mbps). You can manually override it using the dropdown selector if your firmware uses a different rate.
+4. Check **IEEE 802.15.4 TAP** to ensure channel information is included in the pcap output and visible in the Wireshark GUI.
+5. Check **Save parameters on capture start** to retain these settings for future use.
+6. Click **Start** to begin capturing.
+
+> **Troubleshooting:**
+> If you receive a pop-up error stating `[ERROR] Channel X is out of range!`, please verify that your chosen Channel falls strictly within the defined Min Channel and Max Channel limits.
+
 ### Figure 3: Channel
   <p align="center">
     <img src="../picture/miu-sniffer-channel.jpg" alt="MIU Sniffer Channel" width="600"/>
@@ -108,9 +117,9 @@ Navigate to **Preferences → Protocols** in Wireshark to configure protocol set
 3. Check **Automatically acquire Thread sequence counter**.
 
 ### Figure 5: Thread
-  <p align="center">
-    <img src="../picture/miu-sniffer-thread.jpg" alt="MIU Sniffer Thread" width="600"/>
-  </p>
+  <p align="center">
+    <img src="../picture/miu-sniffer-thread.jpg" alt="MIU Sniffer Thread" width="600"/>
+  </p>
 
 ### 5.3 CoAP
 
@@ -135,8 +144,5 @@ Now that you've successfully created a basic Mesh network with `miu-sniffer` dev
 * **Explore other examples:** Learn to run `miu-ftd` or `miu-mtd` to understand different MIU example.
     * [`miu-ftd Example Guide`](miu-ftd-guide.md)
     * [`miu-mtd Example Guide`](miu-mtd-guide.md)
-* **Learn about MIU Services:** Dive into Rafael's proprietary Network Management and OTA features.
-    * [`Network Management Guide`](../Network-management-guide.md)
+* **Learn about MIU Services:** Dive into Rafael's proprietary OTA features.
     * [`OTA Guide`](../OTA-guide.md)
-* **Utilize MIU Tools:** Discover how to use additional tools, such as the Topology Tool.
-    * [`Topology Tool Guide`](../Topology-Tool-guide.md)

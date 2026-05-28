@@ -33,6 +33,7 @@ void init_aux_comp(void) {
     cfg.counter_mode_en = 1;
     cfg.counter_mode_int_en = 1;
     cfg.counter_mode_threshold = 10;
+    cfg.voltage_threshold = 1900;
 
     hosal_aux_comp_open(cfg, aux_callback);
     NVIC_EnableIRQ(Aux_Comp_IRQn);

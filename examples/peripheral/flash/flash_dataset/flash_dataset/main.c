@@ -43,7 +43,6 @@ int main(void) {
     printf("========================================\n");
     printf("EFD Data Persistence Demo \n");
     printf("========================================\n");
-
     /* 
      * Step 1: Initialize EFD Module
      * This will verify Flash partitions, initialize GC (Garbage Collection),

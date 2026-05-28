@@ -15,7 +15,6 @@ extern "C" {
 #include <stdio.h>
 #include "mcu.h"
 
-
 extern uint32_t SystemCoreClock;
 #define configCPU_CLOCK_HZ (SystemCoreClock)
 #define configTICK_RATE_HZ (1000)
@@ -25,21 +24,21 @@ extern uint32_t SystemCoreClock;
 See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY (64)
 
-
-#define configUSE_PREEMPTION				1
-#define configUSE_IDLE_HOOK					1
-#define configUSE_TICK_HOOK					1
+#define configUSE_PREEMPTION 1
+#define configUSE_IDLE_HOOK  1
+#define configUSE_TICK_HOOK  1
 #ifdef CONFIG_HOSAL_SOC_IDLE_SLEEP
 #define configUSE_TICKLESS_IDLE 1
 #else
 #define configUSE_TICKLESS_IDLE 0
 #endif
-#define configAPPLICATION_ALLOCATED_HEAP    1
-#define configFRTOS_MEMORY_SCHEME           5
+#define configAPPLICATION_ALLOCATED_HEAP 1
+#define configFRTOS_MEMORY_SCHEME        5
 
 #define configMAX_PRIORITIES (32)
 
-#define configMINIMAL_STACK_SIZE               ((unsigned short)256) /* SIZE-1-1-12-16-30-34>=4 */                                    \
+#define configMINIMAL_STACK_SIZE                                               \
+    ((unsigned short)256) /* SIZE-1-1-12-16-30-34>=4 */
 
 #define configTOTAL_HEAP_SIZE                   ((size_t)0x8000)
 #define configMAX_TASK_NAME_LEN                 (24)
@@ -69,7 +68,6 @@ See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 #define configTIMER_QUEUE_LENGTH     10
 #define configTIMER_TASK_STACK_DEPTH (512)
 
-
 /* Set the following definitions to 1 to include the API function, or zero
 to exclude the API function. */
 #define INCLUDE_vTaskPrioritySet               (1)
@@ -91,7 +89,6 @@ to exclude the API function. */
 #define INCLUDE_xSemaphoreGetMutexHolder       (1)
 #define INCLUDE_xTimerPendFunctionCall         (1)
 #define INCLUDE_xTaskGetHandle                 (1)
-
 
 /* Stop if an assertion fails. */
 #define configASSERT(x)                                                        \
@@ -126,23 +123,11 @@ standard names. */
 #endif /* CONFIG_BLUETOOTH_LE_HOST_TASK_PRIORITY */
 #endif /* CONFIG_BUILD_COMPONENT_BLUETOOTH_LE_HOST */
 
-#if (CONFIG_BUILD_COMPONENT_ZIGBEE == 1)
-#ifndef CONFIG_ZIGBEE_TASK_PRIORITY
-#define CONFIG_ZIGBEE_TASK_PRIORITY (configMAX_PRIORITIES - 5)
-#endif /* CONFIG_ZIGBEE_TASK_PRIORITY */
-#endif /* CONFIG_BUILD_COMPONENT_ZIGBEE */
-
 #if (CONFIG_BUILD_COMPONENT_MESH_IT_UP == 1)
 #ifndef CONFIG_MIU_OPENTHREAD_TASK_PRIORITY
 #define CONFIG_MIU_OPENTHREAD_TASK_PRIORITY (configMAX_PRIORITIES - 5)
 #endif /* CONFIG_MIU_OPENTHREAD_TASK_PRIORITY */
 #endif /* CONFIG_BUILD_COMPONENT_MESH_IT_UP */
-
-#if (CONFIG_BUILD_COMPONENT_OPENTHREAD_PORT == 1)
-#ifndef CONFIG_OPENTHREAD_TASK_PRIORITY
-#define CONFIG_OPENTHREAD_TASK_PRIORITY (configMAX_PRIORITIES - 5)
-#endif /* CONFIG_OPENTHREAD_TASK_PRIORITY */
-#endif /* CONFIG_BUILD_COMPONENT_OPENTHREAD */
 
 #if (CONFIG_BUILD_COMPONENT_CLI == 1)
 #ifndef CONFIG_CLI_TASK_PRIORITY
@@ -151,12 +136,15 @@ standard names. */
 #endif /* CONFIG_BUILD_COMPONENT_CLI */
 
 #ifndef CONFIG_APPLICATION_MAIN_TASK_PRIORITY
-#define CONFIG_APPLICATION_MAIN_TASK_PRIORITY (2)
+#define CONFIG_APPLICATION_MAIN_TASK_PRIORITY (E_TASK_PRIORITY_IDLE + 2)
 #endif /* CONFIG_APPLICATION_MAIN_TASK_PRIORITY */
 
 typedef enum {
     E_TASK_PRIORITY_MIN = 0,
     E_TASK_PRIORITY_IDLE = 1,
+#if (CONFIG_BUILD_COMPONENT_MESH_IT_UP == 1)
+    E_TASK_PRIORITY_MIU_OPENTHREAD = CONFIG_MIU_OPENTHREAD_TASK_PRIORITY,
+#endif /* CONFIG_BUILD_COMPONENT_OPENTHREAD */
     E_TASK_PRIORITY_APP = CONFIG_APPLICATION_MAIN_TASK_PRIORITY,
 
 #if (CONFIG_BUILD_COMPONENT_CLI == 1)
@@ -177,17 +165,6 @@ typedef enum {
     E_TASK_PRIORITY_BLUETOOTH_LE_HOST = CONFIG_BLUETOOTH_LE_HOST_TASK_PRIORITY,
 #endif /* CONFIG_BUILD_COMPONENT_BLUETOOTH_LE_HOST */
 
-#if (CONFIG_BUILD_COMPONENT_ZIGBEE == 1)
-    E_TASK_PRIORITY_ZIGBEE = CONFIG_ZIGBEE_TASK_PRIORITY,
-#endif /* CONFIG_BUILD_COMPONENT_ZIGBEE */
-
-#if (CONFIG_BUILD_COMPONENT_MESH_IT_UP == 1)
-    E_TASK_PRIORITY_MIU_OPENTHREAD = CONFIG_MIU_OPENTHREAD_TASK_PRIORITY,
-#endif /* CONFIG_BUILD_COMPONENT_OPENTHREAD */
-
-#if (CONFIG_BUILD_COMPONENT_OPENTHREAD_PORT == 1)
-    E_TASK_PRIORITY_OPENTHREAD = CONFIG_OPENTHREAD_TASK_PRIORITY,
-#endif /* CONFIG_BUILD_COMPONENT_OPENTHREAD */
     E_TASK_PRIORITY_SW_TIMER = 29,
     E_TASK_PRIORITY_HOSAL = 30,
     E_TASK_PRIORITY_MAX = (configMAX_PRIORITIES - 1),

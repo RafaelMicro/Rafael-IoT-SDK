@@ -17,6 +17,18 @@ macro(sdk_generate_library)
   message(STATUS "\t+ ${library_name}")
   set(CURRENT_STATIC_LIBRARY ${library_name})
   add_library(${library_name} STATIC)
+
+  target_sources(${library_name} PRIVATE
+    ${PROJECT_SOURCE_DIR}/components/utility/Version_Information/lib_version_info.c
+  )
+
+  if(CONFIG_STRIP_DEBUG)
+    add_custom_command(TARGET ${library_name} POST_BUILD
+      COMMAND ${CMAKE_OBJCOPY} --strip-debug --strip-unneeded --remove-section=.comment $<TARGET_FILE:${library_name}>
+      COMMENT "Strip debug info and metadata: ${library_name}"
+    )
+  endif()
+
   set_property(GLOBAL APPEND PROPERTY SDK_LIBS ${library_name})
   target_link_libraries(${library_name} PUBLIC sdk_intf_lib)
 endmacro()
@@ -370,7 +382,7 @@ function(get_git_hash OUT_VAR)
     endif()
   endforeach()
 
-  set(_default_hash "${SHA}" CACHE INTERNAL "")
+  set(_default_hash "f2d02b2f")
 
   find_package(Git QUIET)
 
@@ -620,14 +632,20 @@ function(show_banner)
 
   if(_mac_ver)
     add_compile_definitions(BUILD_MAC_FW_INFO=${_mac_ver})
+  else()
+    add_compile_definitions(BUILD_MAC_FW_INFO=0)
   endif()
 
   if(_ble_ver)
-      add_compile_definitions(BUILD_BLE_FW_INFO=${_ble_ver})
+    add_compile_definitions(BUILD_BLE_FW_INFO=${_ble_ver})
+  else()
+    add_compile_definitions(BUILD_BLE_FW_INFO=0)
   endif()
 
   if(_multi_ver)
-      add_compile_definitions(BUILD_MULTI_FW_INFO=${_multi_ver})
+    add_compile_definitions(BUILD_MULTI_FW_INFO=${_multi_ver})
+  else()
+    add_compile_definitions(BUILD_MULTI_FW_INFO=0)
   endif()
 
   add_compile_options(

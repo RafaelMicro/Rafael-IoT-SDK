@@ -5,14 +5,28 @@
 #include "hosal_uart.h"
 #include "log.h"
 #include "main.h"
+#if CONFIG_MESH_IT_UP_FTD
 #include "ota_download_cmd_handler.h"
+#endif
 #include "task.h"
 #include "uart_stdio.h"
 #include "util_queue.h"
 
+#include <timers.h>
+#include "FreeRTOS.h"
+#include "queue.h"
+#include "task.h"
+
 #define UART_HANDLER_RX_CACHE_SIZE 128
-#define RX_BUFF_SIZE               484
+#define RX_BUFF_SIZE               1024
 #define MAX_UART_BUFFER_SIZE       384
+
+static xQueueHandle app_uart_msg_queue;
+
+typedef enum {
+    APP_UART0_RECEIVED_EVENT = 0x01,
+    APP_UART1_RECEIVED_EVENT = 0x02,
+} uart_event_id_t;
 
 typedef struct uart_io {
     uint16_t start;
@@ -22,22 +36,114 @@ typedef struct uart_io {
     uint8_t uart_cache[RX_BUFF_SIZE];
 } uart_io_t;
 
+static uart_io_t g_uart0_rx_io = {.start = 0, .end = 0, .recvLen = 0};
 static uart_io_t g_uart1_rx_io = {.start = 0, .end = 0, .recvLen = 0};
 HOSAL_UART_DEV_DECL(uart1_dev, 1, 28, 29, UART_BAUDRATE_Baud115200)
 
-static uint8_t uart_buf[MAX_UART_BUFFER_SIZE] = {0};
-static uint8_t g_tmp_buff[RX_BUFF_SIZE];
+static uint8_t g_uart0_buf[MAX_UART_BUFFER_SIZE] = {0};
 
-static TaskHandle_t app_task_handle = NULL;
+static TimerHandle_t app_uart1_rx_cb_time = NULL;
+
+static void app_uart_task();
+
+/*uart 0 use and ota download use*/
+extern hosal_uart_dev_t uartstdio;
+
+static int uart0_rx_read(uint8_t* p_data, uint32_t p_data_len) {
+    if (p_data == NULL || p_data_len == 0) {
+        return -1; // Prevent invalid reads
+    }
+    uint32_t available_data = 0;
+
+    taskENTER_CRITICAL();
+    if (g_uart0_rx_io.start >= g_uart0_rx_io.end) {
+        available_data = g_uart0_rx_io.start - g_uart0_rx_io.end;
+    } else {
+        available_data = RX_BUFF_SIZE - g_uart0_rx_io.end + g_uart0_rx_io.start;
+    }
+    taskEXIT_CRITICAL();
+
+    if (available_data == 0) {
+        return 0; // No readable data
+    }
+
+    uint32_t read_len = (p_data_len > available_data) ? available_data
+                                                      : p_data_len;
+
+    // Ring buffer reads data
+    if (g_uart0_rx_io.end + read_len < RX_BUFF_SIZE) {
+        // Read directly from end
+        memcpy(p_data, g_uart0_rx_io.uart_cache + g_uart0_rx_io.end, read_len);
+        taskENTER_CRITICAL();
+        g_uart0_rx_io.end += read_len;
+        taskEXIT_CRITICAL();
+    } else {
+        // Read the tail part first
+        uint32_t tail_len = RX_BUFF_SIZE - g_uart0_rx_io.end;
+        memcpy(p_data, g_uart0_rx_io.uart_cache + g_uart0_rx_io.end, tail_len);
+
+        // Then read the rest from the beginning
+        uint32_t head_len = read_len - tail_len;
+        memcpy(p_data + tail_len, g_uart0_rx_io.uart_cache, head_len);
+        taskENTER_CRITICAL();
+        g_uart0_rx_io.end = head_len; // Update `end` position
+        taskEXIT_CRITICAL();
+    }
+
+    // Update `recvLen`
+    taskENTER_CRITICAL();
+    g_uart0_rx_io.recvLen -= read_len;
+    taskEXIT_CRITICAL();
+
+    return read_len;
+}
+
+static int uart0_rx_callback(void* p_arg) {
+    uint32_t new_data_len = 0;
+
+    // Ring buffer writes (make sure not to exceed RX_BUFF_SIZE)
+    if (g_uart0_rx_io.start >= g_uart0_rx_io.end) {
+        new_data_len = hosal_uart_receive(
+            p_arg, g_uart0_rx_io.uart_cache + g_uart0_rx_io.start,
+            RX_BUFF_SIZE - g_uart0_rx_io.start);
+        g_uart0_rx_io.start = (g_uart0_rx_io.start + new_data_len)
+                              % RX_BUFF_SIZE;
+    } else if (((g_uart0_rx_io.start + 1) % RX_BUFF_SIZE)
+               != g_uart0_rx_io.end) {
+        new_data_len = hosal_uart_receive(
+            p_arg, g_uart0_rx_io.uart_cache + g_uart0_rx_io.start,
+            g_uart0_rx_io.end - g_uart0_rx_io.start - 1);
+        g_uart0_rx_io.start = (g_uart0_rx_io.start + new_data_len)
+                              % RX_BUFF_SIZE;
+    }
+    if (new_data_len > 0) {
+        BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
+        uint8_t app_uart_msg = APP_UART0_RECEIVED_EVENT;
+        if (xQueueSendFromISR(app_uart_msg_queue, &app_uart_msg,
+                              &pxHigherPriorityTaskWoken)
+            == pdPASS) {
+            ot_app_task_post(app_uart_task, &app_uart_msg);
+        }
+    }
+
+    return 0;
+}
 
 /*uart 1 use*/
 static int __uart1_read(uint8_t* p_data, uint32_t p_data_len) {
     if (p_data == NULL || p_data_len == 0) {
         return -1; // Prevent invalid reads
     }
+    uint32_t available_data = 0;
 
-    uint32_t available_data =
-        g_uart1_rx_io.recvLen; // Readable data in the ring buffer
+    taskENTER_CRITICAL();
+    if (g_uart1_rx_io.start >= g_uart1_rx_io.end) {
+        available_data = g_uart1_rx_io.start - g_uart1_rx_io.end;
+    } else {
+        available_data = RX_BUFF_SIZE - g_uart1_rx_io.end + g_uart1_rx_io.start;
+    }
+    taskEXIT_CRITICAL();
+
     if (available_data == 0) {
         return 0; // No readable data
     }
@@ -49,7 +155,9 @@ static int __uart1_read(uint8_t* p_data, uint32_t p_data_len) {
     if (g_uart1_rx_io.end + read_len < RX_BUFF_SIZE) {
         // Read directly from end
         memcpy(p_data, g_uart1_rx_io.uart_cache + g_uart1_rx_io.end, read_len);
+        taskENTER_CRITICAL();
         g_uart1_rx_io.end += read_len;
+        taskEXIT_CRITICAL();
     } else {
         // Read the tail part first
         uint32_t tail_len = RX_BUFF_SIZE - g_uart1_rx_io.end;
@@ -58,12 +166,15 @@ static int __uart1_read(uint8_t* p_data, uint32_t p_data_len) {
         // Then read the rest from the beginning
         uint32_t head_len = read_len - tail_len;
         memcpy(p_data + tail_len, g_uart1_rx_io.uart_cache, head_len);
-
+        taskENTER_CRITICAL();
         g_uart1_rx_io.end = head_len; // Update `end` position
+        taskEXIT_CRITICAL();
     }
 
     // Update `recvLen`
+    taskENTER_CRITICAL();
     g_uart1_rx_io.recvLen -= read_len;
+    taskEXIT_CRITICAL();
 
     return read_len;
 }
@@ -86,17 +197,12 @@ static int __uart1_rx_callback(void* p_arg) {
         g_uart1_rx_io.start = (g_uart1_rx_io.start + new_data_len)
                               % RX_BUFF_SIZE;
     }
-
-    // Calculate the length of readable data in the ring buffer
-    uint32_t len = 0;
-    if (g_uart1_rx_io.start >= g_uart1_rx_io.end) {
-        len = g_uart1_rx_io.start - g_uart1_rx_io.end;
-    } else {
-        len = RX_BUFF_SIZE - g_uart1_rx_io.end + g_uart1_rx_io.start;
-    }
-
-    if (g_uart1_rx_io.recvLen != len) {
-        g_uart1_rx_io.recvLen = len;
+    if (new_data_len > 0) {
+        if (app_uart1_rx_cb_time) {
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            xTimerResetFromISR(app_uart1_rx_cb_time, &xHigherPriorityTaskWoken);
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        }
     }
 
     return 0;
@@ -117,48 +223,45 @@ void app_uart1_recv() {
     }
 }
 
-void app_uart1_data_recv(uint8_t* data, uint16_t lens) {
-    ota_download_cmd_proc(data, lens);
-    return;
-}
+void app_uart1_data_recv() { return; }
 
 void app_uart0_hex_recv() {
     static uint16_t total_len = 0;
     static uint16_t offset = 0;
-    static uint8_t rx_buf[UART_HANDLER_RX_CACHE_SIZE] = {0};
-    int len = 0;
 
     uint16_t msgbufflen = 0;
     uint32_t parser_status = 0;
-    int i = 0;
+    int lens = 0;
+    static uint8_t uart0_packet[UART_HANDLER_RX_CACHE_SIZE];
 
     do {
         if (total_len >= MAX_UART_BUFFER_SIZE) {
             total_len = 0;
         }
-        len = uart_stdio_read(rx_buf, UART_HANDLER_RX_CACHE_SIZE);
-        if (len > 0) {
-            log_info("Adding to total_len: current %d, read %d ", total_len,
-                     len);
 
+        memset(uart0_packet, 0, UART_HANDLER_RX_CACHE_SIZE);
+        lens = uart0_rx_read(uart0_packet, UART_HANDLER_RX_CACHE_SIZE);
+        if (lens > 0) {
             uint32_t space_left = MAX_UART_BUFFER_SIZE - total_len;
-            uint32_t data_to_copy = (len > space_left) ? space_left : len;
+            uint32_t data_to_copy = (lens > space_left) ? space_left : lens;
 
-            memcpy(uart_buf + total_len, rx_buf, data_to_copy);
+            memcpy(g_uart0_buf + total_len, uart0_packet, data_to_copy);
             total_len += data_to_copy;
-#if CONFIG_APP_TASK_OTA_ENABLE
-            parser_status = ota_download_cmd_parser(uart_buf, total_len,
+#if CONFIG_APP_TASK_OTA_ENABLE && CONFIG_MESH_IT_UP_FTD
+            parser_status = ota_download_cmd_parser(g_uart0_buf, total_len,
                                                     &msgbufflen, &offset);
             if (parser_status == UART_DATA_VALID) {
-                ota_download_cmd_proc((uart_buf + offset), msgbufflen);
+                ota_download_cmd_proc((g_uart0_buf + offset), msgbufflen);
+            } else if (parser_status == UART_DATA_CS_ERROR) {
+                total_len = 0;
             }
 #endif
             if (msgbufflen > 0) {
                 if (total_len > msgbufflen) {
                     total_len -= msgbufflen;
                     if (total_len > offset) {
-                        memcpy((uart_buf + offset),
-                               (uart_buf + msgbufflen + offset),
+                        memcpy((g_uart0_buf + offset),
+                               (g_uart0_buf + msgbufflen + offset),
                                total_len - offset);
                     }
                 } else {
@@ -170,23 +273,51 @@ void app_uart0_hex_recv() {
             msgbufflen = 0;
         }
 
-    } while (0);
+    } while (lens > 0);
 }
 
-static void app_uart_task(void* pvParameters) {
-    uint8_t cnt = 0;
-    while (1) {
-        if (cli_mode_get_function() == UART0_MODE_HEX_RX) {
+static void app_uart_task() {
+    uint8_t app_uart_event = 0xFF;
+    if (xQueueReceive(app_uart_msg_queue, &app_uart_event, 0) == pdPASS) {
+        if (app_uart_event == APP_UART1_RECEIVED_EVENT) {
+            app_uart1_recv();
+        }
+#if CONFIG_MESH_IT_UP_FTD
+        else if (app_uart_event == APP_UART0_RECEIVED_EVENT) {
+            /*ota download use*/
             app_uart0_hex_recv();
         }
-        app_uart1_recv();
-        vTaskDelay(10);
+#endif
     }
 }
 
 int app_uart_data_send(uint8_t u_port, uint8_t* p_data, uint16_t data_len) {
     hosal_uart_send(&uart1_dev, p_data, data_len);
     return 0;
+}
+
+void app_uart1_rx_cb_timeout_callback(TimerHandle_t xTimer) {
+    BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
+    uint8_t app_uart_msg = APP_UART1_RECEIVED_EVENT;
+    if (xQueueSendFromISR(app_uart_msg_queue, &app_uart_msg,
+                          &pxHigherPriorityTaskWoken)
+        == pdPASS) {
+        ot_app_task_post(app_uart_task, &app_uart_msg);
+    }
+}
+
+void app_uart0_enable(void) {
+    memset(&g_uart0_rx_io, 0, sizeof(g_uart0_rx_io));
+    hosal_uart_callback_set(&uartstdio, HOSAL_UART_RX_CALLBACK,
+                            uart0_rx_callback, &uartstdio);
+    /* Raise UART0 IRQ priority during OTA to prevent FIFO overflow at 2Mbaud.
+     * Priority 3 beats radio (4) while staying within FreeRTOS ISR-safe range. */
+    __NVIC_SetPriority(Uart0_IRQn, 3);
+}
+
+void app_uart0_disable(void) {
+    memset(&g_uart0_rx_io, 0, sizeof(g_uart0_rx_io));
+    __NVIC_SetPriority(Uart0_IRQn, 4); /* restore default */
 }
 
 void app_uart_init() {
@@ -202,10 +333,10 @@ void app_uart_init() {
 
     __NVIC_SetPriority(Uart1_IRQn, 2);
 
-    BaseType_t xReturned;
-    xReturned = xTaskCreate(app_uart_task, "app_uart", 512, NULL,
-                            (configMAX_PRIORITIES - 4), &app_task_handle);
-    if (xReturned != pdPASS) {
-        log_error("task create fail");
+    if (app_uart1_rx_cb_time == NULL) {
+        app_uart1_rx_cb_time = xTimerCreate(
+            "app_uart1_rx_cb_time", 5, pdFALSE, NULL,
+            (TimerCallbackFunction_t)app_uart1_rx_cb_timeout_callback);
     }
+    app_uart_msg_queue = xQueueCreate(5, sizeof(uint8_t));
 }

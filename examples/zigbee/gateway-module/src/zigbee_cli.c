@@ -775,7 +775,7 @@ static int
 _cli_cmd_zcl_scene(int argc, char **argv, cb_shell_out_t log_out, void *pExtra)
 {
     zcl_data_req_t *pt_data_req;
-    uint16_t addr, group_id, scence_id, cmd, ep;
+    uint16_t addr, group_id, scence_id, cmd = 0, ep;
 
     do
     {
@@ -795,6 +795,11 @@ _cli_cmd_zcl_scene(int argc, char **argv, cb_shell_out_t log_out, void *pExtra)
         else if (memcmp("v", argv[1], 1) == 0)
         {
             cmd = ZB_ZCL_CMD_SCENES_VIEW_SCENE;
+        }
+        else
+        {
+            log_info("Unknown scene command");
+            break;
         }
 
         addr = (*(argv[2] + 1) == 'x')
@@ -834,7 +839,7 @@ _cli_cmd_zcl_door_lock(int argc, char **argv, cb_shell_out_t log_out, void *pExt
 {
     zcl_data_req_t *pt_data_req;
     uint16_t addr;
-    uint8_t ep, cmd;
+    uint8_t ep, cmd = 0;
     uint8_t pincode_len = 8;
     uint8_t pin_code[] = {8, '1', '2', '3', '4', '5', '6', '7', '8'};
     do
@@ -851,6 +856,11 @@ _cli_cmd_zcl_door_lock(int argc, char **argv, cb_shell_out_t log_out, void *pExt
         else if (memcmp("unlock", argv[1], 6) == 0)
         {
             cmd = ZB_ZCL_CMD_DOOR_LOCK_UNLOCK_DOOR;
+        }
+        else
+        {
+            log_info("Unknown door lock command");
+            break;
         }
         addr = (*(argv[2] + 1) == 'x')
                ? utility_strtox(argv[2] + 2, 0, 4)

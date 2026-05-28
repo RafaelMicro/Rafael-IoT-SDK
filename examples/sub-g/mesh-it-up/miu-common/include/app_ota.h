@@ -7,6 +7,7 @@ extern "C" {
 
 #include <openthread/ip6.h>
 #include <stdio.h>
+#include "fota_define.h"
 
 #define OTA_FLASH_START         FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB
 #define RAFAEL_OTA_URL_DATA     "ota/data"
@@ -15,6 +16,7 @@ extern "C" {
 #define RAFAEL_OTA_URL_RXMODE   "ota/rxmode"
 #define RAFAEL_OTA_URL_STATUS   "ota/status"
 #define RAFAEL_OTA_URL_EXECUTE  "ota/execute"
+#define OTA_EVENT_DATA_MAX_SIZE 512
 #define OTA_SEGMENTS_MAX_SIZE   256
 #define OTA_REQUEST_TABLE_SIZE  10
 #define OTA_RESPONSE_TABLE_SIZE 40
@@ -23,6 +25,10 @@ extern "C" {
 #define OTA_DONE_TIMEOUT        (3 * 60 * 1000)
 #define OTA_DEPORT_TIMEOUT      (30 * 1000)
 #define OTA_REBOOT_TIMEOUT      (1 * 60 * 1000)
+
+#define OTA_FLASH_SECTOR_SIZE  0x1000 // 4KB
+#define OTA_MAX_IMAGE_SECTORS  (SIZE_OF_FOTA_BANK_1MB / OTA_FLASH_SECTOR_SIZE)
+#define OTA_INFO_HEADER_OFFSET 0x20   // Firmware offset
 
 typedef enum {
     OTA_IDLE = 0x10,
@@ -60,7 +66,7 @@ typedef uint8_t fotaimage_info;
 typedef struct {
     uint8_t event;
     otIp6Address ipv6;
-    uint8_t data[400];
+    uint8_t* data;
     uint16_t data_lens;
 } __attribute__((packed)) ota_event_data_t;
 
@@ -120,6 +126,7 @@ typedef struct {
     bool rxmode;
     uint8_t state;
     uint8_t progress_bar;
+    uint8_t bin_type[12];
     otIp6Address dstipv6;
 } __attribute__((packed)) ota_status_report_t;
 
@@ -127,18 +134,11 @@ typedef struct {
 #define OTA_EXECUTE_STOP   0x62
 
 typedef struct {
-    uint8_t flag;  //61:reboot/62:stop
-    uint16_t time; // millisecond
+    uint8_t flag;          //61:reboot/62:stop
+    uint16_t time;         // millisecond
+    uint8_t bin_type[12];  // 0x00*12 = all devices (backward compat)
 } __attribute__((packed)) ota_execute_t;
 
-#define OTA_STATUS_TABLE_MAX_SIZE 332 //300MTD+32FTD = 332
-
-typedef struct {
-    uint8_t used_state; //1bit: used, 7bit: state
-    uint8_t ipv6[OT_IP6_IID_SIZE];
-    uint32_t version;
-    uint8_t rxmode_progress; //1bit: rxmode, 7bit: progress_bar
-} __attribute__((packed)) ota_state_table_t;
 
 otError ota_init(otInstance* aInstance,
                  void (*ota_state_change_cb)(uint8_t state));
@@ -153,6 +153,7 @@ uint8_t ota_reset();
 uint32_t ota_get_image_version();
 uint32_t ota_get_image_size();
 uint32_t ota_get_image_crc();
+void ota_flash_read_bin_type(uint8_t out_bin_type[12]);
 void ota_set_image_version(uint32_t version);
 void ota_set_image_size(uint32_t size);
 void ota_set_image_crc(uint32_t crc);
@@ -160,6 +161,12 @@ void ota_send(char* ipaddr_str);
 void ota_debug_level(unsigned int level);
 const char* OtaStateToString(ota_state_t state);
 uint32_t crc32checksum(uint32_t flash_addr, uint32_t data_len);
+void ota_update_self();
+void ota_send_execute(otIp6Address dst_ipaddr, uint8_t execute_flag,
+                      uint16_t time);
+uint32_t ota_debug_level_get();
+void ota_send_status_get(otIp6Address dst_ipaddr, uint8_t status_type,
+                         uint16_t report_time);
 
 #ifdef __cplusplus
 };
