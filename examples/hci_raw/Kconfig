@@ -1,9 +1,0 @@
-menu "PROJECT CONFIG"
-
-config TEST_B_BOOL
-    bool "Test BOOL"
-	def_bool false
-    help
-        Test BOOL description
-
-endmenu
