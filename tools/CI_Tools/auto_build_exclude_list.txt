@@ -1,4 +1,0 @@
-Project\\Application\\unittest\\Keil\\unittest.uvprojx
-Project\\Examples\\GPIO_DeepSleep\\Keil\\GPIO_DeepSleep.uvprojx
-Project\\Examples\\GPIO_DeepSleep\\Keil\\GPIO_DS.uvprojx
-Project\\Application\\BLE_Demo\\\Other\\AT_Command\\Keil\\512KB_flash\\AT_Command.uvprojx
