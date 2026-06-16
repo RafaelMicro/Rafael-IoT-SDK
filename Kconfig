@@ -4,7 +4,7 @@ menu "-------- SDK   Configuration --------"
 endmenu
 source "config/devices.config"
 
-if (RT581 || RT582 || RT583 || RT584H ||  RT584HA4 ||  RF1301 || RT584L)
+if (RT581 || RT582 || RT583 || RT584H ||  RT584HA4 || RT584L)
 choice APPLICATION_EXAMPLES_TYPE
 	prompt "Select Application"
 	default BASIC_EXAMPLE
@@ -22,52 +22,12 @@ config BASIC_EXAMPLE
 
 config BLUETOOTH_LE_EXAMPLE
 	bool "Bluetooth"
-	
-config THREAD_EXAMPLE
-	bool "Thread"
 
 config SUBG_EXAMPLE
 	bool "Sub-G"
 
 config ZIGBEE_EXAMPLE
 	bool "Zigbee"
-
-config RF_EV_15P4
-	bool "RF-ev-15p4"
-
-config HCI_RAW
-	bool "Hci-Raw"
-
-config MULTI_PROTOCOL_RCP
-	bool "Multi-Rcp"
-	select BUILD_COMPONENT_OPENTHREAD
-    select BUILD_COMPONENT_ENHANCED_FLASH_DATASET
-    select BUILD_COMPONENT_CLI
-    select BUILD_COMPONENT_LOG
-    select BUILD_COMPONENT_CPC
-    select BUILD_COMPONENT_BLUETOOTH
-    select BUILD_COMPONENT_BLUETOOTH_HCI_BRIDGE
-    select BUILD_COMPONENT_LMAC5P4
-    select BUILD_COMPONENT_UART_STDIO
-    select BUILD_COMPONENT_UTILITY
-
-config RF_EV_UB
-	bool "RF-ev-ub"
-	select BUILD_COMPONENT_CSS
-    select BUILD_COMPONENT_LOG
-    select BUILD_COMPONENT_RT569
-    select BUILD_COMPONENT_RUCI
-    select BUILD_COMPONENT_UART_STDIO
-    select BUILD_COMPONENT_UTILITY
-
-config RF_LABTEST_TOOL
-	bool "RF-labtest-tool"
-	select BUILD_COMPONENT_CSS
-    select BUILD_COMPONENT_LOG
-    select BUILD_COMPONENT_RT569
-    select BUILD_COMPONENT_RUCI
-    select BUILD_COMPONENT_UART_STDIO
-    select BUILD_COMPONENT_UTILITY
 
 
 if BASIC_EXAMPLE
@@ -77,11 +37,6 @@ endif
 if BLUETOOTH_LE_EXAMPLE
 source "config/examples/ble_example.config"
 source "config/components/network/bluetooth/ble.config"
-endif
-
-if THREAD_EXAMPLE 
-source "config/examples/thread_examples.config"
-source "config/components/network/thread/thread.config"
 endif
 
 if SUBG_EXAMPLE 
@@ -94,29 +49,6 @@ source "config/examples/zigbee_examples.config"
 source "config/components/network/zigbee/zigbee.config"
 endif
 
-if RF_EV_UB 
-source "examples/rf-ev-ub/Kconfig"
-endif
-
-if RF_LABTEST_TOOL 
-source "examples/rf-labtest-tool/Kconfig"
-endif
-
-if HCI_RAW 
-source "examples/hci_raw/Kconfig"
-endif
-
-if MULTI_PROTOCOL_RCP
-source "examples/multi-rcp/Kconfig"
-source "config/components/network/bluetooth/ble.config"
-source "config/components/network/thread/thread.config"
-source "config/components/network/zigbee/zigbee.config"
-endif
-
-if RF_EV_15P4 
-source "examples/rf-ev-15p4/Kconfig"
-endif
-
 if HELLOWORLD 
 source "examples/helloworld/Kconfig"
 endif
@@ -124,7 +56,7 @@ endchoice
 endif
 
 
-if RT582_NONE_OS || RT584H_NONE_OS || RT584L_NONE_OS || RF1301_NONE_OS || RT584HA4_NONE_OS
+if RT582_NONE_OS || RT583_NONE_OS || RT584H_NONE_OS || RT584L_NONE_OS || RF1301_NONE_OS || RT584HA4_NONE_OS
 
 choice APPLICATION_EXAMPLES_TYPE
 	prompt "Select Application"

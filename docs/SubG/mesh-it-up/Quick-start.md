@@ -34,10 +34,30 @@ This guide covers:
 * Configuring necessary environment variables.
 
 
-## 3. First Build and Flash (miu-ftd)
+## 3. Configure Frequency Band
+
+The Sub-GHz frequency band is a **compile-time** setting. Before building, edit the `.config` file that matches your board:
+
+**File:** `examples/sub-g/mesh-it-up/<example>/default-<board>.config`
+
+Set the desired band to `=y` and mark the others as `is not set`:
+
+```
+CONFIG_SUBG_FREQUENCY_BAND_915=y
+# CONFIG_SUBG_FREQUENCY_BAND_868 is not set
+# CONFIG_SUBG_FREQUENCY_BAND_470 is not set
+# CONFIG_SUBG_FREQUENCY_BAND_433 is not set
+```
+
+> **Note:** Ensure the selected frequency band complies with your local radio regulations.
+
+For the full channel-to-frequency mapping of each band, see [`Frequency Band Reference`](frequency-band-reference.md).
+
+
+## 4. First Build and Flash (miu-ftd)
 Once your development environment is set up as per the [`Rafael-IoT-SDK Setup Guide`](../../SDK_Setup/), you can proceed to build and flash your first MIU FTD example. Our goal is to simply run the miu-ftd example on a single board to confirm the setup is working.
 
-### 3.1 Select and Build miu-ftd Example:
+### 4.1 Select and Build miu-ftd Example:
 ### Figure 2: RT58X miu build ftd user space
   <p align="center">
     <img src="picture/miu-build-ftd-user-space.jpg" alt="RT58X miu build ftd user space" width="600"/>
@@ -49,7 +69,7 @@ Once your development environment is set up as per the [`Rafael-IoT-SDK Setup Gu
 
 * Verify that the compilation completes successfully in the VS Code TERMINAL panel. The compiled .bin file (e.g., miu-ftd.bin) will be located in the example's build folder.
 
-### 3.2 Flash miu-ftd Example to Board:
+### 4.2 Flash miu-ftd Example to Board:
 
 * Ensure your J-Link or CMSIS-DAP debugger is correctly connected to your development board.
 
@@ -57,13 +77,13 @@ Once your development environment is set up as per the [`Rafael-IoT-SDK Setup Gu
 
 * Monitor the flashing process in the VS Code TERMINAL panel.
 
-### 3.3 Connect UART Debug Tool:
+### 4.3 Connect UART Debug Tool:
 
 * Connect your development board's debug UART interface to your PC using the USB to UART cable.
 
 * Open a terminal program like Tera Term or PuTTY. Configure the correct COM Port and baud rate (e.g., 115200 bps).
 
-### 3.4 Observe Boot Messages:
+### 4.4 Observe Boot Messages:
 
 * After the board reboots (or manually reset it), you should see MIU boot messages and Thread network status output in your UART terminal.
 
@@ -86,14 +106,14 @@ Extaddr            : 5600000000000000
 UDP PORT           : 0x162e
 ```
 
-### 3.5 Verification: If you observe similar output, congratulations! Your development environment is correctly set up, and your first MIU example is running successfully.
+### 4.5 Verification: If you observe similar output, congratulations! Your development environment is correctly set up, and your first MIU example is running successfully.
 
 
-## 4. Standard Operating Procedure (SOP) for Network Setup
+## 5. Standard Operating Procedure (SOP) for Network Setup
 
 This section guides you through the process of establishing a **Leader-Router-Child** network from scratch using three EVK boards.
 
-### 4.1 Device Preparation and Flashing
+### 5.1 Device Preparation and Flashing
 
 Prepare 3 EVK development boards (assumed as EVK #1, #2, #3).
 
@@ -103,14 +123,14 @@ Prepare 3 EVK development boards (assumed as EVK #1, #2, #3).
 | **EVK #2** | `miu-ftd.bin` | Router/Child | Automatically attaches to the existing network. |
 | **EVK #3** | `miu-mtd.bin` | Child | Automatically attaches to the existing network. |
 
-### 4.2 Network Formation and Initialization
+### 5.2 Network Formation and Initialization
 
 1.  **Factory Reset:** To ensure a clean start, it is recommended to factory reset the FTD devices (EVK #1 and EVK #2) before forming the network. On each FTD CLI terminal, run:
     ```bash
     factoryreset
     ```
     > **Note:** EVK #3 (MTD) has no CLI interface and cannot run `factoryreset`. To reset its stored credentials, perform a clean reflash of the firmware.
-### 4.3 Leader Initialization (EVK #1)
+### 5.3 Leader Initialization (EVK #1)
 1.  **Power On Leader (EVK #1):**
     When no existing Thread network is detected, EVK #1 will automatically form a new network and promote itself to Leader. This may take up to 1 minute.
 2.  **Verify Leader State:**
@@ -123,7 +143,7 @@ Prepare 3 EVK development boards (assumed as EVK #1, #2, #3).
         ```bash
         state leader
         ```
-### 4.4 Router and MTD Automatic Attach
+### 5.4 Router and MTD Automatic Attach
 
 1.  **Power On Router (EVK #2) and MTD (EVK #3).**
 2.  Both devices will automatically scan and join the network established by EVK #1 using default parameters.
@@ -133,7 +153,7 @@ Prepare 3 EVK development boards (assumed as EVK #1, #2, #3).
 
 ---
 
-## 5. Network Functionality Verification
+## 6. Network Functionality Verification
 
 We will verify application-layer connectivity using UDP and Ping commands from the Leader.
 
@@ -170,7 +190,7 @@ We will verify application-layer connectivity using UDP and Ping commands from t
 
 ---
 
-## 6. Further Steps
+## 7. Further Steps
 
 You have successfully built and verified the MIU Mesh network. Please refer to the following guides for code details and advanced features:
 

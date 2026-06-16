@@ -6,6 +6,7 @@
 #endif
 #include <string.h>
 #include "app_cli_cmd.h"
+#include "miu_port.h"
 #include "app_led.h"
 #include "app_mac_raw.h"
 #include "app_uart.h"
@@ -22,6 +23,7 @@ static void print_help() {
     printf("app udp port \r\n");
     printf("app led <on/off/toggle/flash> \r\n");
     printf("app mem *(check memory info) \r\n");
+    printf("app libver \r\n");
 }
 
 static otError app_cmd_process(void* aContext, uint8_t aArgsLength,
@@ -113,6 +115,8 @@ static otError app_cmd_process(void* aContext, uint8_t aArgsLength,
         }
     } else if (!strcmp(aArgs[0], "mem")) {
         extMemory();
+    } else if (!strcmp(aArgs[0], "libver")) {
+        printf("miu_port lib ver: %s\r\n", miu_port_lib_version());
     } else {
         print_help();
     }

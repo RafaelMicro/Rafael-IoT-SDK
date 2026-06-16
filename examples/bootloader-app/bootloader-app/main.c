@@ -489,7 +489,7 @@ int main(void) {
     uint32_t ver_major,ver_minor;
 #endif
 
-#if defined(CONFIG_RT582_NONE_OS)
+#if defined(CONFIG_RT582_NONE_OS) || defined(CONFIG_RT583_NONE_OS)
     /*check flash status*/
     flash_suspend_check();
 
@@ -534,7 +534,7 @@ int main(void) {
 #if 1
     do
     {
-        #if defined(CONFIG_RT582_NONE_OS)
+        #if defined(CONFIG_RT582_NONE_OS) || defined(CONFIG_RT583_NONE_OS)
         if ((version_info & IC_CHIP_REVISION_MASK) < IC_CHIP_REVISION_MPB)
         {
             fota_check = CHECK_FOTA_IMAGE_EXIST;
@@ -544,7 +544,7 @@ int main(void) {
         #endif
         {
             #if 0
-            #if defined(CONFIG_RT582_NONE_OS)
+            #if defined(CONFIG_RT582_NONE_OS) || defined(CONFIG_RT583_NONE_OS)
             /*read secure page sector*/
             flash_read_sec_register((uint32_t)sec_page_buf, SECURE_BOOT_INFO_PAGE);
             while (flash_check_busy());

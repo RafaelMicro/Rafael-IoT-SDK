@@ -61,7 +61,7 @@ HOSAL_UART_DEV_DECL(blder_uart2_dev, 2, 30, 31, UART_BAUDRATE_2000000)
 #define BLDER_GET_NOTIFY(ebit)                                                 \
     ebit = BLDER_NOTIFY_HANDEL;                                                \
     BLDER_NOTIFY_HANDEL = BLDER_EVENT_NONE;
-#if defined(CONFIG_RT582_NONE_OS)
+#if defined(CONFIG_RT582_NONE_OS) || defined(CONFIG_RT583_NONE_OS)
 #define BLDER_UART_CACHE_SIZE 0x400
 #elif defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)
 #define BLDER_UART_CACHE_SIZE 0x1000
@@ -487,7 +487,7 @@ uint32_t bootloader_run_loop(void) {
     return evt;
 }
 
-#if defined(CONFIG_RT582_NONE_OS)
+#if defined(CONFIG_RT582_NONE_OS) || defined(CONFIG_RT583_NONE_OS)
 void bootloader_uart1_handler(void) { bootloader_isr(1); }
 void bootloader_uart2_handler(void) { bootloader_isr(2); }
 #elif defined(CONFIG_RT584H_NONE_OS) || defined(CONFIG_RT584L_NONE_OS) || defined(CONFIG_RF1301_NONE_OS) || defined(CONFIG_RT584HA4_NONE_OS)

@@ -382,7 +382,7 @@ function(get_git_hash OUT_VAR)
     endif()
   endforeach()
 
-  set(_default_hash "f2d02b2f")
+  set(_default_hash "05e6df6d")
 
   find_package(Git QUIET)
 
@@ -422,6 +422,7 @@ function(get_fw_version MAC_OUT_VAR BLE_OUT_VAR MULTI_OUT_VAR)
         OR DEFINED CONFIG_RT582
         OR DEFINED CONFIG_RT583
         OR DEFINED CONFIG_RT582_NONE_OS
+        OR DEFINED CONFIG_RT583_NONE_OS
     )
         message(STATUS "CONFIG_RT58x doesn't have FW version")
 

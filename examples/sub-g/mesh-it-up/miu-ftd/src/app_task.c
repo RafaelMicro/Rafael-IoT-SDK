@@ -520,6 +520,7 @@ void app_common_init() {
         systeminfo.sysinfo[8], systeminfo.sysinfo[9], systeminfo.sysinfo[10],
         systeminfo.sysinfo[11], systeminfo.sysinfo[12], systeminfo.sysinfo[13],
         systeminfo.sysinfo[14], systeminfo.sysinfo[15]);
+    log_info("miu_port lib ver   : %s", miu_port_lib_version());
 
     /*subg phy parameter setting*/
     cca_duration = cca_duration_table[sPhyDataRate];

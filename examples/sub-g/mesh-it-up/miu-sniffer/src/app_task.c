@@ -8,6 +8,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 #include "app_led.h"
+#include "miu_port.h"
 #include "app_miu_config.h"
 #include "app_task.h"
 #include "hosal_rf.h"
@@ -83,6 +84,7 @@ void app_common_init() {
     log_info("Mesh It Up Sniffer");
     log_info("Band               : %s", band_str[sPhyFrequencyBand]);
     log_info("Data Rate          : %s", data_rate_str[sPhyDataRate]);
+    log_info("miu_port lib ver   : %s", miu_port_lib_version());
 
     /*subg phy parameter setting*/
     cca_duration = cca_duration_table[sPhyDataRate];
