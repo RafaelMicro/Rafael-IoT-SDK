@@ -23,9 +23,10 @@
 /* Element 0 */
 /* Declare the state variable for models */
 /* Extending model is shaeing the same subscription list with major model */
-light_lightness_state_t     el0_light_lightness_state = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0x0001, 0xFFFF, 0xFFFF}; /*default state: 0xFFFF*/
-publication_info_t          el0_light_lightness_model_publish_entry;
-uint16_t                    el0_light_lightness_subscribe_list[RAF_BLE_MESH_SUBSCRIPTION_LIST_SIZE];
+const light_lightness_state_t  el0_light_lightness_state_default = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0x0001, 0xFFFF, 0xFFFF}; /*default state: 0xFFFF*/
+light_lightness_state_t        el0_light_lightness_state = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0x0001, 0xFFFF, 0xFFFF}; /*default state: 0xFFFF*/
+publication_info_t             el0_light_lightness_model_publish_entry;
+uint16_t                       el0_light_lightness_subscribe_list[RAF_BLE_MESH_SUBSCRIPTION_LIST_SIZE];
 
 ble_mesh_model_param_t      el0_light_lightness_model =
 {
@@ -60,6 +61,7 @@ ble_mesh_model_param_t      el0_light_lightness_setup_model =
 };
 
 /* extended models and models variables */
+const gen_level_state_t     el0_gen_level_state_default = {0x7FFF, 0x7FFF, 0x7FFF, 0, 0, 0, 0, 0}; /*default state: 0x7FFF*/
 gen_level_state_t           el0_gen_level_state = {0x7FFF, 0x7FFF, 0x7FFF, 0, 0, 0, 0, 0}; /*default state: 0x7FFF*/
 publication_info_t          el0_gen_level_model_publish_entry;
 uint16_t                    el0_gen_level_model_subscribe_list[RAF_BLE_MESH_SUBSCRIPTION_LIST_SIZE];
@@ -80,7 +82,7 @@ ble_mesh_model_param_t      el0_gen_level_model =
     0
 };
 
-
+const gen_on_off_state_t    el0_gen_on_off_state_default = {0x01, 0x01, 0x01};   /*default state: on*/
 gen_on_off_state_t          el0_gen_on_off_state = {0x01, 0x01, 0x01};   /*default state: on*/
 publication_info_t          el0_gen_on_off_model_publish_entry;
 uint16_t                    el0_gen_on_off_model_subscribe_list[RAF_BLE_MESH_SUBSCRIPTION_LIST_SIZE];
@@ -190,6 +192,7 @@ ble_mesh_model_param_t *el0_light_lightness_element_model_list[] =
 
 /***************************** element 4, the On/Off element *********************************************/
 /* Declare the state variable for models */
+gen_on_off_state_t          el1_gen_on_off_state_default = {0x01, 0x01, 0x01};   /*default state: on*/
 gen_on_off_state_t          el1_gen_on_off_state = {0x01, 0x01, 0x01};   /*default state: on*/
 publication_info_t          el1_gen_on_off_model_publish_entry;
 uint16_t                    el1_gen_on_off_subscribe_list[RAF_BLE_MESH_SUBSCRIPTION_LIST_SIZE];
@@ -245,7 +248,7 @@ ble_mesh_model_param_t     el1_scene_setup_model =
     0
 };
 
-/* Declare the model using in element 4 */
+/* Declare the model using in element 1 */
 ble_mesh_model_param_t *el1_gen_on_off_element_model_list[] =
 {
     &el1_gen_on_off_model,
@@ -293,7 +296,15 @@ void element_info_init(void)
         el0_scene_subscribe_list[i] = 0x0000;
     }
 
+    for (i = 0; i < RAF_BLE_MESH_SUBSCRIPTION_LIST_SIZE; i++)
+    {
+        el1_gen_on_off_subscribe_list[i] = 0x0000;
+        el1_scene_subscribe_list[i] = 0x0000;
+    }
+
+
     memset(&el0_scene_state, 0, sizeof(scene_state_t));
+    memset(&el1_scene_state, 0, sizeof(scene_state_t));
     scene_info_reset();
 
     for (i = 0 ; i < ble_mesh_element_count ; i++)
@@ -307,5 +318,9 @@ void element_info_init(void)
             }
         }
     }
+    memcpy((uint8_t *)&el0_light_lightness_state, (uint8_t *)&el0_light_lightness_state_default, sizeof(light_lightness_state_t));
+    memcpy((uint8_t *)&el0_gen_level_state, (uint8_t *)&el0_gen_level_state_default, sizeof(gen_level_state_t));
+    memcpy((uint8_t *)&el0_gen_on_off_state, (uint8_t *)&el0_gen_on_off_state_default, sizeof(gen_on_off_state_t));
+    memcpy((uint8_t *)&el1_gen_on_off_state, (uint8_t *)&el1_gen_on_off_state_default, sizeof(gen_on_off_state_t));
 }
 

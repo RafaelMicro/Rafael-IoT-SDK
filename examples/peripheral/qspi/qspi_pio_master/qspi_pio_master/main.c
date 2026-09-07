@@ -13,6 +13,7 @@
 #include "hosal_sysctrl.h"
 #include "hosal_qspi.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 HOSAL_QSPI_DEV_DECL(qspi_dev0, QSPI0, 6, 7, 8, 9, 0, 0, HOSAL_QSPI_BAUDRATE_1M, HOSAL_QSPI_MASTER_MODE);
@@ -45,6 +46,7 @@ int main(void) {
     hosal_qspi_ioctl(&qspi_dev0, HOSAL_QSPI_SLAVE_POLARTITY_SET, &spol);
 
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

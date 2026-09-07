@@ -11,6 +11,7 @@
 #include "hosal_otp.h"
 #include "hosal_uart.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 #define BUF_SIZE       256
 
@@ -80,6 +81,7 @@ int main(void) {
 	uint32_t buf[BUF_SIZE];
     uint8_t  getinptchar;
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n");
     printf("----------------------------------------------------------------\r\n");
     printf("Examples    : hosal one time program write demo\r\n");

@@ -24,6 +24,7 @@
 #include "hosal_rf.h"
 #include "lmac15p4.h"
 #include "log.h"
+#include "mac_frame_gen.h"
 #include "main.h"
 #include "miu_bin_version.h"
 #include "miu_ext_mem.h"
@@ -50,21 +51,26 @@
 #endif
 const sys_information_t systeminfo = SYSTEMINFO_INIT(BIN_TYPE_ARR);
 
+/* MIU_BIN_TYPE_STR is also published as the netdiag Vendor Model TLV. */
+#ifdef MIU_BIN_TYPE_STR
+_Static_assert(sizeof((char[]){BIN_TYPE_ARR}) == sizeof(MIU_BIN_TYPE_STR) - 1,
+               "BIN_TYPE_ARR and MIU_BIN_TYPE_STR do not match");
+#endif
+
 #define PHY_PIB_TURNAROUND_TIMER  1000
 #define PHY_PIB_CCA_DETECTED_TIME 640 // 8 symbols for 50 kbps-data rate
-#define PHY_PIB_CCA_DETECT_MODE   0
-#define PHY_PIB_CCA_THRESHOLD     65
+#define PHY_PIB_CCA_DETECT_MODE   (ENERGY_DETECTION | 0x10)
+#define PHY_PIB_CCA_THRESHOLD     75
 #define MAC_PIB_UNIT_BACKOFF_PERIOD                                            \
     1640 // PHY_PIB_TURNAROUND_TIMER + PHY_PIB_CCA_DETECTED_TIME
-#define MAC_PIB_MAC_ACK_WAIT_DURATION         2000  // oqpsk neee more then 2000
-#define MAC_PIB_MAC_MAX_FRAME_TOTAL_WAIT_TIME 82080 // for 50 kbps-data rate
-#define MAC_PIB_MAC_MAX_FRAME_RETRIES         4
-#define MAC_PIB_MAC_MAX_CSMACA_BACKOFFS       2
-#define MAC_PIB_MAC_MAX_BE                    3
-#define MAC_PIB_MAC_MIN_BE                    2
+#define MAC_PIB_MAC_ACK_WAIT_DURATION   2000 // oqpsk neee more then 2000
+#define MAC_PIB_MAC_MAX_FRAME_RETRIES   5
+#define MAC_PIB_MAC_MAX_CSMACA_BACKOFFS 3
+#define MAC_PIB_MAC_MAX_BE              4
+#define MAC_PIB_MAC_MIN_BE              2
 static uint16_t cca_duration_table[] = {0, 0, 0, 380, 700, 1140, 260, 480};
-static uint32_t frame_total_wait_time_table[] = {0,      0,      0,     70000,
-                                                 100000, 150080, 55000, 80000};
+// static uint32_t frame_total_wait_time_table[] = {0,      0,      0,     70000,
+//                                                  100000, 150080, 55000, 80000};
 static const char* const data_rate_str[] = {
     "2M", "1M", "500K", "200K", "100K", "50K", "300K", "150K", "75K"};
 static const char* const band_str[] = {"SubG_915M", "2P4G",      "SubG_868M",
@@ -453,22 +459,7 @@ static void otdatasetInit(otInstance* instance) {
 
 #if CONFIG_APP_TASK_OTA_ENABLE
 void ota_state_change_cb(uint8_t state) {
-    switch (state) {
-        case OTA_IDLE: log_info("change to ota idle state "); break;
-        case OTA_DATA_SENDING: log_info("change to ota sending state "); break;
-        case OTA_DATA_RECEIVING:
-            log_info("change to ota receiving state");
-            break;
-        case OTA_UNICAST_RECEIVING:
-            log_info("change to ota unicase receiving state");
-            break;
-        case OTA_REQUEST_SENDING:
-            log_info("change to ota request sending state");
-            break;
-        case OTA_DONE: log_info("change to ota done state"); break;
-        case OTA_REBOOT: log_info("change to ota reboot state"); break;
-        default: break;
-    }
+    log_info("OTA state → %s", OtaStateToString((ota_state_t)state));
 }
 #endif
 
@@ -524,7 +515,7 @@ void app_common_init() {
 
     /*subg phy parameter setting*/
     cca_duration = cca_duration_table[sPhyDataRate];
-    frame_total_wait_time = frame_total_wait_time_table[sPhyDataRate];
+    frame_total_wait_time = 0; // frame_total_wait_time_table[sPhyDataRate];
     backof_period = PHY_PIB_TURNAROUND_TIMER + cca_duration;
 
 #if CONFIG_SUBG_DATA_RATE_OQPSK_25K

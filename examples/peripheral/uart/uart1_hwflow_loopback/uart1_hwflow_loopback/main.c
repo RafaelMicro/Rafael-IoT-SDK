@@ -15,6 +15,7 @@
 #include "hosal_sysctrl.h"
 #include "hosal_status.h"
 #include "gpio.h"
+#include "dump_boot_info.h"
 
 #define RT_TIMER0     0
 
@@ -136,6 +137,7 @@ int main(void) {
     uint32_t i = 0,j;
     
     uart_stdio_init();
+    _dump_boot_info();
     hosal_dma_init();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);

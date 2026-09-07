@@ -7,7 +7,7 @@
 
 /** @file
  *
- * @brief FreeRTOSbySystem example file.
+ * @brief BLE Mesh lightness and TRSP element demo.
  *
  */
 /**************************************************************************************************
@@ -60,35 +60,52 @@
 /**************************************************************************************************
  *    TYPEDEFS
  *************************************************************************************************/
+/** @brief UART command table entry used to recognize and dispatch typed user commands.
+ * @details Each entry pairs a human-readable command example (for help text) with the
+ *          matching command header prefix and the handler invoked when a line of UART
+ *          input starts with that prefix.
+ */
 typedef struct
 {
-    const char          *p_cmd_example;
-    const char          *p_cmd_header;
-    void                (*p_cmd_process)(uint8_t *p_data);
+    const char          *p_cmd_example;    /**< Example string shown to the user, e.g. "DstAddr0x001c". */
+    const char          *p_cmd_header;     /**< Command prefix that identifies this command, e.g. "DstAddr0x". */
+    void                (*p_cmd_process)(uint8_t *p_data); /**< Handler invoked with the data following the prefix. */
 } user_cmd_t;
 
+/** @brief Message posted to the application event queue (app_msg_q).
+ * @details Carries the event type and data for BLE mesh, button, and UART events consumed by
+ *          app_main_task(); pt_tlv optionally carries a heap-allocated TLV payload which the
+ *          handler must free once processed.
+ */
 typedef struct
 {
-    mesh_tlv_t *pt_tlv;
-    uint32_t event;
-    uint32_t data;
+    mesh_tlv_t *pt_tlv;    /**< Pointer to an allocated mesh TLV payload (used for mesh events). */
+    uint32_t event;        /**< Index into app_event_handler[] selecting which handler to run. */
+    uint32_t data;         /**< Event-specific data (e.g. GPIO pin number or UART character). */
 } app_queue_t;
 
+/** @brief Identifies which handler in app_event_handler[] should process a queued event.
+ * @details Used as the app_queue_t::event value.
+ */
 typedef enum
 {
-    APP_BLE_MESH_EVT,
-    APP_BUTTON_EVT,
-    APP_UART_EVT,
+    APP_BLE_MESH_EVT,   /**< Event originates from the BLE mesh stack. */
+    APP_BUTTON_EVT,     /**< Event originates from a button press. */
+    APP_UART_EVT,       /**< Event originates from UART character reception. */
 } app_evt_t;
 
 
+/** @brief States of the application's main provisioning/idle state machine.
+ * @details Drives app_main_loop(); transitions between GATT/mesh provisioning, the
+ *          in-progress provisioning wait, provisioning completion, and idle.
+ */
 typedef enum
 {
-    APP_GATT_PROVISION_EVT,
-    APP_MESH_PROVISION_EVT,
-    APP_PROVISIONING_EVT,
-    APP_PROVISION_DONE_EVT,
-    APP_IDLE_EVT,
+    APP_GATT_PROVISION_EVT,   /**< Start (or resume) provisioning over the GATT bearer. */
+    APP_MESH_PROVISION_EVT,   /**< Start (or resume) provisioning over the mesh (PB-ADV) bearer. */
+    APP_PROVISIONING_EVT,     /**< Provisioning is in progress; waiting for it to complete. */
+    APP_PROVISION_DONE_EVT,   /**< Provisioning just completed; one-time post-provision setup runs. */
+    APP_IDLE_EVT,             /**< Device is provisioned and idle; nothing to do. */
 } app_main_evt_t;
 /**************************************************************************************************
  *    GLOBAL VARIABLES
@@ -161,7 +178,14 @@ static const uint8_t         DEVICE_NAME_STR[] = {DEVICE_NAME};
 static TimerHandle_t unprov_idc_tmr;
 xQueueHandle app_msg_q;
 
-/*this is pin mux setting*/
+/**
+ * @brief Configures the default GPIO pin multiplexing for the board.
+ *
+ * Sets every GPIO pin (0-31) to plain GPIO mode, except GPIO16 and GPIO17 which are
+ * reserved for other functions and left untouched.
+ *
+ * @return void This function does not return a value.
+ */
 static void init_default_pin_mux(void)
 {
     int i;
@@ -178,6 +202,13 @@ static void init_default_pin_mux(void)
     return;
 }
 
+/**
+ * @brief Converts a single ASCII hex character to its 4-bit numeric value.
+ *
+ * @param c ASCII character to convert ('0'-'9', 'a'-'f', or 'A'-'F').
+ * @return uint8_t The numeric value (0-15) of the hex digit.
+ * @retval 0xFF c is not a valid hex digit.
+ */
 static uint8_t parse_hex_digit(char c)
 {
     uint8_t result = 0xff;
@@ -198,6 +229,17 @@ static uint8_t parse_hex_digit(char c)
     return result;
 }
 
+/**
+ * @brief Periodic timer callback that blinks the lightness elements' PWM outputs while unprovisioned.
+ *
+ * Called every 100 ms while the device is not yet provisioned; toggles the PWM duty cycle of
+ * both lightness elements (ELEMENT0_PWN_ID, ELEMENT1_PWN_ID) between 0 and 100 to blink them
+ * as a visual "unprovisioned" indicator. Once the device becomes provisioned, it turns both
+ * outputs off and stops itself.
+ *
+ * @param t_timer Handle of the expired timer (unprov_idc_tmr).
+ * @return void This function does not return a value.
+ */
 static void unprov_tmr_cb(TimerHandle_t t_timer)
 {
     static uint8_t toggle;
@@ -205,6 +247,7 @@ static void unprov_tmr_cb(TimerHandle_t t_timer)
     if (pib_is_provisioned())
     {
         hosal_pwm_fmt0_duty(ELEMENT0_PWN_ID, 0);
+        hosal_pwm_fmt0_duty(ELEMENT1_PWN_ID, 0);
         xTimerStop(unprov_idc_tmr, 0);
     }
     else
@@ -213,15 +256,25 @@ static void unprov_tmr_cb(TimerHandle_t t_timer)
         if (toggle)
         {
             hosal_pwm_fmt0_duty(ELEMENT0_PWN_ID, 0);
+            hosal_pwm_fmt0_duty(ELEMENT1_PWN_ID, 0);
         }
         else
         {
             hosal_pwm_fmt0_duty(ELEMENT0_PWN_ID, 100);
-            hosal_pwm_fmt0_duty(ELEMENT0_PWN_ID, 100);
+            hosal_pwm_fmt0_duty(ELEMENT1_PWN_ID, 100);
         }
     }
 }
 
+/**
+ * @brief Parses a 4-digit hex string into the UART TRSP destination address.
+ *
+ * Called by uart_data_handler() when a "DstAddr0x" command is recognized. Converts the 4
+ * hex characters following the command header into user_data_dst_addr and prints the result.
+ *
+ * @param p_rx_data Pointer to the 4 ASCII hex characters following the "DstAddr0x" prefix.
+ * @return void This function does not return a value.
+ */
 static void user_data_dst_address_set(uint8_t *p_rx_data)
 {
     uint8_t dst_addr[4];
@@ -238,6 +291,15 @@ static void user_data_dst_address_set(uint8_t *p_rx_data)
     printf("Destination address of uart data: 0x%04x\n", user_data_dst_addr);
 }
 
+/**
+ * @brief Parses a hex digit into the UART TRSP "request ack" flag.
+ *
+ * Called by uart_data_handler() when a "TxAckEnable" command is recognized. Sets
+ * user_data_req_ack from the single hex character following the command header.
+ *
+ * @param p_rx_data Pointer to the ASCII hex character following the "TxAckEnable" prefix.
+ * @return void This function does not return a value.
+ */
 static void user_data_tx_ack_set(uint8_t *p_rx_data)
 {
     user_data_req_ack = parse_hex_digit((char)p_rx_data[0]);
@@ -245,6 +307,22 @@ static void user_data_tx_ack_set(uint8_t *p_rx_data)
     printf("Uart data tx with ack %d\n", user_data_req_ack);
 }
 
+/**
+ * @brief Handles one received UART character, buffering it and processing complete lines.
+ *
+ * Accumulates characters from the UART into a static line buffer. On overflow, the buffer is
+ * discarded and the index reset. On receiving '\n' or '\r', the buffered line is checked
+ * against the known user commands (g_user_cmd_list) and dispatched to the matching command
+ * handler if found; otherwise, if a valid destination address has been configured via the
+ * "DstAddr0x" command and an app key has been bound to the Rafael TRSP client model, the line
+ * is sent as a Rafael TRSP Set message (acknowledged or unacknowledged, per
+ * user_data_req_ack) to that destination. If no destination address has been configured yet, a
+ * usage message listing the available commands is printed instead. The line buffer index is
+ * reset once the line has been processed.
+ *
+ * @param ch Character received from the UART.
+ * @return void This function does not return a value.
+ */
 static void uart_data_handler(char ch)
 {
     static uint8_t rx_buffer[MAX_TRSP_DATA_LEN + 1];
@@ -335,6 +413,20 @@ static void uart_data_handler(char ch)
     }
 }
 
+/**
+ * @brief Handles button-press events, restarting device provisioning.
+ *
+ * Invoked via app_event_handler[APP_BUTTON_EVT] for GPIO button pins 0-4. Pins 0 and 1
+ * (re)start mesh or GATT provisioning respectively: any in-progress provisioning is stopped,
+ * an already-provisioned device has its proxy service disabled, the element info and local
+ * provisioning info are reset, and app_main_event is set to APP_MESH_PROVISION_EVT (pin 0) or
+ * APP_GATT_PROVISION_EVT (pin 1) so app_main_loop() restarts provisioning. Pins 2-4 are
+ * currently unused (no-op).
+ *
+ * @param data GPIO pin number that triggered the button event (0-4).
+ * @param p_mesh_tlv Unused for button events.
+ * @return uint8_t Always false; no TLV buffer needs to be freed by the caller for this event type.
+ */
 static uint8_t app_button_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
 {
     uint8_t memory_free = false;
@@ -369,6 +461,16 @@ static uint8_t app_button_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
     return memory_free;
 }
 
+/**
+ * @brief Handles queued UART character events.
+ *
+ * Invoked via app_event_handler[APP_UART_EVT]; forwards the received character to
+ * uart_data_handler() for line buffering and command/data processing.
+ *
+ * @param data The received UART character, passed through as uint32_t.
+ * @param p_mesh_tlv Unused for UART events.
+ * @return uint8_t Always false; no TLV buffer needs to be freed by the caller for this event type.
+ */
 static uint8_t app_uart_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
 {
     uart_data_handler(data);
@@ -376,6 +478,17 @@ static uint8_t app_uart_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
     return false;
 }
 
+/**
+ * @brief Handles BLE TRSPS characteristic write data received from the mesh event queue.
+ *
+ * Logs the raw bytes received from the BLE Transparent Service Profile Server (TRSPS), then
+ * loops the same data back out through ble_trsps_data_set() (e.g. as a notification to a
+ * connected central), logging whether the loopback send succeeded.
+ *
+ * @param len Length in bytes of the received TRSPS data.
+ * @param p_trsps_data Pointer to the received TRSPS data buffer.
+ * @return void This function does not return a value.
+ */
 static void ble_trsps_evt_msg_handler(uint16_t len, uint8_t *p_trsps_data)
 {
     uint16_t i;
@@ -393,6 +506,23 @@ static void ble_trsps_evt_msg_handler(uint16_t len, uint8_t *p_trsps_data)
     printf("Loopback received BLE TRSPS data %d:\n", tx_success);
 }
 
+/**
+ * @brief Dispatches BLE mesh stack indications/confirmations received on the app message queue.
+ *
+ * Invoked via app_event_handler[APP_BLE_MESH_EVT] for every mesh_tlv_t delivered by
+ * mesh_app_evt_indication_cb(). Handles: provisioning start confirmation (advances
+ * app_main_event and records this node's element addresses), node reset, BLE TRSPS
+ * characteristic writes (forwarded to ble_trsps_evt_msg_handler()), generic model event
+ * messages (forwarded to mmdl_evt_msg_cb(), e.g. Lightness/TRSP model messages), app-key
+ * bind indications (captures the app key index bound to the Rafael TRSP client model),
+ * provisioning completion, and provisioning/proxy advertising enable results. Unrecognized
+ * TLV types are ignored.
+ *
+ * @param data Unused for mesh events.
+ * @param p_mesh_tlv Pointer to the mesh TLV describing the event type and its payload.
+ * @return uint8_t Always true; the caller must free the TLV buffer (p_mesh_tlv) after this
+ *         handler returns.
+ */
 static uint8_t app_mesh_event_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
 {
     mesh_prov_start_cfm_t *p_start_cfm;
@@ -487,6 +617,17 @@ static uint8_t app_mesh_event_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
     return memory_free;
 }
 
+/**
+ * @brief Runs one step of the application's provisioning/idle state machine.
+ *
+ * Called repeatedly from app_main_task()'s loop. Starts mesh or GATT provisioning when in the
+ * corresponding *_PROVISION_EVT state (if not already provisioned) and arms the unprovisioned
+ * indication timer; once provisioning completes, enables the mesh proxy service and
+ * transitions to the idle state. No action is taken while provisioning is in progress or once
+ * idle.
+ *
+ * @return void This function does not return a value.
+ */
 static void app_main_loop(void)
 {
     switch (app_main_event)
@@ -537,6 +678,18 @@ static void app_main_loop(void)
     }
 }
 
+/**
+ * @brief Main application task loop.
+ *
+ * Sets the GATT device name, and if the device is already provisioned on entry, resolves the
+ * app key bound to the Rafael TRSP client model for each element and enables the mesh proxy
+ * service. Then runs forever, driving the provisioning state machine via app_main_loop() and
+ * dispatching any event queued on app_msg_q to the matching handler in app_event_handler[],
+ * freeing the event's TLV buffer when the handler indicates it is no longer needed.
+ *
+ * @return void This function does not return a value.
+ * @note Never returns; this is the body of the main application FreeRTOS task.
+ */
 static void app_main_task(void)
 {
     ble_mesh_model_param_t  *p_model;
@@ -583,6 +736,22 @@ static void app_main_task(void)
     }
 }
 
+/**
+ * @brief Mesh stack indication callback; forwards a mesh TLV event onto the app message queue.
+ *
+ * Registered with mesh_stack_init() as the mesh event indication callback. Makes a heap copy
+ * of the TLV pointed to by p_param, queues it as an APP_BLE_MESH_EVT event on app_msg_q for
+ * app_main_task()/app_mesh_event_handler() to process, then frees the original p_param buffer.
+ * If the queue is full, it keeps retrying the send (20 ticks per attempt) until it succeeds.
+ *
+ * @param p_param Pointer to the mesh_tlv_t event delivered by the mesh stack; must not be NULL.
+ * @return ble_err_t Result of the operation.
+ * @retval BLE_ERR_OK The event was copied and queued successfully.
+ * @retval BLE_ERR_INVALID_PARAMETER p_param was NULL.
+ * @retval BLE_ERR_ALLOC_MEMORY_FAIL Failed to allocate memory for the queued TLV copy.
+ * @retval BLE_BUSY Returned if the queue send had to be retried at least once before
+ *         succeeding (the event is still queued once the retry succeeds).
+ */
 static ble_err_t mesh_app_evt_indication_cb(void *p_param)
 {
     ble_err_t status;
@@ -621,6 +790,19 @@ static ble_err_t mesh_app_evt_indication_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief BLE host general-event callback; forwards HCI events into the mesh bearer layer.
+ *
+ * Registered with ble_host_callback_set(APP_GENERAL_EVENT, ...). Wraps the BLE event
+ * parameters in a mesh_tlv_t tagged MSG_TAG_BEARER_HCI_EVENT and forwards it to the mesh
+ * stack's bearer layer via mesh_queue_sendto().
+ *
+ * @param p_param Pointer to the ble_evt_param_t event data provided by the BLE host stack.
+ * @return ble_err_t Result of the operation.
+ * @retval BLE_ERR_OK The event was forwarded to the mesh bearer layer successfully.
+ * @retval BLE_ERR_DATA_MALLOC_FAIL Failed to allocate the TLV buffer for the event.
+ * @retval BLE_BUSY mesh_queue_sendto() failed to queue the event.
+ */
 static ble_err_t ble_app_event_cb(void *p_param)
 {
     ble_err_t status;
@@ -641,6 +823,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
 
         if (mesh_queue_sendto(MESH_LAYER_BEARER, p_tlv) != MESH_SUCCESS)
         {
+            vPortFree(p_tlv);
             status = BLE_BUSY;
         }
     } while (0);
@@ -648,6 +831,19 @@ static ble_err_t ble_app_event_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief BLE host service-event (ATT/GATT) callback; forwards ACL data into the mesh bearer layer.
+ *
+ * Registered with ble_host_callback_set(APP_SERVICE_EVENT, ...). Wraps the BLE ATT event
+ * parameters in a mesh_tlv_t tagged MSG_TAG_BEARER_HCI_ACL_DATA and forwards it to the mesh
+ * stack's bearer layer via mesh_queue_sendto().
+ *
+ * @param p_param Pointer to the ble_evt_att_param_t event data provided by the BLE host stack.
+ * @return ble_err_t Result of the operation.
+ * @retval BLE_ERR_OK The event was forwarded to the mesh bearer layer successfully.
+ * @retval BLE_ERR_DATA_MALLOC_FAIL Failed to allocate the TLV buffer for the event.
+ * @retval BLE_BUSY mesh_queue_sendto() failed to queue the event.
+ */
 static ble_err_t ble_service_data_cb(void *p_param)
 {
     ble_err_t status;
@@ -671,6 +867,7 @@ static ble_err_t ble_service_data_cb(void *p_param)
         if (mesh_queue_sendto(MESH_LAYER_BEARER, p_tlv) != MESH_SUCCESS)
         {
             status = BLE_BUSY;
+            vPortFree(p_tlv);
             //xSemaphoreGive(semaphore_cb);
         }
 
@@ -679,6 +876,17 @@ static ble_err_t ble_service_data_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief Initializes the BLE mesh stack, model layer, and application queue/timer.
+ *
+ * Initializes the provisioning info base (PIB) and mesh models (mmdl_init()), creates the
+ * application event queue (app_msg_q) and the unprovisioned-indication timer
+ * (unprov_idc_tmr), registers the general and service BLE host event callbacks, and starts
+ * the BLE host stack and the mesh stack (registering mesh_app_evt_indication_cb() as the mesh
+ * event callback). Prints a status message for each initialization step.
+ *
+ * @return void This function does not return a value.
+ */
 void app_init(void)
 {
     mesh_task_priority_t task_priority_cfg;
@@ -724,7 +932,19 @@ void app_init(void)
     }
 }
 
-void button_cb(uint32_t pin, void* isr_param) 
+/**
+ * @brief GPIO interrupt callback for the button pins.
+ *
+ * Reads and logs the current level of the triggering pin, and for pins 0-4 queues an
+ * APP_BUTTON_EVT event (carrying the pin number) onto app_msg_q from ISR context for
+ * app_button_handler() to process.
+ *
+ * @param pin GPIO pin number that triggered the interrupt.
+ * @param isr_param Unused ISR callback parameter.
+ * @return void This function does not return a value.
+ * @note Called from GPIO ISR context.
+ */
+void button_cb(uint32_t pin, void* isr_param)
 {
     BaseType_t context_switch;
     app_queue_t t_app_q;
@@ -753,6 +973,14 @@ void button_cb(uint32_t pin, void* isr_param)
     return;
 }
 
+/**
+ * @brief Configures GPIO pins 0-4 as debounced, pulled-up button inputs.
+ *
+ * Sets the GPIO debounce time, configures pins 0-4 for rising-edge interrupts with
+ * button_cb() as the callback and a 100K pull-up, and enables the GPIO interrupt in the NVIC.
+ *
+ * @return void This function does not return a value.
+ */
 void button_init(void)
 {
     uint8_t i = 0;
@@ -772,6 +1000,16 @@ void button_init(void)
     NVIC_EnableIRQ(Gpio_IRQn);
 }
 
+/**
+ * @brief UART0 receive interrupt callback.
+ *
+ * Drains all bytes currently available in the UART0 receive FIFO, queuing an APP_UART_EVT
+ * event (carrying the character) onto app_msg_q from ISR context for each byte received.
+ *
+ * @param p_arg Unused callback parameter.
+ * @return int Always returns 0.
+ * @note Called from UART0 ISR context.
+ */
 static int uart0_rx_callback(void *p_arg)
 {
     BaseType_t context_switch;
@@ -787,6 +1025,16 @@ static int uart0_rx_callback(void *p_arg)
     return 0;
 }
 
+/**
+ * @brief UART0 receive-line-status interrupt callback.
+ *
+ * Invoked when the UART0 line status changes. If a break condition (UART_LSR_BI) is detected,
+ * reads and discards one byte from the UART to clear it and logs the break.
+ *
+ * @param p_arg Unused callback parameter.
+ * @return int Not used by the caller.
+ * @note Called from UART0 ISR context.
+ */
 static int uart0_receive_line_callback(void* p_arg)
 {
     if (hosal_uart_get_lsr(&uart0_dev) & UART_LSR_BI)
@@ -799,6 +1047,15 @@ static int uart0_receive_line_callback(void* p_arg)
     }
 }
 
+/**
+ * @brief Initializes UART0 for stdio-style command/data input.
+ *
+ * Initializes the UART0 device, registers the TX DMA, RX, and receive-line-status callbacks,
+ * configures UART0 for interrupt-driven RX mode with receive-line-status detection enabled,
+ * and sets the UART0 interrupt priority.
+ *
+ * @return void This function does not return a value.
+ */
 static void uart_init(void)
 {
     /*Init UART In the first place*/
@@ -820,13 +1077,17 @@ static void uart_init(void)
 }
 
 /**
- * @brief Main entry point for the application.
+ * @brief Main application entry task.
  *
- * This function initializes the RF module, starts the application initialization,
- * and enters an infinite loop to keep the application running.
+ * Initializes the low-power manager and the RF module for BLE, configures the PWM outputs
+ * driving the two lightness elements' brightness (ELEMENT0_PWN_ID on pin 20, ELEMENT1_PWN_ID
+ * on pin 21), initializes the buttons and UART, then runs app_init() and app_main_task()
+ * (which never returns).
  *
  * @param pvParameters Pointer to parameters passed to the task (not used).
  * @return void This function does not return a value.
+ * @note The trailing infinite loop is unreachable in practice because app_main_task() never
+ *       returns.
  */
 static void app_main_entry(void* pvParameters)
 {
@@ -857,9 +1118,11 @@ static void app_main_entry(void* pvParameters)
 /**
  * @brief Application entry point.
  *
- * Initializes hardware, configures peripherals, and starts the main application task.
+ * Configures the default pin multiplexing, initializes UART stdio and the heap regions, dumps
+ * boot info, creates the main application FreeRTOS task (app_main_entry), and starts the
+ * FreeRTOS scheduler.
  *
- * @return int Not used.
+ * @return int Not used; the FreeRTOS scheduler does not return.
  */
 int main(void)
 {

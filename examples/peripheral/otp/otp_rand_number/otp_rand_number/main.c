@@ -13,6 +13,7 @@
 #include "hosal_trng.h"
 #include "hosal_sysctrl.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 
@@ -23,6 +24,7 @@ int main(void) {
     uint32_t randum[32];
 
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n");
     printf("----------------------------------------------------------------\r\n");
     printf("Examples    : hosal rand number demo\r\n");

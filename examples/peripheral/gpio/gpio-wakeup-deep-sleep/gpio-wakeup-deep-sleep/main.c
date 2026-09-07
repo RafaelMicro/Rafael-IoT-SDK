@@ -18,6 +18,7 @@
 #include "hosal_sysctrl.h"
 #include "app_hooks.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 #if defined(CONFIG_RF1301) || defined(CONFIG_RT584H) ||  defined(CONFIG_RT584HA4) || defined(CONFIG_RT584L)
@@ -45,6 +46,7 @@ int main(void) {
 
     uart_stdio_init();
     vHeapRegionsInt();
+    _dump_boot_info();
     printf("Starting %s now %d.... \r\n", CONFIG_CHIP,
            CONFIG_HOSAL_SOC_MAIN_ENTRY_TASK_SIZE);
            

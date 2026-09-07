@@ -127,20 +127,22 @@ static void trsp_data_send_from_isr(uint8_t *p_data, uint8_t length);
  *  Handler
  * ------------------------------
  */
-/*
+/**
  * @brief GPIO interrupt handler for low power mode.
+ *
  * This function is called when a GPIO interrupt occurs, and it sets the low power mask for the BLE application.
  *
  * @param pin The GPIO pin that triggered the interrupt.
  * @param isr_param Additional parameters for the interrupt handler.
- */ 
+ */
 static void app_gpio_handler(uint32_t pin, void *isr_param)
 {
     hosal_lpm_ioctrl(HOSAL_LPM_MASK, HOSAL_LOW_POWER_MASK_BIT_TASK_BLE_APP);
 }
 
-/*
+/**
  * @brief UART data handler.
+ *
  * This function processes the received UART data and determines whether the system can enable sleep mode.
  *
  * @param ch The character received from the UART.
@@ -176,9 +178,12 @@ static bool uart_data_handler(char ch)
     return status;
 }
 
-/*
- * @brief UART receive line callback function.
- * This function is called when a line is received on the UART. It masks the low power mode for the BLE application.
+/**
+ * @brief UART receive line status callback function.
+ *
+ * This function is called when the UART line status changes. If a break condition is
+ * detected, it reads and discards the pending byte and masks the low power mode for
+ * the BLE application.
  *
  * @param p_arg Pointer to the argument provided to the callback function.
  * @return Always returns 0.
@@ -196,8 +201,9 @@ static int uart0_receive_line_callback(void *p_arg)
     return 0;
 }
 
-/*
+/**
  * @brief UART receive callback function.
+ *
  * This function is called when data is received on the UART. It processes the received character
  * and determines whether the system can enable sleep mode.
  *
@@ -281,9 +287,9 @@ static void ble_svcs_trsps_evt_handler(ble_evt_att_param_t *p_param)
 /**
  * @brief Processes application requests in the peripheral role.
  *
- * This function handles various application requests, such as starting advertising,
- * sending data, and managing FOTA timer expiration. It ensures the peripheral device
- * operates correctly by interacting with the BLE stack and updating its state.
+ * This function handles various application requests, such as starting advertising
+ * and sending data. It ensures the peripheral device operates correctly by
+ * interacting with the BLE stack and updating its state.
  *
  * @param p_param Pointer to the request parameters.
  *                - host_id: The ID of the host initiating the request.
@@ -845,6 +851,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -898,6 +905,7 @@ static ble_err_t ble_service_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -946,6 +954,7 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -1140,7 +1149,7 @@ static void svcs_trsps_data_init(ble_svcs_trsps_data_t *p_data)
  * @brief Initializes the server profile for the TRSP service.
  * 
  * This function initializes the server profile for the TRSP service.
- * It sets up the GATT, GAP, and TRSPS services and configures the device name.
+ * It sets up the GAP, GATT, DIS, and TRSPS services and configures the device name.
  * 
  * @param host_id The ID of the host for which to initialize the profile.
  * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error code on failure).

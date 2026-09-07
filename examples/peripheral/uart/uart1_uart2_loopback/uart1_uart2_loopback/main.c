@@ -20,6 +20,7 @@
 #include "uart_stdio.h"
 #include "hosal_sysctrl.h"
 #include "gpio.h"
+#include "dump_boot_info.h"
 
 uint32_t rx1_finish, tx1_finish;
 uint32_t rx2_finish, tx2_finish;
@@ -128,6 +129,7 @@ int main(void) {
 
     uint32_t i = 0,j;
     uart_stdio_init();
+    _dump_boot_info();
     hosal_dma_init();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);

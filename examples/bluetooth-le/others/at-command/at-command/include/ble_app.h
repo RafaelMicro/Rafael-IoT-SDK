@@ -31,15 +31,15 @@ extern "C" {
 typedef enum
 {
     QUEUE_TYPE_APP_REQ,   /**< Application queue type: application request.*/
-    QUEUE_TYPE_OTHERS,    /**< Application queue type: others including BLE events and BLE service events.*/
+    QUEUE_TYPE_OTHERS,    /**< Application queue type: others including BLE events, BLE service events, and BLE L2CAP data events.*/
 } app_queue_param_type;
 
 typedef enum
 {
     STATE_STANDBY,          /**< Application state: standby.*/
     STATE_ADVERTISING,      /**< Application state: advertising.*/
-    STATE_SCANNING,
-    STATE_INITIATING,
+    STATE_SCANNING,         /**< Application state: scanning.*/
+    STATE_INITIATING,       /**< Application state: initiating (connecting).*/
     STATE_CONNECTED,        /**< Application state: connected.*/
 } ble_state_t;
 
@@ -51,8 +51,8 @@ typedef struct
 
 typedef enum
 {
-    APP_REQUEST_IDLE = 0x00,
-    APP_REQUEST_AT_CMD_PROCESS,
+    APP_REQUEST_IDLE = 0x00,      /**< Application request event: idle, no action.*/
+    APP_REQUEST_AT_CMD_PROCESS,   /**< Application request event: process a pending AT command.*/
 } app_request_t;
 
 
@@ -79,7 +79,7 @@ extern uint16_t tx_index[2];
  *    PUBLIC FUNCTIONS
  *************************************************************************************************/
 
-/** @brief Application Resuet Set command.
+/** @brief Application Request Set command.
  *
  * @param[in] host_id : the link's id.
  * @param[in] request : request parameter.

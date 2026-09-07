@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include "hosal_crypto_aes_ccm.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 #define NUM_NIST_KEYS 16
@@ -513,6 +514,7 @@ int main(void) {
 
 
     uart_stdio_init();
+    _dump_boot_info();
     
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);

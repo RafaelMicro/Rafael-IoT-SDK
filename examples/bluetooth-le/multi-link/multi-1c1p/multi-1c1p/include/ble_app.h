@@ -37,8 +37,8 @@ typedef enum
 {
     STATE_STANDBY,          /**< Application state: standby.*/
     STATE_ADVERTISING,      /**< Application state: advertising.*/
-    STATE_SCANNING,
-    STATE_INITIATING,
+    STATE_SCANNING,         /**< Application state: scanning.*/
+    STATE_INITIATING,       /**< Application state: initiating (connection creation in progress).*/
     STATE_CONNECTED,        /**< Application state: connected.*/
 } ble_state_t;
 
@@ -50,16 +50,16 @@ typedef struct
 
 typedef enum
 {
-    APP_REQUEST_IDLE = 0x00,
-    APP_REQUEST_SCAN_START,
-    APP_REQUEST_SCAN_STOP,
-    APP_REQUEST_CREATE_CONN,
-    APP_REQUEST_TRSPC_MULTI_CMD,
-    APP_REQUEST_ADV_START,
-    APP_REQUEST_ADV_STOP,
-    APP_REQUEST_DATA_SEND,
-    APP_REQUEST_DISCONNECT,
-    APP_REQUEST_PROCESS_UART_CMD,
+    APP_REQUEST_IDLE = 0x00,       /**< Application request event: idle, no action.*/
+    APP_REQUEST_SCAN_START,        /**< Application request event: start scanning (central role).*/
+    APP_REQUEST_SCAN_STOP,         /**< Application request event: stop scanning (central role).*/
+    APP_REQUEST_CREATE_CONN,       /**< Application request event: create connection to the found target peer.*/
+    APP_REQUEST_TRSPC_MULTI_CMD,   /**< Application request event: run the TRSP client post-connection command sequence.*/
+    APP_REQUEST_ADV_START,         /**< Application request event: start advertising (peripheral role).*/
+    APP_REQUEST_ADV_STOP,          /**< Application request event: stop advertising (peripheral role).*/
+    APP_REQUEST_DATA_SEND,         /**< Application request event: send pending TRSP TX data (central client or peripheral server role).*/
+    APP_REQUEST_DISCONNECT,        /**< Application request event: disconnect the link.*/
+    APP_REQUEST_PROCESS_UART_CMD,  /**< Application request event: process a received UART command line.*/
 } app_request_t;
 
 

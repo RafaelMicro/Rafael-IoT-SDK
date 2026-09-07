@@ -67,9 +67,9 @@ static void test_cmd(atcmd_item_t *item)
         "  set the address type of device\n"
         "  <num> : the address type of device\n"
         "    0: public address\n"
-        "    1: ramdom address\n"
+        "    1: random address\n"
         "  notice\n"
-        "    If BLE Address Type is set to ramdom address,\n"
+        "    If BLE Address Type is set to random address,\n"
         "    addr[5] >= 0xC0(the two most significant bits\n"
         "    of the address shall be equal to 1).\n"
     );

@@ -55,6 +55,7 @@ target_sources(app PRIVATE
     ${MIU_COMMON_DIR}/src/app_mac_raw.c
     ${MIU_COMMON_DIR}/src/cli_uart.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/app_task.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/app_cli_cmd.c
 )
 
 # ========================================

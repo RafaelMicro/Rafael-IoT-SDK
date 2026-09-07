@@ -11,6 +11,7 @@
 #include "mcu.h"
 #include "hosal_qspi.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 #define FLASH_SECTOR_SIZE 256
 
@@ -63,6 +64,7 @@ int main(void) {
     NVIC_EnableIRQ(qspi_dev0.irq_num);
 
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

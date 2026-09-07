@@ -712,10 +712,9 @@ int main(void) {
                 if ( p_fota_info->fota_image_info & FOTA_IMAGE_INFO_COMPRESSED )
                 {
                     DEBUG_PRINT("[FOTA] FOTA_IMAGE_INFO_COMPRESSED.\r\n");
-                    DEBUG_PRINT("[FOTA] %.8x\r\n",FOTA_UPDATE_BUFFER_FW_ADDRESS);
                     res = check_decode_unpack_size(p_fota_info->fotabank_startaddr);
                     if( res == SZ_OK ) {
-                        set_flash_erase(APP_START_ADDRESS, (FOTA_UPDATE_BUFFER_FW_ADDRESS - APP_START_ADDRESS));
+                        set_flash_erase(APP_START_ADDRESS, (p_fota_info->fotabank_startaddr - APP_START_ADDRESS));
                         res = Decode(p_fota_info->target_startaddr, p_fota_info->fotabank_startaddr);
                     }
                 }

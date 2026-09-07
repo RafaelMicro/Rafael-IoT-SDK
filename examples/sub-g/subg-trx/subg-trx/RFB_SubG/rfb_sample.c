@@ -175,6 +175,12 @@ static void subg_rx_done(uint16_t ruci_packet_length, uint8_t *rx_data_address, 
 
     g_rx_total_count++;
     rx_data_len = ruci_packet_length - (RUCI_PHY_STATUS_LENGTH + phr_length + RX_APPEND_LENGTH);
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+    if (data_rate <= SUBG_CTRL_DATA_RATE_1M)
+    {
+        rx_data_len -= 1; //special case: 58x 1M/2M data rate with 24-bit CRC
+    }
+#endif
 
     if (crc_status == 0)
     {

@@ -13,6 +13,7 @@
 #include "hosal_crypto_aes.h"
 #include "hosal_crypto_sha256.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 void hkdf_case1(void) {
@@ -266,6 +267,7 @@ int main(void) {
 
 
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

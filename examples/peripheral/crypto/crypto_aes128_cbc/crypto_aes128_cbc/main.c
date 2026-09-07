@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include "hosal_crypto_aes.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 
@@ -37,6 +38,7 @@ int main(void) {
     hosal_aes_dev_t aes_dev;
 
     uart_stdio_init();
+    _dump_boot_info();
     /*
      *   Please notice: plain_text_buf is only 85 bytes. It is not 64N...
      * so we need add padding in the end of plain_text. In this example we

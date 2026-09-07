@@ -11,6 +11,7 @@
 #include <inttypes.h>
 #include "hosal_crypto_sha256.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 /*In this test case, we limit generate test key length less than 64 bytes.*/
@@ -186,6 +187,7 @@ int main(void) {
     uint32_t              i;
 
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

@@ -198,6 +198,8 @@ You have successfully built and verified the MIU Mesh network. Please refer to t
     * [`miu-ftd Example Guide`](example/miu-ftd-guide.md)
     * [`miu-mtd Example Guide`](example/miu-mtd-guide.md)
 * **Diagnostics and Debugging:**
+    * [`Mesh Topology and Ping Guide`](topology-guide.md) — the same `state` and
+      `ping` checks above, done for a whole network at once from the PC tool
     * [`miu-sniffer Example Guide`](example/miu-sniffer-guide.md)
 * **Advanced Features (To be completed):**
     * [`OTA Guide`](OTA-guide.md)

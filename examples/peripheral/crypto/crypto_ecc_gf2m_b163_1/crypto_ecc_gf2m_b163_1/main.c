@@ -11,6 +11,7 @@
 #include "rt_crypto.h"
 #include "hosal_crypto_ecc.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 /* GF2m_ECC_B163's key should be NOT greater than (<=) 21 bytes */
@@ -63,6 +64,7 @@ int main(void) {
 
 
     uart_stdio_init();
+    _dump_boot_info();
     
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);

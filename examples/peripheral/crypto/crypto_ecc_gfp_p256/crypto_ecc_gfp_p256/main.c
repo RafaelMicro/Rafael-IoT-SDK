@@ -11,6 +11,7 @@
 #include "hosal_crypto_ecc.h"
 #include "hosal_crypto_ctr_drbg.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 typedef struct  ECC256_vector
@@ -168,6 +169,7 @@ int main(void) {
     hosal_crypto_ecc_p256_t ecc_p256;
 
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

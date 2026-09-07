@@ -13,7 +13,7 @@
 #define OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE                0
 #define OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE                       1
 #define OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE             0
-#define OPENTHREAD_CONFIG_ECDSA_ENABLE                           1
+#define OPENTHREAD_CONFIG_ECDSA_ENABLE                           0
 #define OPENTHREAD_CONFIG_SRP_CLIENT_ENABLE                      0
 #define OPENTHREAD_CONFIG_SRP_CLIENT_AUTO_START_API_ENABLE       0
 #define OPENTHREAD_ENABLE_NCP_VENDOR_HOOK                        0
@@ -25,12 +25,19 @@
 #define OPENTHREAD_CONFIG_NCP_CPC_ENABLE                         0
 #define OPENTHREAD_CONFIG_MAC_FILTER_ENABLE                      1
 #define OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE                1
+
+/* Required by the tool's Topology scan; without them there is no meshdiag. */
+#define OPENTHREAD_CONFIG_TMF_NETDIAG_CLIENT_ENABLE              1
+#define OPENTHREAD_CONFIG_MESH_DIAG_ENABLE                       1
+#define OPENTHREAD_CONFIG_MESH_DIAG_RESPONSE_TIMEOUT             10000
+/* Vendor strings come from the build, so drop the ~180 B of runtime setters. */
+#define OPENTHREAD_CONFIG_NET_DIAG_VENDOR_INFO_SET_API_ENABLE    0
 #define OPENTHREAD_CONFIG_PLATFORM_ASSERT_MANAGEMENT             1
 #define OPENTHREAD_CONFIG_COMMISSIONER_ENABLE                    0
 #define OPENTHREAD_CONFIG_JOINER_ENABLE                          0
 #define OPENTHREAD_CONFIG_COAP_API_ENABLE                        1
 #define OPENTHREAD_CONFIG_IP6_FRAGMENTATION_ENABLE               1
-#define OPENTHREAD_CONFIG_NUM_MESSAGE_BUFFERS                    100
+#define OPENTHREAD_CONFIG_NUM_MESSAGE_BUFFERS                    128
 #define OPENTHREAD_CONFIG_TMF_ADDRESS_CACHE_ENTRIES              300
 #define OPENTHREAD_CONFIG_MLE_MAX_CHILDREN                       32
 #define OPENTHREAD_CONFIG_MLE_CHILD_TIMEOUT_DEFAULT              240

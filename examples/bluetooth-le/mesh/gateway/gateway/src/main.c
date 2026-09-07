@@ -7,7 +7,7 @@
 
 /** @file
  *
- * @brief FreeRTOSbySystem example file.
+ * @brief BLE Mesh gateway application.
  *
  */
 
@@ -52,28 +52,40 @@
 //=============================================================================
 //                Private ENUM
 //=============================================================================
+/** @brief Application state machine states.
+ *  @details Tracked by app_main_event and stepped by app_main_loop().
+ */
 typedef enum
 {
-    APP_INIT_EVT,
-    APP_IDLE_EVT,
+    APP_INIT_EVT,   /**< Initial state; transitions to APP_IDLE_EVT on the first loop pass. */
+    APP_IDLE_EVT,   /**< Idle state; no periodic action is taken. */
 } app_main_evt_t;
 
+/** @brief Identifiers for the events dispatched through app_msg_q.
+ *  @details Used as the index into app_event_handler[] to select the handler
+ *           that processes a queued app_queue_t message.
+ */
 typedef enum
 {
-    APP_BLE_MESH_EVT = 0,
-    APP_BUTTON_EVT,
-    APP_QUEUE_UART_MSG_EVT,
+    APP_BLE_MESH_EVT = 0,   /**< A mesh_tlv_t indication was received from the mesh stack. */
+    APP_BUTTON_EVT,         /**< A button GPIO interrupt was posted by button_cb(). */
+    APP_QUEUE_UART_MSG_EVT, /**< A gateway command was parsed from UART input. */
 } app_queue_evt_t;
 
 //=============================================================================
 //                Private Struct
 //=============================================================================
 
+/** @brief Message format posted to app_msg_q.
+ *  @details Carries the event type and its associated data to the handler
+ *           selected from app_event_handler[] in app_main_task().
+ */
 typedef struct
 {
-    mesh_tlv_t *pt_tlv;
-    uint32_t event;
-    uint32_t data;
+    mesh_tlv_t *pt_tlv; /**< TLV buffer associated with the event, or NULL if unused; freed by
+                          *   app_main_task() when the handler returns true. */
+    uint32_t event;     /**< Event type, one of app_queue_evt_t. */
+    uint32_t data;      /**< Event-specific scalar data (e.g. GPIO pin number for APP_BUTTON_EVT). */
 } app_queue_t;
 //=============================================================================
 //                Private Function Declaration
@@ -106,6 +118,17 @@ extern void auto_prov_device_start(uint16_t primary_addr, uint8_t *p_device_uuid
 extern void auto_prov_device_complete(uint16_t *p_primary_addr, mesh_prov_complete_idc_t *p_prov_complete_idc);
 #endif
 
+/**
+ * @brief Handles an application model event message indication from the mesh stack.
+ *
+ * When CLI support is enabled, delegates parsing to app_model_evt_parse(); otherwise
+ * prints the opcode, source/destination addresses and raw parameter bytes for debugging.
+ * In both cases, forwards the event to the connected host over the gateway UART interface
+ * via ble_mesh_gateway_cmd_send() using the DEVICE_APPLICATION_SVC_CMD service.
+ *
+ * @param pt_msg_idc Pointer to the application model event message indication received
+ *                   from the mesh stack.
+ */
 static void app_model_evt_msg_handler(mesh_app_mdl_evt_msg_idc_t *pt_msg_idc)
 {
 #if (SUPPORT_DEBUG_CONSOLE_CLI == 1)
@@ -126,6 +149,18 @@ static void app_model_evt_msg_handler(mesh_app_mdl_evt_msg_idc_t *pt_msg_idc)
 
 }
 
+/**
+ * @brief Handles a configuration model event message indication from the mesh stack.
+ *
+ * When CLI support is enabled, delegates parsing to cfg_model_evt_parse(); otherwise
+ * prints the opcode, source address and raw parameter bytes for debugging. In both cases,
+ * forwards the event to the connected host over the gateway UART interface via
+ * ble_mesh_gateway_cmd_send() using the DEVICE_CONFIGURATION_SVC_CMD service (the appkey
+ * index is always reported as 0, since configuration messages are not appkey-bound).
+ *
+ * @param pt_msg_idc Pointer to the configuration model event message indication received
+ *                   from the mesh stack.
+ */
 static void cfg_model_evt_msg_handler(mesh_cfg_mdl_evt_msg_idc_t *pt_msg_idc)
 {
 #if (SUPPORT_DEBUG_CONSOLE_CLI == 1)
@@ -146,6 +181,15 @@ static void cfg_model_evt_msg_handler(mesh_cfg_mdl_evt_msg_idc_t *pt_msg_idc)
 
 }
 
+/**
+ * @brief Handles data received on the BLE Transparent Service (TRSPS) write characteristic.
+ *
+ * Prints the received bytes for debugging, then loops the data back by writing it to the
+ * TRSPS notify characteristic via ble_trsps_data_set().
+ *
+ * @param len Length of the received data, in bytes.
+ * @param p_trsps_data Pointer to the received data buffer.
+ */
 static void ble_trsps_evt_msg_handler(uint16_t len, uint8_t *p_trsps_data)
 {
     uint16_t i;
@@ -163,6 +207,21 @@ static void ble_trsps_evt_msg_handler(uint16_t len, uint8_t *p_trsps_data)
     printf("Loopback received BLE TRSPS data %d:\n", tx_success);
 }
 
+/**
+ * @brief Dispatches a mesh stack event indication queued via mesh_app_evt_indication_cb().
+ *
+ * Inspects the TLV type carried by @p p_mesh_tlv and handles it accordingly: forwards
+ * unprovisioned-device and provisioning-complete indications to the host over the gateway
+ * UART interface (and, when CLI support is enabled, drives the auto-provisioning flow via
+ * auto_prov_device_start()/auto_prov_device_complete()), dispatches application and
+ * configuration model events and TRSPS write data to their respective handlers, and logs
+ * TRSPS connection and mesh friendship state-change indications.
+ *
+ * @param data Unused for this handler.
+ * @param p_mesh_tlv Pointer to the TLV-encoded mesh event indication to process.
+ * @return Always returns true, indicating app_main_task() should free @p p_mesh_tlv after
+ *         this call.
+ */
 static uint8_t app_mesh_event_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
 {
 #if (SUPPORT_DEBUG_CONSOLE_CLI == 1)
@@ -261,6 +320,18 @@ static uint8_t app_mesh_event_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
     return true;
 }
 
+/**
+ * @brief Handles a button-press event queued from button_cb().
+ *
+ * Maps the GPIO pin number carried in @p data to an action: pin 0 creates a BLE TRSPS
+ * connection, pin 1 cancels a pending BLE TRSPS connection attempt; pins 2-4 currently
+ * take no action.
+ *
+ * @param data GPIO pin number that triggered the button event.
+ * @param p_mesh_tlv Unused for this handler.
+ * @return Always returns false, indicating app_main_task() should not attempt to free
+ *         any TLV buffer (none is allocated for this event).
+ */
 static uint8_t app_button_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
 {
     uint32_t pin = data;
@@ -286,6 +357,13 @@ static uint8_t app_button_handler(uint32_t data, mesh_tlv_t *p_mesh_tlv)
     return false;
 }
 
+/**
+ * @brief Runs one iteration of the application's main state machine.
+ *
+ * Called on every pass of app_main_task()'s loop. Currently only transitions the
+ * application state from APP_INIT_EVT to APP_IDLE_EVT on the first call; the idle state
+ * takes no further action.
+ */
 static void app_main_loop(void)
 {
     switch (app_main_event)
@@ -303,6 +381,14 @@ static void app_main_loop(void)
 }
 
 
+/**
+ * @brief Main application task loop.
+ *
+ * Sets the BLE mesh device advertising name, then repeatedly runs the application state
+ * machine (app_main_loop()) and services app_msg_q: each dequeued message is dispatched
+ * to the handler registered in app_event_handler[] for its event type, and the
+ * associated mesh_tlv_t buffer is freed if the handler returns true. Never returns.
+ */
 static void app_main_task(void)
 {
     app_queue_t app_q;
@@ -323,6 +409,18 @@ static void app_main_task(void)
     }
 }
 
+/**
+ * @brief BLE host general-event callback registered for APP_GENERAL_EVENT.
+ *
+ * Wraps the incoming HCI event parameters in a mesh_tlv_t tagged with
+ * MSG_TAG_BEARER_HCI_EVENT and forwards it to the mesh bearer layer via
+ * mesh_queue_sendto().
+ *
+ * @param p_param Pointer to the ble_evt_param_t event data supplied by the BLE host stack.
+ * @return BLE_ERR_OK on success.
+ * @retval BLE_ERR_DATA_MALLOC_FAIL if allocating the TLV buffer failed.
+ * @retval BLE_BUSY if the event could not be queued to the mesh bearer layer.
+ */
 static ble_err_t ble_app_event_cb(void *p_param)
 {
     ble_err_t status;
@@ -343,6 +441,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
 
         if (mesh_queue_sendto(MESH_LAYER_BEARER, p_tlv) != MESH_SUCCESS)
         {
+            vPortFree(p_tlv);
             status = BLE_BUSY;
         }
     } while (0);
@@ -350,6 +449,18 @@ static ble_err_t ble_app_event_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief BLE host service-data callback registered for APP_SERVICE_EVENT.
+ *
+ * Wraps the incoming ATT service data in a mesh_tlv_t tagged with
+ * MSG_TAG_BEARER_HCI_ACL_DATA and forwards it to the mesh bearer layer via
+ * mesh_queue_sendto().
+ *
+ * @param p_param Pointer to the ble_evt_att_param_t data supplied by the BLE host stack.
+ * @return BLE_ERR_OK on success.
+ * @retval BLE_ERR_DATA_MALLOC_FAIL if allocating the TLV buffer failed.
+ * @retval BLE_BUSY if the data could not be queued to the mesh bearer layer.
+ */
 static ble_err_t ble_service_data_cb(void *p_param)
 {
     ble_err_t status;
@@ -373,6 +484,7 @@ static ble_err_t ble_service_data_cb(void *p_param)
         if (mesh_queue_sendto(MESH_LAYER_BEARER, p_tlv) != MESH_SUCCESS)
         {
             status = BLE_BUSY;
+            vPortFree(p_tlv);
             //xSemaphoreGive(semaphore_cb);
         }
 
@@ -381,6 +493,16 @@ static ble_err_t ble_service_data_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief UART receive callback that queues a parsed gateway command for processing.
+ *
+ * Registered as the UART handler's receive callback. Wraps @p pt_tlv in an
+ * APP_QUEUE_UART_MSG_EVT message and posts it to app_msg_q for app_main_task() to
+ * dispatch to ble_mesh_gateway_cmd_proc().
+ *
+ * @param pt_tlv Pointer to the TLV-encoded command parsed from UART input by
+ *               ble_mesh_gateway_cmd_parser().
+ */
 static void app_uart_msg_recv(mesh_tlv_t *pt_tlv)
 {
     app_queue_t app_q;
@@ -391,6 +513,23 @@ static void app_uart_msg_recv(mesh_tlv_t *pt_tlv)
     xQueueSendToBack(app_msg_q, &app_q, 0);
 }
 
+/**
+ * @brief Mesh stack event-indication callback registered via mesh_stack_init().
+ *
+ * Copies the TLV event indication pointed to by @p p_param into a newly allocated
+ * mesh_tlv_t, queues it to app_msg_q as an APP_BLE_MESH_EVT message for
+ * app_mesh_event_handler() to process, and frees the original @p p_param buffer owned
+ * by the mesh stack. Retries posting to the queue until it succeeds.
+ *
+ * @param p_param Pointer to the mesh_tlv_t event indication allocated and owned by the
+ *                mesh stack.
+ * @return BLE_ERR_OK on success.
+ * @retval BLE_ERR_INVALID_PARAMETER if @p p_param is NULL.
+ * @retval BLE_ERR_ALLOC_MEMORY_FAIL if allocating the queued TLV buffer failed.
+ * @retval BLE_BUSY if a queue post attempt failed (the function keeps retrying until it
+ *         succeeds, so this may be returned even though the message was ultimately
+ *         delivered).
+ */
 static ble_err_t mesh_app_evt_indication_cb(void *p_param)
 {
     ble_err_t status;
@@ -432,6 +571,15 @@ static ble_err_t mesh_app_evt_indication_cb(void *p_param)
 //=============================================================================
 //                Public Functions
 //=============================================================================
+/**
+ * @brief Initializes the gateway application.
+ *
+ * Sets the local BLE device address and PIB, creates the application message queue,
+ * registers the BLE host general-event and service-data callbacks, initializes the BLE
+ * host stack and the mesh stack (with mesh_app_evt_indication_cb() as the mesh event
+ * callback), and initializes the UART handler with the gateway command parser and
+ * receive callback. When CLI support is enabled, also initializes the debug console CLI.
+ */
 void app_init(void)
 {
     mesh_task_priority_t task_priority_cfg;
@@ -487,7 +635,18 @@ void app_init(void)
 #endif
 }
 
-void button_cb(uint32_t pin, void* isr_param) 
+/**
+ * @brief GPIO interrupt callback for the buttons.
+ *
+ * Called from GPIO ISR context when a configured button pin transitions. Reads and
+ * prints the pin's current level, and for pins 0-4 posts an APP_BUTTON_EVT message
+ * carrying the pin number to app_msg_q for app_button_handler() to process.
+ *
+ * @param pin GPIO pin number that triggered the interrupt.
+ * @param isr_param Unused ISR callback parameter.
+ * @note Called from interrupt context.
+ */
+void button_cb(uint32_t pin, void* isr_param)
 {
     BaseType_t context_switch;
     app_queue_t t_app_q;
@@ -515,6 +674,13 @@ void button_cb(uint32_t pin, void* isr_param)
     return;
 }
 
+/**
+ * @brief Configures GPIO pins 0-4 as debounced button inputs.
+ *
+ * Sets debounce time, pull-up, and rising-edge interrupt configuration for GPIO pins
+ * 0 through 4, registers button_cb() as their interrupt handler, and enables the GPIO
+ * interrupt in the NVIC.
+ */
 void button_init(void)
 {
     uint8_t i = 0;
@@ -537,10 +703,11 @@ void button_init(void)
 }
 
 /**
- * @brief Main entry point for the application.
+ * @brief FreeRTOS task entry point for the application.
  *
- * This function initializes the RF module, starts the application initialization,
- * and enters an infinite loop to keep the application running.
+ * Initializes low-power mode support and the RF/BLE controller, configures the button
+ * GPIOs, then performs application initialization (app_init()) and enters the main
+ * application task loop (app_main_task()), which never returns.
  *
  * @param pvParameters Pointer to parameters passed to the task (not used).
  * @return void This function does not return a value.
@@ -562,7 +729,14 @@ static void app_main_entry(void* pvParameters)
 /**************************************************************************************************
  *    GLOBAL FUNCTIONS
  *************************************************************************************************/
-/*this is pin mux setting*/
+/**
+ * @brief Initializes the default pin multiplexing.
+ *
+ * Sets all GPIO pins to GPIO mode except GPIO16, GPIO17, GPIO28 and GPIO29, then
+ * configures GPIO16/GPIO17 as UART0 RX/TX.
+ *
+ * @return void This function does not return a value.
+ */
 static void init_default_pin_mux(void)
 {
     int i;
@@ -584,6 +758,15 @@ static void init_default_pin_mux(void)
 }
 
 
+/**
+ * @brief Main function.
+ *
+ * Entry point of the application. Initializes the default pin multiplexing, UART stdio,
+ * heap regions and boot-info dump, then creates the app_main_entry() FreeRTOS task and
+ * starts the scheduler.
+ *
+ * @return int This function does not return a value.
+ */
 int main(void)
 {
     init_default_pin_mux();

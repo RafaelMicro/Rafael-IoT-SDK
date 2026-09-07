@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include "hosal_dma.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 uint8_t  dma_src_mem_buf[1024];
 uint8_t  dma_dest_mem_buf[1024];
@@ -22,6 +23,7 @@ int main(void) {
     hosal_dma_dev_t dma_dev;
     
 	uart_stdio_init();
+    _dump_boot_info();
 	hosal_dma_init();
 	
     printf("\r\n");

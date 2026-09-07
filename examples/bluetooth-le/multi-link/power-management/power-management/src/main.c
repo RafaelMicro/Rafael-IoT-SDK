@@ -7,7 +7,10 @@
 
 /** @file
  *
- * @brief BLE TRSP Cental role demo.
+ * @brief BLE Power Measurement demo: a dual-link application that runs a TRSP
+ *        central role (host id 0) and a TRSP peripheral role (host id 1)
+ *        simultaneously, together with low-power mode (HOSAL LPM) transitions
+ *        driven by GPIO and UART wake-up sources.
  *
  */
 
@@ -145,11 +148,36 @@ static ble_err_t conn_create(uint8_t host_id, ble_gap_addr_t *p_peer);
  *  Handler
  * ------------------------------
  */
+/**
+ * @brief GPIO wake-up pin interrupt handler.
+ *
+ * Registered as the callback for GPIO_WAKE_UP_PIN (falling-edge triggered).
+ * When the wake-up pin toggles, it masks (blocks) the BLE application task's
+ * low-power sleep bit so the system stays awake while the GPIO event is handled.
+ *
+ * @param pin The GPIO pin number that triggered the interrupt.
+ * @param isr_param User parameter registered together with the callback (not used).
+ * @note Runs in interrupt context.
+ */
 static void app_gpio_handler(uint32_t pin, void *isr_param)
 {
     hosal_lpm_ioctrl(HOSAL_LPM_MASK, HOSAL_LOW_POWER_MASK_BIT_TASK_BLE_APP);
 }
 
+/**
+ * @brief Handles a single character received from the UART, in ISR context.
+ *
+ * Accumulates characters into a local static buffer. When a line terminator
+ * ('\n' or '\r') is received, the buffered line (including the terminator) is
+ * copied into g_uart_buffer/g_uart_length and an APP_REQUEST_PROCESS_UART_CMD
+ * request (host_id 0xFF) is queued from ISR context so the application task
+ * can process the command later. The internal buffer index is then reset.
+ *
+ * @param ch The character received from the UART.
+ * @return true if a complete line was received (so the caller can re-enable
+ *         low-power sleep mode), false otherwise.
+ * @note Called from the UART RX interrupt (uart0_rx_callback).
+ */
 static bool uart_data_handler(char ch)
 {
     bool status = false;
@@ -176,6 +204,17 @@ static bool uart_data_handler(char ch)
     return status;
 }
 
+/**
+ * @brief UART receive line status callback.
+ *
+ * Invoked when the UART line status changes. If a break indicator (BI) is
+ * present, the pending byte is drained and the low-power sleep mode is
+ * masked (blocked) for the BLE application task.
+ *
+ * @param p_arg Pointer to the argument passed to the callback function (not used).
+ * @return This callback has no explicit return statement, so the returned
+ *         value is unspecified; it is not used by the UART driver.
+ */
 static int uart0_receive_line_callback(void *p_arg)
 {
     if (hosal_uart_get_lsr(&uart0_dev) & UART_LSR_BI)
@@ -187,6 +226,17 @@ static int uart0_receive_line_callback(void *p_arg)
     }
 }
 
+/**
+ * @brief UART receive callback function.
+ *
+ * Reads one byte from UART0 and forwards it to uart_data_handler(). If a
+ * complete line has been received, the low-power sleep mask for the BLE
+ * application task is cleared (unmasked), allowing the system to sleep again.
+ *
+ * @param p_arg Pointer to the argument provided to the callback function (not used).
+ * @return Always returns 0.
+ * @note Runs in interrupt context (UART0 RX interrupt).
+ */
 static int uart0_rx_callback(void *p_arg)
 {
     char ch;
@@ -194,13 +244,24 @@ static int uart0_rx_callback(void *p_arg)
     hosal_uart_receive(&uart0_dev, &ch, 1);
     if (uart_data_handler(ch) == true)
     {
-        // recieved '\n' or '\r' --> enable sleep mode
+        // received '\n' or '\r' --> enable sleep mode
         hosal_lpm_ioctrl(HOSAL_LPM_UNMASK, HOSAL_LOW_POWER_MASK_BIT_TASK_BLE_APP);
     }
 
     return 0;
 }
 
+/**
+ * @brief Handles DIS (Device Information Service) client-role events.
+ *
+ * Processes read-response events for the manufacturer name string and
+ * firmware revision string characteristics received from a connected DIS
+ * server, and prints them to the console.
+ *
+ * @param p_param Pointer to the BLE ATT event parameters.
+ * @return void This function does not return a value.
+ * @note Only handles events where p_param->gatt_role is BLE_GATT_ROLE_CLIENT.
+ */
 static void ble_svcs_dis_evt_handler(ble_evt_att_param_t *p_param)
 {
     if (p_param->gatt_role == BLE_GATT_ROLE_CLIENT)
@@ -224,6 +285,17 @@ static void ble_svcs_dis_evt_handler(ble_evt_att_param_t *p_param)
     }
 }
 
+/**
+ * @brief Handles TRSPS (Transparent Service Profile) client-role events.
+ *
+ * Dispatches notify, indicate, and write-response events received from a
+ * connected TRSPS server. In this demo the handled cases are placeholders
+ * and do not perform any additional processing.
+ *
+ * @param p_param Pointer to the BLE ATT event parameters.
+ * @return void This function does not return a value.
+ * @note Only handles events where p_param->gatt_role is BLE_GATT_ROLE_CLIENT.
+ */
 static void ble_svcs_trsps_evt_handler(ble_evt_att_param_t *p_param)
 {
     if (p_param->gatt_role == BLE_GATT_ROLE_CLIENT)
@@ -244,6 +316,25 @@ static void ble_svcs_trsps_evt_handler(ble_evt_att_param_t *p_param)
     }
 }
 
+/**
+ * @brief Runs the post-connection TRSP client setup command sequence.
+ *
+ * Called repeatedly (once per invocation) after the ATT database parsing has
+ * finished, to step through the sequence: MTU exchange, data length update,
+ * set TRSPS CCCD, set GATT service-changed CCCD, read DIS manufacturer name,
+ * and read DIS firmware revision. Each call issues the next command in the
+ * sequence identified by an internal static index, which only advances when
+ * the previous command returned BLE_ERR_OK.
+ *
+ * @param host_id The connection's host id.
+ * @return ble_err_t
+ * @retval BLE_ERR_OK The full command sequence has completed (the internal
+ *         step index is reset to 0).
+ * @retval BLE_BUSY The link is not connected (the internal step index is also
+ *         reset to 0 in this case), or the link is connected but the sequence
+ *         has not finished yet; the caller is expected to invoke this function
+ *         again to continue.
+ */
 static ble_err_t svcs_trspc_multi_cmd_handler(uint8_t host_id)
 {
     // after received "BLECMD_EVENT_ATT_DATABASE_PARSING_FINISHED" event, do
@@ -334,6 +425,17 @@ static ble_err_t svcs_trspc_multi_cmd_handler(uint8_t host_id)
 }
 
 // TRSPS Central
+/**
+ * @brief Handles application requests for the central role.
+ *
+ * Processes the application requests targeted at the central-role link
+ * (APP_POWER_MEASUREMENT_C_HOST_ID): creating/cancelling a connection,
+ * running the post-connection TRSPC multi-command sequence, starting/stopping
+ * scanning, disconnecting, and updating the connection parameters or PHY.
+ *
+ * @param p_param Pointer to the request parameters (host id and request type).
+ * @return void This function does not return a value.
+ */
 static void app_central_handler(app_req_param_t *p_param)
 {
     ble_err_t status;
@@ -449,6 +551,16 @@ static void app_central_handler(app_req_param_t *p_param)
 }
 
 // TRSPS Peripheral
+/**
+ * @brief Handles application requests for the peripheral role.
+ *
+ * Processes the application requests targeted at the peripheral-role link
+ * (APP_POWER_MEASUREMENT_P_HOST_ID): starting/stopping advertising,
+ * disconnecting, and updating the connection parameters or PHY.
+ *
+ * @param p_param Pointer to the request parameters (host id and request type).
+ * @return void This function does not return a value.
+ */
 static void app_peripheral_handler(app_req_param_t *p_param)
 {
     ble_err_t status;
@@ -527,6 +639,18 @@ static void app_peripheral_handler(app_req_param_t *p_param)
     }
 }
 
+/**
+ * @brief Handles general BLE events for both the central and peripheral links.
+ *
+ * Processes connection-cancel, connection-complete, connection-parameter-update,
+ * PHY read/update, MTU exchange, data-length-change, disconnection-complete, and
+ * ATT database parsing-complete events, updating link state and printing status
+ * information. On DB-parse-complete for the central link, it also fetches the
+ * link's service handles and kicks off the TRSPC multi-command sequence.
+ *
+ * @param p_param Pointer to the BLE event parameters.
+ * @return void This function does not return a value.
+ */
 static void ble_evt_handler(ble_evt_param_t *p_param)
 {
     switch (p_param->event)
@@ -664,6 +788,16 @@ static void ble_evt_handler(ble_evt_param_t *p_param)
  *  Methods
  * ------------------------------
  */
+/**
+ * @brief Sets the scan parameters and enables scanning.
+ *
+ * Copies the current scan parameters from appParam.app_param_c.scan_param,
+ * applies them via ble_cmd_scan_param_set(), and then enables scanning via
+ * ble_cmd_scan_enable().
+ *
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error
+ *         code from the failing command otherwise).
+ */
 static ble_err_t scan_start(void)
 {
     ble_err_t      status;
@@ -697,6 +831,18 @@ static ble_err_t scan_start(void)
     return status;
 }
 
+/**
+ * @brief Issues a connection-create request to a given peer address.
+ *
+ * Builds the create-connection parameters (own address, scan interval/window,
+ * "accept all" initiator filter policy, peer address, and the connection
+ * parameters from appParam.conn_param) and sends the create-connection command.
+ *
+ * @param host_id The host id that will own the resulting connection.
+ * @param p_peer Pointer to the peer device address to connect to.
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error
+ *         code from ble_cmd_conn_create() otherwise).
+ */
 static ble_err_t conn_create(uint8_t host_id, ble_gap_addr_t *p_peer)
 {
     ble_err_t             status;
@@ -722,6 +868,17 @@ static ble_err_t conn_create(uint8_t host_id, ble_gap_addr_t *p_peer)
     return status;
 }
 
+/**
+ * @brief Initializes the advertising parameters and data for the peripheral role.
+ *
+ * Sets the advertising parameters from appParam.app_param_p.adv_param (plus a
+ * fixed "all channels" map and "accept all" filter policy), sets the
+ * advertising data (limited-discoverable-mode flags), and sets the scan
+ * response data (the device's complete local name).
+ *
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error
+ *         code from the failing command otherwise).
+ */
 static ble_err_t adv_init(void)
 {
     ble_err_t status;
@@ -783,6 +940,13 @@ static ble_err_t adv_init(void)
     return status;
 }
 
+/**
+ * @brief Enables advertising for the specified host id.
+ *
+ * @param host_id The ID of the host for which to enable advertising.
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error
+ *         code from ble_cmd_adv_enable() otherwise).
+ */
 static ble_err_t adv_enable(uint8_t host_id)
 {
     ble_err_t status;
@@ -796,6 +960,16 @@ static ble_err_t adv_enable(uint8_t host_id)
     return status;
 }
 
+/**
+ * @brief Starts advertising for the specified host id.
+ *
+ * Convenience wrapper that first initializes the advertising parameters and
+ * data via adv_init(), then enables advertising via adv_enable().
+ *
+ * @param host_id The ID of the host for which to start advertising.
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error
+ *         code from the failing step otherwise).
+ */
 static ble_err_t adv_start(uint8_t host_id)
 {
     ble_err_t status;
@@ -822,6 +996,22 @@ static ble_err_t adv_start(uint8_t host_id)
     return status;
 }
 
+/**
+ * @brief Queues an application request for the specified host id.
+ *
+ * Adds a request to the application message queue for the specified host id.
+ * Can be called from both normal task context and ISR context; the function
+ * takes a counting semaphore (semaphore_app or semaphore_isr, respectively)
+ * to reserve a queue slot before enqueuing, giving the semaphore back if the
+ * enqueue fails.
+ *
+ * @param host_id The ID of the host for which to set the request.
+ * @param request The application request to set.
+ * @param from_isr Indicates whether the function is called from an ISR
+ *                 context (true) or not (false).
+ * @return true if the request was successfully queued, false if no queue
+ *         slot/semaphore was available or the enqueue failed.
+ */
 bool app_request_set(uint8_t host_id, app_request_t request, bool from_isr)
 {
     app_queue_t p_app_q;
@@ -875,6 +1065,20 @@ bool app_request_set(uint8_t host_id, app_request_t request, bool from_isr)
  *  Application Task
  * ------------------------------
  */
+/**
+ * @brief Callback function for general BLE application events.
+ *
+ * Copies the incoming event (including its extended data) into a heap-allocated
+ * TLV buffer and queues it (as QUEUE_TYPE_OTHERS / APP_GENERAL_EVENT) for
+ * processing by the application task. Takes the semaphore_cb counting
+ * semaphore to bound the number of in-flight buffers.
+ *
+ * @param p_param Pointer to the BLE event parameters.
+ * @return ble_err_t
+ * @retval BLE_ERR_OK The event was successfully queued.
+ * @retval BLE_ERR_DATA_MALLOC_FAIL Buffer allocation failed.
+ * @retval BLE_BUSY No semaphore/queue slot was available, or the enqueue failed.
+ */
 static ble_err_t ble_app_event_cb(void *p_param)
 {
     ble_err_t status;
@@ -895,6 +1099,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -912,6 +1117,20 @@ static ble_err_t ble_app_event_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief Callback function for BLE service (ATT/GATT) data events.
+ *
+ * Copies the incoming service event (including its variable-length data)
+ * into a heap-allocated TLV buffer and queues it (as QUEUE_TYPE_OTHERS /
+ * APP_SERVICE_EVENT) for processing by the application task. Takes the
+ * semaphore_cb counting semaphore to bound the number of in-flight buffers.
+ *
+ * @param p_param Pointer to the BLE ATT event parameters.
+ * @return ble_err_t
+ * @retval BLE_ERR_OK The event was successfully queued.
+ * @retval BLE_ERR_DATA_MALLOC_FAIL Buffer allocation failed.
+ * @retval BLE_BUSY No semaphore/queue slot was available, or the enqueue failed.
+ */
 static ble_err_t ble_service_data_cb(void *p_param)
 {
     ble_err_t status;
@@ -940,6 +1159,7 @@ static ble_err_t ble_service_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -952,6 +1172,20 @@ static ble_err_t ble_service_data_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief Callback function for BLE L2CAP data events.
+ *
+ * Copies the incoming L2CAP event (including its variable-length data) into
+ * a heap-allocated TLV buffer and queues it (as QUEUE_TYPE_OTHERS /
+ * APP_L2CAP_DATA_EVENT) for processing by the application task. Takes the
+ * semaphore_cb counting semaphore to bound the number of in-flight buffers.
+ *
+ * @param p_param Pointer to the BLE L2CAP event parameters.
+ * @return ble_err_t
+ * @retval BLE_ERR_OK The event was successfully queued.
+ * @retval BLE_ERR_DATA_MALLOC_FAIL Buffer allocation failed.
+ * @retval BLE_BUSY No semaphore/queue slot was available, or the enqueue failed.
+ */
 static ble_err_t ble_l2cap_data_cb(void *p_param)
 {
     ble_err_t status;
@@ -980,6 +1214,7 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -992,6 +1227,18 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief Main task for the BLE application.
+ *
+ * Performs the BLE stack/profile initialization via ble_init(), then loops
+ * forever receiving from the application message queue and dispatching each
+ * entry: application requests (QUEUE_TYPE_APP_REQ) are routed to
+ * ble_app_main(), while queued BLE/service/L2CAP events (QUEUE_TYPE_OTHERS)
+ * are routed to ble_evt_handler() or the relevant service attribute handler.
+ *
+ * @return void This function does not return (infinite loop); if ble_init()
+ *         fails it prints an error and halts in an infinite loop instead.
+ */
 static void app_main_task(void)
 {
     ble_err_t status;
@@ -1078,6 +1325,17 @@ static void app_main_task(void)
     }
 }
 
+/**
+ * @brief Main application-request dispatcher.
+ *
+ * Routes a dequeued application request either to the UART command processor
+ * (when host_id is 0xFF and the request is APP_REQUEST_PROCESS_UART_CMD), or
+ * to app_central_handler()/app_peripheral_handler() based on whether host_id
+ * matches the central or peripheral link.
+ *
+ * @param p_param Pointer to the request parameters (host id and request type).
+ * @return void This function does not return a value.
+ */
 static void ble_app_main(app_req_param_t *p_param)
 {
     if (p_param->host_id == 0xFF)
@@ -1104,6 +1362,16 @@ static void ble_app_main(app_req_param_t *p_param)
  *  Application Initializations
  * ------------------------------
  */
+/**
+ * @brief Initializes UART0 for the demo's command console.
+ *
+ * Initializes the UART device, registers the RX and receive-line-status
+ * callbacks, configures interrupt-driven RX mode, and enables UART RX as a
+ * HOSAL low-power wake-up source so an incoming byte can wake the system
+ * from sleep.
+ *
+ * @return void This function does not return a value.
+ */
 static void app_uart_init(void)
 {
     /*Init UART In the first place*/
@@ -1125,16 +1393,46 @@ static void app_uart_init(void)
     __NVIC_SetPriority(Uart0_IRQn, 6);
 }
 
+/**
+ * @brief Initializes the GATT service data.
+ *
+ * Resets the service-changed characteristic's client configuration
+ * descriptor (CCCD) to 0.
+ *
+ * @param p_data Pointer to the GATT service data structure.
+ * @return void This function does not return a value.
+ */
 static void svcs_gatts_data_init(ble_svcs_gatts_data_t *p_data)
 {
     p_data->service_changed_cccd = 0;
 }
 
+/**
+ * @brief Initializes the TRSPS service data.
+ *
+ * Resets the user data notification characteristic's client configuration
+ * descriptor (CCCD) to 0.
+ *
+ * @param p_data Pointer to the TRSPS service data structure.
+ * @return void This function does not return a value.
+ */
 static void svcs_trsps_data_init(ble_svcs_trsps_data_t *p_data)
 {
     p_data->udatni01_cccd = 0;
 }
 
+/**
+ * @brief Initializes the client-role profile (GAP/GATT/DIS/TRSPS) for a host id.
+ *
+ * Sets the link's state to STATE_STANDBY, then initializes the GAP, GATT,
+ * DIS, and TRSPS services in the BLE_GATT_ROLE_CLIENT role, registering
+ * ble_svcs_dis_evt_handler() and ble_svcs_trsps_evt_handler() for the DIS and
+ * TRSPS service events respectively.
+ *
+ * @param host_id The ID of the host (link) to initialize as a client.
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error
+ *         code from the failing service init otherwise).
+ */
 static ble_err_t client_profile_init(uint8_t host_id)
 {
     ble_err_t status = BLE_ERR_OK;
@@ -1185,6 +1483,19 @@ static ble_err_t client_profile_init(uint8_t host_id)
     return status;
 }
 
+/**
+ * @brief Initializes the server-role profile (GAP/GATT/DIS/TRSPS) for a host id.
+ *
+ * Sets the link's state to STATE_STANDBY, sets the GAP device name, then
+ * initializes the GAP, GATT, DIS, and TRSPS services in the
+ * BLE_GATT_ROLE_SERVER role, registering ble_svcs_dis_evt_handler() and
+ * ble_svcs_trsps_evt_handler() for the DIS and TRSPS service events
+ * respectively.
+ *
+ * @param host_id The ID of the host (link) to initialize as a server.
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error
+ *         code from the failing service init otherwise).
+ */
 static ble_err_t server_profile_init(uint8_t host_id)
 {
     ble_err_t status = BLE_ERR_OK;
@@ -1242,6 +1553,22 @@ static ble_err_t server_profile_init(uint8_t host_id)
     return status;
 }
 
+/**
+ * @brief Initializes the BLE stack, device address, and both link profiles.
+ *
+ * Registers the general/service/L2CAP event callbacks, initializes the PHY
+ * controller, sets the device address (from the factory-programmed unique
+ * code if available, falling back to DEVICE_ADDR) and identity resolving key,
+ * initializes resolvable address generation and the suggested data length,
+ * then initializes the central-role profile (client_profile_init) on
+ * APP_POWER_MEASUREMENT_C_HOST_ID and the peripheral-role profile
+ * (server_profile_init) on APP_POWER_MEASUREMENT_P_HOST_ID. Finally it
+ * populates appParam with the default scan/adv/connection/PHY settings and
+ * prints the UART control command help text.
+ *
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error
+ *         code from the failing step otherwise).
+ */
 static ble_err_t ble_init(void)
 {
     ble_err_t status;
@@ -1357,6 +1684,18 @@ static ble_err_t ble_init(void)
     return status;
 }
 
+/**
+ * @brief Initializes the application: queues, semaphores, BLE stack, UART, and wake-up GPIO.
+ *
+ * Creates the application message queue and its associated counting
+ * semaphores, initializes the BLE host stack with the configured task
+ * priorities, re-initializes UART0 for the command console (via
+ * app_uart_init()), and configures GPIO_WAKE_UP_PIN as a debounced,
+ * falling-edge interrupt source (handled by app_gpio_handler()) that is
+ * also registered as a HOSAL low-power wake-up source.
+ *
+ * @return void This function does not return a value.
+ */
 static void app_init(void)
 {
     ble_task_priority_t ble_task_level;
@@ -1417,10 +1756,14 @@ static void pin_mux_init(void)
 }
 
 /**
- * @brief Main entry point for the application.
+ * @brief Main entry point for the application FreeRTOS task.
  *
- * This function initializes the RF module, starts the application initialization,
- * and enters an infinite loop to keep the application running.
+ * This function initializes the HOSAL low-power module and sets the default
+ * low-power sleep level to HOSAL_LOW_POWER_LEVEL_SLEEP0, initializes the RF
+ * module for the BLE controller, starts the application initialization
+ * (app_init()) and main task (app_main_task()), and finally enters an
+ * infinite loop (which is not reached in practice since app_main_task()
+ * itself never returns).
  *
  * @param pvParameters Pointer to parameters passed to the task (not used).
  * @return void This function does not return a value.
@@ -1445,9 +1788,12 @@ static void app_main_entry(void* pvParameters)
 /**
  * @brief Application entry point.
  *
- * Initializes hardware, configures peripherals, and starts the main application task.
+ * Configures the pin mux, initializes the stdio UART, heap regions, and boot
+ * info dump, creates the main FreeRTOS task (app_main_entry), and starts the
+ * FreeRTOS scheduler.
  *
- * @return int Not used.
+ * @return int Not used; execution does not normally return from
+ *         vTaskStartScheduler().
  */
  int main(void)
 {

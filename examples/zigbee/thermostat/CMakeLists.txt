@@ -1,7 +1,7 @@
 sdk_add_subdirectory_ifdef(CONFIG_FREERTOS ${CMAKE_CURRENT_LIST_DIR}/rtos)
 sdk_add_include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
 app_git_version(APP_PACKAGE_VERSION)
-message(STATUS "${CONFIG_BUILD_PORJECT} version : ${APP_PACKAGE_VERSION}")
+message(STATUS "${CONFIG_BUILD_PROJECT} version : ${APP_PACKAGE_VERSION}")
 add_compile_options(-DCONFIG_PROJECT_VERSION="${APP_PACKAGE_VERSION}")
 sdk_use_app_lib()
 target_sources(app PRIVATE

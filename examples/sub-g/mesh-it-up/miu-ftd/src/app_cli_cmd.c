@@ -115,6 +115,10 @@ static otError app_cmd_process(void* aContext, uint8_t aArgsLength,
         }
     } else if (!strcmp(aArgs[0], "mem")) {
         extMemory();
+    } else if (!strcmp(aArgs[0], "radio")) {
+        ot_radio_dbg_dump();
+    } else if (!strcmp(aArgs[0], "evt")) {
+        ot_evt_count_dump();
     } else if (!strcmp(aArgs[0], "libver")) {
         printf("miu_port lib ver: %s\r\n", miu_port_lib_version());
     } else {
@@ -132,7 +136,7 @@ static void ota_print_help() {
     printf("ota self \r\n");
     printf("ota debug <level> \r\n");
     printf("ota erase \r\n");
-    printf("ota rxmode <on/off> \r\n");
+    printf("ota rxmode <on/off> [ipv6]                                  *(no ipv6 = broadcast wake all; with ipv6 = unicast wake one)\r\n");
 #if CONFIG_MIU_DEVICE_TYPE_FTD
     printf("ota status <ipv6> <ftd/mtd/all> <report timeout(ms)>    *(query OTA state, log: OTA_STATUS|...)\r\n");
 #endif
@@ -186,10 +190,19 @@ otError app_cmd_ota_process(void* aContext, uint8_t aArgsLength,
             printf("Too few parameters \r\n");
             return OT_ERROR_INVALID_ARGS;
         }
-        if (!strncmp(aArgs[1], "on", 2)) {
-            ota_send_rxmode(true);
+        bool on = !strncmp(aArgs[1], "on", 2);
+        if (aArgsLength >= 3) {
+            // Unicast form: "ota rxmode <on/off> <ipv6>" wakes only the
+            // named device, unlike the broadcast form which hits ff03::1
+            // (all nodes) plus every locally-attached sleepy child.
+            otIp6Address dst_addr;
+            if (otIp6AddressFromString(aArgs[2], &dst_addr) != OT_ERROR_NONE) {
+                printf("rxmode: invalid IPv6\r\n");
+                return OT_ERROR_INVALID_ARGS;
+            }
+            ota_send_rxmode_unicast(on, dst_addr);
         } else {
-            ota_send_rxmode(false);
+            ota_send_rxmode(on);
         }
     } else if (!strncmp(aArgs[0], "status", 6)) {
 #if CONFIG_MIU_DEVICE_TYPE_FTD

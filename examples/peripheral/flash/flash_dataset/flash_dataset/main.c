@@ -11,6 +11,7 @@
 #include "hosal_flash.h"
 #include "uart_stdio.h"
 #include "EnhancedFlashDataset.h"
+#include "dump_boot_info.h"
 
 
 int main(void) {
@@ -21,6 +22,7 @@ int main(void) {
 
     /* Initialize UART for logging */
     uart_stdio_init();
+    _dump_boot_info();
     
     /**
      * EFD (Enhanced Flash Dataset) Recorder Start Address Configuration

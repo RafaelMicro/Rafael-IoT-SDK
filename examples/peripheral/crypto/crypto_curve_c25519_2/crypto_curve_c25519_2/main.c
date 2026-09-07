@@ -12,6 +12,7 @@
 #include "rt_sha256.h"
 #include "hosal_crypto_ctr_drbg.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 #define curve25519_in_bytes       32
@@ -51,6 +52,7 @@ int main(void) {
     hosal_crypto_curve25519_t curve25519;
 
     uart_stdio_init();
+    _dump_boot_info();
     
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);

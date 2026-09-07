@@ -7,7 +7,7 @@
 
 /** @file
  *
- * @brief BLE TRSP central role demo.
+ * @brief BLE data rate test central role demo.
  *
  */
 
@@ -142,6 +142,19 @@ static void RunTxTest(uint8_t host_id);
  *  Handler
  * ------------------------------
  */
+/**
+ * @brief Handles a single character received from the UART.
+ *
+ * Buffers received characters until a line terminator ('\n' or '\r') is seen. When a
+ * complete line is received, it is copied into the global UART buffer (g_uart_buffer /
+ * g_uart_length) and an APP_REQUEST_PROCESS_UART_CMD request is queued (from ISR context)
+ * so the application task can process it.
+ *
+ * @param ch The character received from the UART.
+ * @return true if a complete line was received (so the caller may re-enable low-power mode),
+ *         false otherwise.
+ * @note Called from the UART RX interrupt (via uart0_rx_callback()).
+ */
 static bool uart_data_handler(char ch)
 {
     bool status = false;
@@ -169,6 +182,16 @@ static bool uart_data_handler(char ch)
     return status;
 }
 
+/**
+ * @brief UART0 RX interrupt callback.
+ *
+ * Reads one received byte from the UART and forwards it to uart_data_handler(). If a
+ * complete line has been received, low-power mode is unmasked (re-enabled) again.
+ *
+ * @param p_arg Unused callback context pointer.
+ * @return Always returns 0.
+ * @note Executes in interrupt context.
+ */
 static int uart0_rx_callback(void *p_arg)
 {
     char ch;
@@ -176,19 +199,33 @@ static int uart0_rx_callback(void *p_arg)
     hosal_uart_receive(&uart0_dev, &ch, 1);
     if (uart_data_handler(ch) == true)
     {
-        // recieved '\n' or '\r' --> enable sleep mode
+        // received '\n' or '\r' --> enable sleep mode
         hosal_lpm_ioctrl(HOSAL_LPM_UNMASK, HOSAL_LOW_POWER_MASK_BIT_TASK_BLE_APP);
     }
 
     return 0;
 }
 
+/**
+ * @brief Increments the millisecond tick counter (g_time_ms) used to time the data rate test.
+ *
+ * @note Called from timer_handler() on every HW timer interrupt (~1ms tick).
+ */
 static void timer_count_update(void)
 {
     g_time_ms++;
 }
 
 
+/**
+ * @brief HW timer interrupt handler.
+ *
+ * Updates the elapsed-time tick counter when the interrupt originates from the
+ * application's HW timer instance.
+ *
+ * @param timer_id ID of the timer that triggered the interrupt.
+ * @note Registered as the callback in hw_timer_init(); runs in interrupt context.
+ */
 static void timer_handler(uint32_t timer_id)
 {
     if (timer_id == APP_HW_TIMER_ID)
@@ -198,6 +235,16 @@ static void timer_handler(uint32_t timer_id)
 }
 
 /* timer init*/
+/**
+ * @brief Configures and initializes the HW timer used to time data rate tests.
+ *
+ * Sets up a periodic, down-counting timer (4M ticks/s with the /8 prescaler applied to the
+ * 32MHz input clock) with its interrupt enabled, registers timer_handler() as the interrupt
+ * callback, and enables the Timer0 IRQ in the NVIC.
+ *
+ * @note Only configures the timer; it does not start counting. hosal_timer_start() is called
+ *       later when an RX test actually begins.
+ */
 static void hw_timer_init(void)
 {
     hosal_timer_config_t cfg;
@@ -214,6 +261,16 @@ static void hw_timer_init(void)
     NVIC_EnableIRQ(Timer0_IRQn);
 }
 
+/**
+ * @brief Device Information Service (DIS) client event handler.
+ *
+ * Handles read-response events for the manufacturer name and firmware revision string
+ * characteristics received from the connected server and prints them to the console.
+ *
+ * @param p_param Pointer to the ATT event parameters (event type, GATT role, and data).
+ * @note Only processes events where gatt_role is BLE_GATT_ROLE_CLIENT. Registered as the
+ *       DIS client event callback in client_profile_init().
+ */
 static void ble_svcs_dis_evt_handler(ble_evt_att_param_t *p_param)
 {
     uint8_t *p_data;
@@ -251,6 +308,18 @@ static void ble_svcs_dis_evt_handler(ble_evt_att_param_t *p_param)
     }
 }
 
+/**
+ * @brief Transparent Service (TRSPS) client event handler.
+ *
+ * Handles notification/indication events carrying test data during an RX data rate test
+ * (starts the elapsed-time timer on the first packet, accumulates the received byte count,
+ * logs progress and final throughput), and the write-response event used to kick off the
+ * TX/RX handshake with the server.
+ *
+ * @param p_param Pointer to the ATT event parameters (event type, GATT role, data, and length).
+ * @note Only processes events where gatt_role is BLE_GATT_ROLE_CLIENT. Registered as the
+ *       TRSPS client event callback in client_profile_init().
+ */
 static void ble_svcs_trsps_evt_handler(ble_evt_att_param_t *p_param)
 {
     if (p_param->gatt_role == BLE_GATT_ROLE_CLIENT)
@@ -327,6 +396,22 @@ static void ble_svcs_trsps_evt_handler(ble_evt_att_param_t *p_param)
     }
 }
 
+/**
+ * @brief Runs the post-connection GATT command sequence for the central role, one step per call.
+ *
+ * Sequentially exchanges MTU size, updates the data length, sets the TRSPS and GATT client
+ * characteristic configuration descriptors, and reads the DIS manufacturer name and firmware
+ * revision strings from the connected server, advancing to the next step only after the
+ * previous command completes successfully.
+ *
+ * @param host_id The connection/host id whose profile info is used to issue the GATT commands.
+ * @return @retval BLE_ERR_OK once all commands in the sequence have completed (the internal
+ *         step index is then reset for the next connection).
+ *         @retval BLE_BUSY while the sequence is still in progress, or if the link is no
+ *         longer in STATE_CONNECTED.
+ * @note Called repeatedly via re-queued APP_REQUEST_TRSPC_MULTI_CMD requests (see
+ *       app_central_handler()) until it returns BLE_ERR_OK.
+ */
 static ble_err_t svcs_trspc_multi_cmd_handler(uint8_t host_id)
 {
     // after received "BLECMD_EVENT_ATT_DATABASE_PARSING_FINISHED" event, do
@@ -417,6 +502,18 @@ static ble_err_t svcs_trspc_multi_cmd_handler(uint8_t host_id)
 }
 
 // TRSPS Central
+/**
+ * @brief Central-role application request dispatcher.
+ *
+ * Processes application-layer requests for host 0 (the TRSP central link): creating or
+ * cancelling the GAP connection, driving the post-connection command sequence, dispatching
+ * received UART commands to the command handler, and running the data rate test state
+ * machine (parameter negotiation, starting the test, and sending/requesting test data).
+ *
+ * @param p_param Pointer to the request parameters, containing the host id and the
+ *        requested app_request_t.
+ * @note Invoked from ble_app_main() for every dequeued application request.
+ */
 static void app_central_handler(app_req_param_t *p_param)
 {
     ble_err_t status;
@@ -619,6 +716,20 @@ static void app_central_handler(app_req_param_t *p_param)
     }
 }
 
+/**
+ * @brief General BLE stack event handler.
+ *
+ * Processes GAP/GATT events forwarded from the BLE host stack: connection creation and
+ * cancellation, connection parameter and PHY updates, MTU exchange, data length changes
+ * (updates connect_info.data_length), disconnection, ATT database parsing completion
+ * (triggers the post-connection command sequence via APP_REQUEST_TRSPC_MULTI_CMD), and
+ * channel map reads. Status/results are logged via printf.
+ *
+ * @param p_param Pointer to the generic BLE event parameters, including the event type and
+ *        event-specific payload.
+ * @note Invoked from app_main_task() when a QUEUE_TYPE_OTHERS / APP_GENERAL_EVENT message
+ *       is dequeued.
+ */
 static void ble_evt_handler(ble_evt_param_t *p_param)
 {
     switch (p_param->event)
@@ -769,6 +880,20 @@ static void ble_evt_handler(ble_evt_param_t *p_param)
  *  Methods
  * ------------------------------
  */
+/**
+ * @brief Sends one packet of TX data rate test data.
+ *
+ * Sends a single write-without-response packet over the TRSPS characteristic, clamping the
+ * packet length to the amount of data still remaining in the test. On success, updates
+ * transmittedTotalDataLength, logs progress at the configured percentage interval, and stops
+ * the test (sets test_state to DATARATE_STATE_IDLE) once the configured total length has been
+ * sent; otherwise re-queues an APP_DATA_RATE_TEST_RUN request to send the next packet.
+ *
+ * @param host_id The connection/host id used to send the TRSPS write and to re-queue the
+ *        next TX request.
+ * @note Called from app_central_handler() while app_DR_test_info.test_state is running and
+ *       test_mode is DATARATE_MODE_TX.
+ */
 static void RunTxTest(uint8_t host_id)
 {
     ble_err_t status = BLE_ERR_OK;
@@ -814,6 +939,15 @@ static void RunTxTest(uint8_t host_id)
     }
 }
 
+/**
+ * @brief Computes the byte-count interval at which TX/RX progress is logged.
+ *
+ * Sets print_percentage_base to approximately 5% of the configured total test length,
+ * rounded down to a multiple of the current packet size (connect_info.data_length). Falls
+ * back to one packet's worth of data if the computed interval would be zero.
+ *
+ * @note Does nothing (leaves print_percentage_base unchanged) if connect_info.data_length is 0.
+ */
 static void daraRate_Test_PercentageBase_Set(void)
 {
     // 5%
@@ -833,6 +967,21 @@ static void daraRate_Test_PercentageBase_Set(void)
     }
 }
 
+/**
+ * @brief Queues an application request event for processing by the main application task.
+ *
+ * Builds an app_queue_t entry of type QUEUE_TYPE_APP_REQ from host_id/request and posts it
+ * to g_app_msg_q, taking the appropriate counting semaphore first (semaphore_app for normal
+ * calls, semaphore_isr for calls made from an ISR) to bound the number of outstanding requests.
+ *
+ * @param host_id The connection/host id the request applies to.
+ * @param request The application request event to post.
+ * @param from_isr true if called from interrupt context (uses the FromISR queue/semaphore
+ *        APIs), false for normal task context.
+ * @return true if the request was successfully queued, false if no semaphore/queue slot was
+ *         available.
+ * @note Safe to call from ISR context when from_isr is true.
+ */
 bool app_request_set(uint8_t host_id, app_request_t request, bool from_isr)
 {
     app_queue_t p_app_q;
@@ -886,6 +1035,21 @@ bool app_request_set(uint8_t host_id, app_request_t request, bool from_isr)
  *  Application Task
  * ------------------------------
  */
+/**
+ * @brief BLE host general-event callback, registered for APP_GENERAL_EVENT.
+ *
+ * Copies the received ble_evt_param_t payload into a heap-allocated TLV buffer and posts it
+ * to the application queue (g_app_msg_q) as a QUEUE_TYPE_OTHERS / APP_GENERAL_EVENT message,
+ * to be processed later by app_main_task() / ble_evt_handler().
+ *
+ * @param p_param Pointer to the ble_evt_param_t event data supplied by the BLE host stack.
+ * @return @retval BLE_ERR_OK the event was queued successfully.
+ *         @retval BLE_ERR_DATA_MALLOC_FAIL the TLV buffer could not be allocated.
+ *         @retval BLE_BUSY the callback-queue semaphore could not be taken, or the message
+ *         queue was full.
+ * @note Registered via ble_host_callback_set() in ble_init(); semaphore_cb is released once
+ *       the message is consumed in app_main_task().
+ */
 static ble_err_t ble_app_event_cb(void *p_param)
 {
     ble_err_t status;
@@ -906,6 +1070,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -923,6 +1088,20 @@ static ble_err_t ble_app_event_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief BLE host service-event callback, registered for APP_SERVICE_EVENT.
+ *
+ * Copies the received ble_evt_att_param_t payload (including its variable-length data) into
+ * a heap-allocated TLV buffer and posts it to the application queue as a QUEUE_TYPE_OTHERS /
+ * APP_SERVICE_EVENT message.
+ *
+ * @param p_param Pointer to the ble_evt_att_param_t event data supplied by the BLE host stack.
+ * @return @retval BLE_ERR_OK the event was queued successfully.
+ *         @retval BLE_ERR_DATA_MALLOC_FAIL the TLV buffer could not be allocated.
+ *         @retval BLE_BUSY the callback-queue semaphore could not be taken, or the message
+ *         queue was full.
+ * @note Registered via ble_host_callback_set() in ble_init().
+ */
 static ble_err_t ble_service_data_cb(void *p_param)
 {
     ble_err_t status;
@@ -951,6 +1130,7 @@ static ble_err_t ble_service_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -963,6 +1143,20 @@ static ble_err_t ble_service_data_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief BLE host L2CAP data-event callback, registered for APP_L2CAP_DATA_EVENT.
+ *
+ * Copies the received ble_l2cap_evt_param_t payload into a heap-allocated TLV buffer and
+ * posts it to the application queue as a QUEUE_TYPE_OTHERS / APP_L2CAP_DATA_EVENT message.
+ *
+ * @param p_param Pointer to the ble_l2cap_evt_param_t event data supplied by the BLE host stack.
+ * @return @retval BLE_ERR_OK the event was queued successfully.
+ *         @retval BLE_ERR_DATA_MALLOC_FAIL the TLV buffer could not be allocated.
+ *         @retval BLE_BUSY the callback-queue semaphore could not be taken, or the message
+ *         queue was full.
+ * @note Registered via ble_host_callback_set() in ble_init(); app_main_task() currently only
+ *       frees APP_L2CAP_DATA_EVENT messages without further processing.
+ */
 static ble_err_t ble_l2cap_data_cb(void *p_param)
 {
     ble_err_t status;
@@ -991,6 +1185,7 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -1003,6 +1198,18 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief Main BLE application task loop.
+ *
+ * Performs one-time BLE stack/profile initialization via ble_init(), then loops forever
+ * dequeuing messages from g_app_msg_q: application requests (QUEUE_TYPE_APP_REQ) release
+ * their originating semaphore and are dispatched to ble_app_main(); queued BLE/service/L2CAP
+ * events (QUEUE_TYPE_OTHERS) are dispatched to the appropriate handler based on their TLV
+ * type and GATT role, then freed.
+ *
+ * @note Never returns. Enters an infinite while(1) loop if ble_init() fails. Runs as the
+ *       body of the FreeRTOS task started from app_main_entry().
+ */
 static void app_main_task(void)
 {
     ble_err_t status;
@@ -1089,6 +1296,15 @@ static void app_main_task(void)
     }
 }
 
+/**
+ * @brief Top-level application request dispatcher.
+ *
+ * Forwards the request to app_central_handler() for link 0, the sole TRSP central connection
+ * handled by this application.
+ *
+ * @param p_param Pointer to the dequeued application request parameters.
+ * @note Called from app_main_task() for every QUEUE_TYPE_APP_REQ message.
+ */
 static void ble_app_main(app_req_param_t *p_param)
 {
     // Link 0 (Central)
@@ -1098,6 +1314,15 @@ static void ble_app_main(app_req_param_t *p_param)
 /* ------------------------------
  *  Application Initializations
  * ------------------------------
+ */
+/**
+ * @brief Initializes UART0 for interrupt-driven command/data input.
+ *
+ * Initializes the UART device, registers uart0_rx_callback() for RX interrupts (and clears
+ * the TX DMA callback), switches the UART into interrupt-driven RX mode, and sets the
+ * UART0 interrupt priority.
+ *
+ * @note Called once from app_init(), after uart_stdio_deinit() has released the UART.
  */
 static void app_uart_init(void)
 {
@@ -1114,6 +1339,15 @@ static void app_uart_init(void)
     __NVIC_SetPriority(Uart0_IRQn, 6);
 }
 
+/**
+ * @brief Initializes the data rate test parameters to their default values.
+ *
+ * Sets the total test length to DATARATE_TEST_LENGTH, the test state to DATARATE_STATE_IDLE,
+ * and the test mode to DATARATE_MODE_TX.
+ *
+ * @note Called once from ble_init() during startup. The UART "set_param" command can
+ *       subsequently change these values at runtime.
+ */
 static void dataRate_Test_Param_Init(void)
 {
     // init
@@ -1122,16 +1356,42 @@ static void dataRate_Test_Param_Init(void)
     app_DR_test_info.test_mode = DATARATE_MODE_TX;
 }
 
+/**
+ * @brief Initializes GATT service client data to its default (disabled) state.
+ *
+ * @param p_data Pointer to the GATT service client data structure to initialize.
+ * @note Called from client_profile_init() and again each time a new connection is created
+ *       in app_central_handler().
+ */
 static void svcs_gatts_data_init(ble_svcs_gatts_data_t *p_data)
 {
     p_data->service_changed_cccd = 0;
 }
 
+/**
+ * @brief Initializes TRSP service client data to its default (disabled) state.
+ *
+ * @param p_data Pointer to the TRSP service client data structure to initialize.
+ * @note Called from client_profile_init() and again each time a new connection is created
+ *       in app_central_handler().
+ */
 static void svcs_trsps_data_init(ble_svcs_trsps_data_t *p_data)
 {
     p_data->udatni01_cccd = 0;
 }
 
+/**
+ * @brief Initializes the client-role BLE profile for a link and sets its state to standby.
+ *
+ * Initializes the GAP, GATT, DIS, and TRSP services in client role for the given link, and
+ * registers ble_svcs_dis_evt_handler() / ble_svcs_trsps_evt_handler() as the DIS/TRSP client
+ * event callbacks.
+ *
+ * @param host_id The connection/host id whose profile is being initialized.
+ * @return @retval BLE_ERR_OK all services initialized successfully.
+ *         @retval other the error code from whichever ble_svcs_*_init() call failed first.
+ * @note Called once from ble_init() during startup.
+ */
 static ble_err_t client_profile_init(uint8_t host_id)
 {
     ble_err_t status = BLE_ERR_OK;
@@ -1185,6 +1445,21 @@ static ble_err_t client_profile_init(uint8_t host_id)
     return status;
 }
 
+/**
+ * @brief Performs one-time BLE stack and application initialization.
+ *
+ * Registers the general/service/L2CAP event callbacks, initializes the PHY controller, sets
+ * the device BLE address (from the factory-programmed unique code if available, otherwise the
+ * DEVICE_ADDR default) and identity resolving key, initializes LE Secure Connections and
+ * resolvable address generation, sets the suggested data length, initializes the client
+ * profile for the TRSP central link, initializes the data rate test parameters, and prints
+ * the UART command help text.
+ *
+ * @return @retval BLE_ERR_OK initialization completed successfully.
+ *         @retval other the error code from whichever initialization step failed first.
+ * @note Called once from app_main_task() before it enters its event loop; the caller enters
+ *       an infinite loop and never proceeds if this returns an error.
+ */
 static ble_err_t ble_init(void)
 {
     ble_err_t status;
@@ -1278,6 +1553,15 @@ static ble_err_t ble_init(void)
     return status;
 }
 
+/**
+ * @brief Application-level initialization performed before the main task loop starts.
+ *
+ * Prints the startup banner, creates the application message queue and its associated
+ * counting semaphores, initializes and starts the BLE host stack, then tears down the UART
+ * used for stdio and re-initializes UART0 for interrupt-driven command input.
+ *
+ * @note Called once from app_main_entry().
+ */
 static void app_init(void)
 {
     ble_task_priority_t ble_task_level;
@@ -1327,10 +1611,12 @@ static void pin_mux_init(void)
 }
 
 /**
- * @brief Main entry point for the application.
+ * @brief FreeRTOS task entry function that performs application startup.
  *
- * This function initializes the RF module, starts the application initialization,
- * and enters an infinite loop to keep the application running.
+ * Initializes low-power management and the RF module (BLE controller mode), initializes the
+ * HW timer used for data rate test timing, runs application initialization (app_init()), then
+ * runs the main application task loop (app_main_task()), which does not return. The trailing
+ * infinite loop is a safety net in case app_main_task() ever returns.
  *
  * @param pvParameters Pointer to parameters passed to the task (not used).
  * @return void This function does not return a value.

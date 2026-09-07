@@ -11,10 +11,11 @@
 #include <stdint.h>
 #include "hosal_dma.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 uint8_t  dma_src_mem_buf[1024];
 uint8_t  dma_dest_mem_buf[1024];
-uint32_t dma_finish_state;
+uint32_t volatile dma_finish_state;
 
 void dma_user_complete(uint32_t channel_id, uint32_t status) {
     
@@ -33,6 +34,7 @@ int main(void) {
     dma_finish_state = 0;
 
     uart_stdio_init();
+    _dump_boot_info();
     hosal_dma_init();
 
     printf("\r\n----------------------------------------------------------------\r\n");
@@ -62,7 +64,7 @@ int main(void) {
     
     hosal_dma_interrupt_mode(&dma_dev);
 
-    while (dma_finish_state != 0) {;}
+    while (dma_finish_state == 0) {;}
     dma_finish_state = 0;
 
     for (i = 0; i < 1024; i++) {

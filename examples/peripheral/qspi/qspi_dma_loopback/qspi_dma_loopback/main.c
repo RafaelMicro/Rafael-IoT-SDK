@@ -12,6 +12,7 @@
 #include "hosal_qspi.h"
 #include "hosal_sysctrl.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 #define BUFSIZE 4096
 
@@ -49,6 +50,7 @@ int main(void) {
     hosal_qspi_mode_t     slave_mode = HOSAL_QSPI_SLAVE_MODE;
 
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

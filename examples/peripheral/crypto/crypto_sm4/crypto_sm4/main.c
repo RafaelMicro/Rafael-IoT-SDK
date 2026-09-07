@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include "hosal_crypto_sm4.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 void sm4_test_encode(void) {
@@ -181,6 +182,7 @@ int main(void) {
 
     
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

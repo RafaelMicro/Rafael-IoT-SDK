@@ -16,6 +16,7 @@
 #include "hosal_crypto_ctr_drbg.h"
 #include "app_hooks.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 void becp_print_hex_bytes(const char *name, const uint8_t *data, uint32_t size)
 {
@@ -185,6 +186,7 @@ re_generate_key:
 //------------------ ECC GF(2m) ------------------
 int main(void) {
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

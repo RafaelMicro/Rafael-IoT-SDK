@@ -14,6 +14,7 @@
 #include "hosal_trng.h"
 #include "uart_stdio.h"
 #include "app_hooks.h"
+#include "dump_boot_info.h"
 
 #define BUF_SIZE       256
 
@@ -71,6 +72,7 @@ void printf_otp(uint32_t id, uint32_t *outbuf, uint32_t length)
 int main(void) {
     uart_stdio_init();
     vHeapRegionsInt();
+    _dump_boot_info();
 
 	uint32_t buf[256];
     uint32_t pufs_version = 0;

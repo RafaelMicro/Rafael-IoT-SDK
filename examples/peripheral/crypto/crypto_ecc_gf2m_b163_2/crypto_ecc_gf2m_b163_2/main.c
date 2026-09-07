@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include "hosal_crypto_ecc.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 
@@ -181,6 +182,7 @@ void compare_and_disaply(const char* name, const uint8_t* data, uint32_t size,
 
 int main(void) {
     uart_stdio_init();
+    _dump_boot_info();
     
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);

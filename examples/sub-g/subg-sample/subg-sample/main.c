@@ -142,6 +142,9 @@ uint32_t g_freq_support[7] = {903000, 907000, 911000, 915000,
                               919000, 923000, 927000}; //Unit: kHz
 
 static bool RF_Rx_Switch = false;
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+static bool is_58x_1m2m = false;
+#endif
 
 xQueueHandle app_msg_q;
 
@@ -220,6 +223,9 @@ void gpio_frequency_chek() {
 void subg_cfg_set(subg_ctrl_modulation_t mode, uint8_t data_rate) {
     modem_type = mode;
     subg_ctrl_idle_set();
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+            is_58x_1m2m = false;
+#endif
     if (mode == SUBG_CTRL_MODU_FSK) {
 #if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
         if (data_rate <= SUBG_CTRL_DATA_RATE_1M) {
@@ -239,6 +245,7 @@ void subg_cfg_set(subg_ctrl_modulation_t mode, uint8_t data_rate) {
             subg_ctrl_modem_config_set(mode, data_rate, SUBG_CTRL_FSK_MOD_0P5);
 #if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
             subg_ctrl_ble_mac_set(0x71764129, SUBG_CTRL_WHITEN_ENABLE);
+            is_58x_1m2m = true;
 #else
             subg_ctrl_sfd_set(mode, 0x71764129);
 #endif
@@ -755,6 +762,12 @@ static void subg_mac_rx_done(uint16_t packet_length, uint8_t* rx_data_address,
         rx_data_len = packet_length
                       - (RUCI_PHY_STATUS_LENGTH + phr_length
                          + RX_APPEND_LENGTH);
+#if (defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583))
+        if (is_58x_1m2m == true)
+        {
+            rx_data_len -= 1; //special case: 58x 1M/2M data rate with 24-bit CRC
+        }   
+#endif
 #if (!SUBG_MAC)
         /* Verify data content*/
         for (i = 0; i < rx_data_len; i++) {

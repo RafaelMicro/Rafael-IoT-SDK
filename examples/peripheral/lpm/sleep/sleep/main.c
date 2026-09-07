@@ -15,6 +15,7 @@
 #include "hosal_sysctrl.h"
 #include "hosal_dma.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 #define PWR_LEVEL4_KEY   GPIO4
 #define PWR_LEVEL3_KEY   GPIO3
@@ -214,6 +215,7 @@ void gpio_init(void) {
 int main(void) {
 
     uart_stdio_init();
+    _dump_boot_info();
     hosal_dma_init();
 
     printf("----------------------------------------------------------------\r\n");
@@ -239,7 +241,7 @@ int main(void) {
     hosal_lpm_init();
 
     #if defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583)
-    hosal_lpm_ioctrl(HOSAL_LPM_SUBSYSTEM_SRAM_DEEP_SLEEP_INIT,NULL);
+    hosal_lpm_ioctrl(HOSAL_LPM_SUBSYSTEM_SRAM_DEEP_SLEEP_INIT,HOSAL_LPM_PARAM_NONE);
     hosal_lpm_ioctrl(HOSAL_LPM_SUBSYSTEM_DISABLE_LDO_MODE,HOSAL_LPM_PARAM_NONE); //if no load 569 FW, need to disable ldo mode.
     hosal_lpm_ioctrl(HOSAL_LPM_SRAM0_RETAIN, LPM_SRAM0_RETAIN);
     hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LOW_POWER_LEVEL_SLEEP0);

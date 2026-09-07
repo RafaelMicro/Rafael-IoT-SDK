@@ -15,6 +15,7 @@
 #include "uart_stdio.h"
 #include "hosal_dma.h"
 #include "app_hooks.h"
+#include "dump_boot_info.h"
 
 
 int main(void) {
@@ -25,6 +26,7 @@ int main(void) {
 
     uart_stdio_init();
     vHeapRegionsInt();
+    _dump_boot_info();
 
 	
     printf("\r\n----------------------------------------------------------------\r\n");

@@ -775,7 +775,7 @@ static int
 _cli_cmd_zcl_scene(int argc, char **argv, cb_shell_out_t log_out, void *pExtra)
 {
     zcl_data_req_t *pt_data_req;
-    uint16_t addr, group_id, scence_id, cmd = 0, ep;
+    uint16_t addr, group_id, scene_id, cmd = 0, ep;
 
     do
     {
@@ -814,9 +814,15 @@ _cli_cmd_zcl_scene(int argc, char **argv, cb_shell_out_t log_out, void *pExtra)
                    ? utility_strtox(argv[4] + 2, 0, 4)
                    : utility_strtol(argv[4], 0);
 
-        scence_id = (*(argv[5] + 1) == 'x')
+        scene_id = (*(argv[5] + 1) == 'x')
                     ? utility_strtox(argv[5] + 2, 0, 4)
                     : utility_strtol(argv[5], 0);
+
+        if(scene_id > 0xFF)
+        {
+            log_info("Invalid scene ID");
+            break;
+        }
 
         ZIGBEE_ZCL_DATA_REQ(pt_data_req, addr, ZB_APS_ADDR_MODE_16_ENDP_PRESENT, ep, ZIGBEE_DEFAULT_ENDPOINT, ZB_ZCL_CLUSTER_ID_SCENES,
                             cmd, TRUE, TRUE, ZCL_FRAME_CLIENT_SERVER_DIR, 0, 3)
@@ -825,7 +831,7 @@ _cli_cmd_zcl_scene(int argc, char **argv, cb_shell_out_t log_out, void *pExtra)
         {
             pt_data_req->cmdFormat[0] = group_id & 0xFF;
             pt_data_req->cmdFormat[1] = (group_id >> 8) & 0xFF;
-            pt_data_req->cmdFormat[2] = scence_id & 0xFF;
+            pt_data_req->cmdFormat[2] = scene_id & 0xFF;
 
             zigbee_app_zcl_send_command(pt_data_req);
             vPortFree(pt_data_req);

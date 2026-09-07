@@ -54,6 +54,7 @@ Located within `examples/sub-g/mesh-it-up/`, these provide pre-compiled applicat
 * [`Quick-start.md`](Quick-start.md): Step-by-step guide on setting up the development environment, building, and running your first MIU example.
 * **Example Guides:** [`miu-ftd-guide.md`](example/miu-ftd-guide.md), [`miu-mtd-guide.md`](example/miu-mtd-guide.md), [`miu-sniffer-guide.md`](example/miu-sniffer-guide.md)
 * **OTA Guides:** [`OTA-guide.md`](OTA-guide.md) : OTA Design and Operation Instructions.
+* [`topology-guide.md`](topology-guide.md): Scanning a live mesh with the MiuTool — topology graph, link quality, per-device ping, and CSV/PNG export.
 
 ### External Resources
 

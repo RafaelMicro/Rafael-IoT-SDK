@@ -58,8 +58,9 @@ static void _init_sleep() {
 
 void vApplicationMallocFailedHook(void) {
     extern void extMemory(void);
-    printf("Memory Allocate Failed! Left heap: %u bytes\r\n",
-           xPortGetFreeHeapSize());
+    printf(
+        "Memory Allocate Failed! Left heap: %u bytes, min ever: %u bytes\r\n",
+        xPortGetFreeHeapSize(), xPortGetMinimumEverFreeHeapSize());
     extMemory();
 
     taskDISABLE_INTERRUPTS();
@@ -102,7 +103,7 @@ static void app_task_entry(void* pvParameters) {
     vTaskDelete(NULL);
 }
 
-int main(void) {    
+int main(void) {
     /*gpio init*/
     pin_mux_init();
 

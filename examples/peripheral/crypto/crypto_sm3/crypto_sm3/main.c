@@ -11,6 +11,7 @@
 #include "hosal_sysctrl.h"
 #include "hosal_crypto_sm3.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 uint8_t    sm3_digest[32], sm3_digest2[32], sm3_digest_caseA[32];
@@ -38,6 +39,7 @@ int main(void) {
     uint8_t*  ptr;
 
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

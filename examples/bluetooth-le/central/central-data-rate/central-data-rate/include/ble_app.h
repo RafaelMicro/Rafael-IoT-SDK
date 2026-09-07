@@ -36,11 +36,11 @@ typedef enum
 {
     APP_REQUEST_IDLE,               /**< Application request event: idle.*/
     APP_REQUEST_CREATE_CONN,        /**< Application request event: create connection.*/
-    APP_REQUEST_CREATE_CONN_CANCEL,
+    APP_REQUEST_CREATE_CONN_CANCEL, /**< Application request event: cancel a pending connection creation.*/
     APP_REQUEST_TRSPC_MULTI_CMD,    /**< Application request event: Exchange information.*/
-    APP_REQUEST_PROCESS_UART_CMD,
-    APP_DATA_RATE_TEST_RUN,
-    APP_DATA_RATE_TEST_STOP_RUN,
+    APP_REQUEST_PROCESS_UART_CMD,   /**< Application request event: process a received UART command.*/
+    APP_DATA_RATE_TEST_RUN,         /**< Application request event: run/continue the data rate test.*/
+    APP_DATA_RATE_TEST_STOP_RUN,    /**< Application request event: stop/cancel the data rate test.*/
 } app_request_t;
 
 typedef enum
@@ -75,6 +75,14 @@ typedef struct
 /**************************************************************************************************
  *    PUBLIC FUNCTIONS
  *************************************************************************************************/
+/** @brief Application Request Set command.
+ *
+ * @param[in] host_id : the link's id.
+ * @param[in] request : request parameter.
+ * @param[in] from_isr: Is Request from interrupt.
+ *
+ * @return true: Send OK, false: Send fail.
+ */
 bool app_request_set(uint8_t host_id, app_request_t request, bool from_isr);
 
 

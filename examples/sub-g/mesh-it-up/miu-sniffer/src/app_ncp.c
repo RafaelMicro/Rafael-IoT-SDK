@@ -179,11 +179,9 @@ static int ncp_uart_rx_callback(void* p_arg) {
 static int NcpSend(const uint8_t* aBuf, uint16_t aBufLength) {
     // log_info_hexdump("send", ncp_uart_dam_tx_cfg.dma_buf,
     //                  ncp_uart_dam_tx_cfg.dma_buf_size);
-    app_set_led0_on();
     hosal_uart_send(&ncp_uart_dev, aBuf, aBufLength);
     hosal_uart_send_complete(&ncp_uart_dev);
     otNcpHdlcSendDone();
-    app_set_led0_off();
     return aBufLength;
 }
 
@@ -203,6 +201,18 @@ void app_ncp_uart_rx_cb_timeout_callback(TimerHandle_t xTimer) {
     ot_app_task_post(ot_ncp_task, NULL);
 }
 
+// [diag] 完全獨立於 otrStackTask 的心跳燈,由 FreeRTOS Timer Service Task
+// 週期驅動。持續閃爍 = 排程器/其他 task 仍活著(otrStackTask 單獨卡死);
+// 完全停止 = 整個系統凍結(中斷關閉/hard fault/卡在某個 ISR)。
+static TimerHandle_t app_heartbeat_timer = NULL;
+
+static void app_heartbeat_timer_callback(TimerHandle_t xTimer) {
+    // [diag] 每 300ms 把兩顆燈清掉一次:事件持續發生就會一直被點亮
+    // (看起來常亮或閃爍),事件真的停了就會在下一次清除後暗掉且不再亮。
+    app_set_led0_off();
+    app_set_led1_off();
+}
+
 void ncpInitUser() {
     BaseType_t xReturned;
 #if (CONFIG_APP_OT_NCP_OPERATION_UART_PORT == 0)
@@ -212,6 +222,13 @@ void ncpInitUser() {
         app_ncp_rx_cb_time = xTimerCreate(
             "app_ncp_rx_cb_time", 5, pdFALSE, NULL,
             (TimerCallbackFunction_t)app_ncp_uart_rx_cb_timeout_callback);
+    }
+
+    if (app_heartbeat_timer == NULL) {
+        app_heartbeat_timer = xTimerCreate(
+            "app_heartbeat", pdMS_TO_TICKS(300), pdTRUE, NULL,
+            app_heartbeat_timer_callback);
+        xTimerStart(app_heartbeat_timer, 0);
     }
 
     NVIC_SetPriority(OT_NCP_UART_IRQn, 5);

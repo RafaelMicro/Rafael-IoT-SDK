@@ -94,7 +94,7 @@ typedef struct
 typedef struct
 {
     uint8_t   event;                /**< Application queue parameter: event.*/
-    uint8_t   from_isr;             /**< Application queue parameter: Dose the Request come from interruption? */
+    uint8_t   from_isr;             /**< Application queue parameter: Does the Request come from interruption? */
     uint16_t  param_type;           /**< Application queue parameter: @ref app_queue_param_type_t "application queue type".*/
     union
     {

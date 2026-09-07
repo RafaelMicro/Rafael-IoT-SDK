@@ -320,9 +320,11 @@ static void hids_timer_handler(TimerHandle_t timer)
 /**
  * @brief Handles HIDS service events.
  *
- * This function processes events related to the HIDS service. It handles various
- * HIDS-related events such as CCCD write events for different input reports and
- * starts the HIDS timer if notifications are enabled.
+ * This function processes server-side HIDS service events. For CCCD write events on the boot
+ * keyboard/mouse and report-mode keyboard/mouse/consumer input reports, it starts the HIDS
+ * software timer when notifications have been enabled by the client. For read events on the
+ * boot keyboard input/output report and the report-mode keyboard/mouse/consumer input reports,
+ * it replies with the currently stored report data via a GATT read response.
  *
  * @param p_param Pointer to the event parameters.
  * @return void This function does not return a value.
@@ -491,14 +493,17 @@ static void ble_svcs_hids_evt_handler(ble_evt_att_param_t *p_param)
 }
 
 /**
- * @brief Handles events for the peripheral role.
+ * @brief Handles application requests for the peripheral role.
  *
- * This function processes events related to the peripheral role, such as connection and disconnection events.
+ * This function processes application requests dispatched from the application task. It handles
+ * starting advertising (initializes the GATT/HIDS service data, sets the default MTU size, and
+ * enables advertising), forwarding a user-entered passkey or numeric-comparison result to the BLE
+ * stack, and periodically building and sending HID input reports (mouse movement, keyboard
+ * keycodes, and consumer control keys) to a connected client that has notifications enabled.
  *
- * @param p_param Pointer to the event parameters.
- *                - host_id: The ID of the host that triggered the event.
- *                - app_req: The type of request (e.g., start advertising, send data).
- *                - other fields: Additional fields related to the event.
+ * @param p_param Pointer to the application request parameters.
+ *                - host_id: The ID of the host that triggered the request.
+ *                - app_req: The @ref app_request_t "application request" to process.
  *
  * @return void This function does not return a value.
  */
@@ -797,6 +802,7 @@ static void handle_adv_set_enable(ble_evt_adv_set_adv_enable_t *p_adv_enable)
  * This function processes the event when a connection is established or failed.
  *
  * @param p_conn_param Pointer to the connection complete event parameters.
+ * @return void This function does not return a value.
  */
 static void handle_conn_complete(ble_evt_gap_conn_complete_t *p_conn_param)
 {
@@ -882,7 +888,6 @@ static void handle_mtu_exchange(ble_evt_mtu_t *p_mtu_param)
  *
  * @param p_data_len_param Pointer to the write suggested default data length event parameters.
  *                         - status: The status of the write operation.
- *                         - other fields: Additional fields related to the event.
  * @return void This function does not return a value.
  */
 static void handle_write_suggested_default_data_length(ble_evt_suggest_data_length_set_t *p_data_len_param)
@@ -1320,14 +1325,17 @@ static bool ble_app_request_set(uint8_t host_id, app_request_t request, bool fro
 
 #if ((IO_CAPABILITY_SETTING == KEYBOARD_ONLY) || (IO_CAPABILITY_SETTING == KEYBOARD_DISPLAY) || (IO_CAPABILITY_SETTING == DISPLAY_YESNO))
 /**
- * @brief Sets the passkey for BLE pairing.
+ * @brief Parses UART input for a pending passkey entry or numeric-comparison confirmation.
  *
- * This function processes the received passkey data and sets it for BLE pairing.
- * It validates the input to ensure it is numeric and then sets the passkey.
- * If the passkey confirmation state is active, it sends the passkey entry request.
+ * If a passkey entry is pending, this function validates that the received data is numeric,
+ * converts it into the passkey value, and requests that it be sent to the BLE stack for pairing.
+ * If a numeric-comparison confirmation is pending (KEYBOARD_DISPLAY / DISPLAY_YESNO IO capability
+ * only), it validates and converts the received data into the "same_numeric" result and requests
+ * that the comparison result be sent to the BLE stack. In either case, invalid (non-numeric)
+ * input is rejected with an error message and the corresponding pending state is cleared.
  *
- * @param p_data Pointer to the received passkey data.
- * @param length Length of the received passkey data.
+ * @param p_data Pointer to the received UART data.
+ * @param length Length of the received UART data.
  */
 static void passkey_set(uint8_t *p_data, uint8_t length)
 {
@@ -1419,6 +1427,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -1466,6 +1475,7 @@ static ble_err_t ble_service_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -1513,6 +1523,7 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -1776,11 +1787,11 @@ static ble_err_t server_profile_init(uint8_t host_id)
  * to the specified parameter.
  *
  * @param param The IO capabilities to be set. Possible values are:
- *              - IO_CAP_DISPLAY_ONLY
- *              - IO_CAP_DISPLAY_YESNO
- *              - IO_CAP_KEYBOARD_ONLY
- *              - IO_CAP_NO_INPUT_NO_OUTPUT
- *              - IO_CAP_KEYBOARD_DISPLAY
+ *              - DISPLAY_ONLY
+ *              - DISPLAY_YESNO
+ *              - KEYBOARD_ONLY
+ *              - NOINPUT_NOOUTPUT
+ *              - KEYBOARD_DISPLAY
  * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
  */
 static ble_err_t io_capability_init(io_caps_t param)

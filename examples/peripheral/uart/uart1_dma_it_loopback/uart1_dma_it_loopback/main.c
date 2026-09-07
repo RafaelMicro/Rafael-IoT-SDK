@@ -13,6 +13,7 @@
 #include "hosal_status.h"
 #include "uart_stdio.h"
 #include "hosal_sysctrl.h"
+#include "dump_boot_info.h"
 
 volatile uint32_t rx_finish, tx_finish;
 uint8_t  sendbuf[1024], recvbuf[1024];
@@ -75,6 +76,7 @@ int main(void) {
     uint32_t i = 0,j;
 
     uart_stdio_init();
+    _dump_boot_info();
     hosal_dma_init();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);

@@ -12,6 +12,7 @@
 #include "hosal_dma.h"
 #include "hosal_sysctrl.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 uint32_t rx_finish, tx_finish;
@@ -50,6 +51,7 @@ int main(void) {
     uint32_t i = 0,j, dma_status=0;
 
     uart_stdio_init();
+    _dump_boot_info();
     hosal_dma_init();
     
     printf("\r\n----------------------------------------------------------------\r\n");

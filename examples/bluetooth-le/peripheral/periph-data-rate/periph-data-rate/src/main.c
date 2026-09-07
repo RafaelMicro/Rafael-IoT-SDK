@@ -252,10 +252,14 @@ static void trsps_read_handler(uint8_t host_id, uint16_t handle_num)
 
 /**
  * @brief Handles write commands from the client to the TRSPS.
- * 
- * This function processes write commands received from the client. It handles various commands
- * such as starting or canceling tests, setting parameters, and updating connection latency.
- * 
+ *
+ * This function processes write commands received from the client. When the link is in
+ * STATE_TEST_STANDBY, it parses command strings to start or cancel tests, set/get test
+ * parameters, and update connection latency. When the link is in STATE_TEST_RXING, it instead
+ * treats the incoming writes as RX test data, accumulating the received length and, once the
+ * configured test length is reached, stopping the timer and printing the measured throughput.
+ * A cancel-test command is checked unconditionally regardless of the current state.
+ *
  * @param host_id The ID of the host that sent the write command.
  * @param length The length of the data received in the command.
  * @param data Pointer to the data buffer containing the command and its parameters.
@@ -293,10 +297,19 @@ static void trsps_write_cmd_handler(uint8_t host_id, uint8_t length, uint8_t *da
             tick_cfg.timeout_ticks = 0;
             hosal_timer_start(APP_HW_TIMER_ID, tick_cfg);
 
-            // total test length follows the test string
-            data[length] = 0;
-            sscanf((char *)(data + strlen(PRX_TEST_STR)), "%d", &dataLen);
-            g_test_length = dataLen;
+            // total test length follows the test string; copy into a
+            // dynamically-allocated NUL-terminated buffer instead of writing
+            // past the end of the exact-sized heap allocation backing this
+            // ATT write
+            char *cmd_buf = pvPortMalloc(length + 1);
+            if (cmd_buf != NULL)
+            {
+                memcpy(cmd_buf, data, length);
+                cmd_buf[length] = 0;
+                sscanf(cmd_buf + strlen(PRX_TEST_STR), "%d", &dataLen);
+                g_test_length = dataLen;
+                vPortFree(cmd_buf);
+            }
 
             printf("Test length = %d\n", g_test_length);
             printf("Start RX...\n");
@@ -309,10 +322,19 @@ static void trsps_write_cmd_handler(uint8_t host_id, uint8_t length, uint8_t *da
             // init parameter
             g_curr_tx_lenght = 0;
 
-            // total test length follows the test string
-            data[length] = 0;
-            sscanf((char *)(data + strlen(PTX_TEST_STR)), "%d", &dataLen);
-            g_test_length = dataLen;
+            // total test length follows the test string; copy into a
+            // dynamically-allocated NUL-terminated buffer instead of writing
+            // past the end of the exact-sized heap allocation backing this
+            // ATT write
+            char *cmd_buf = pvPortMalloc(length + 1);
+            if (cmd_buf != NULL)
+            {
+                memcpy(cmd_buf, data, length);
+                cmd_buf[length] = 0;
+                sscanf(cmd_buf + strlen(PTX_TEST_STR), "%d", &dataLen);
+                g_test_length = dataLen;
+                vPortFree(cmd_buf);
+            }
 
             // set TX test request
             if (ble_app_request_set(host_id, APP_REQUEST_TX_TEST, false) == false)
@@ -325,15 +347,23 @@ static void trsps_write_cmd_handler(uint8_t host_id, uint8_t length, uint8_t *da
         }
         else if (CHECK_STR(data, SET_PARAM_STR))
         {
-            int state;
+            int state = -1;
 
-            // get Data Rate Parameters
-            data[length] = 0;
-            state = sscanf((char *)data, "set_param=%u,%u,%u,%u",
-                           (unsigned int *) & (g_temp_test_param.phy),
-                           (unsigned int *) & (g_temp_test_param.packet_data_len),
-                           (unsigned int *) & (g_temp_test_param.conn_interval_min),
-                           (unsigned int *) & (g_temp_test_param.conn_interval_max));
+            // get Data Rate Parameters; copy into a dynamically-allocated
+            // NUL-terminated buffer instead of writing past the end of the
+            // exact-sized heap allocation backing this ATT write
+            char *cmd_buf = pvPortMalloc(length + 1);
+            if (cmd_buf != NULL)
+            {
+                memcpy(cmd_buf, data, length);
+                cmd_buf[length] = 0;
+                state = sscanf(cmd_buf, "set_param=%u,%u,%u,%u",
+                               (unsigned int *) & (g_temp_test_param.phy),
+                               (unsigned int *) & (g_temp_test_param.packet_data_len),
+                               (unsigned int *) & (g_temp_test_param.conn_interval_min),
+                               (unsigned int *) & (g_temp_test_param.conn_interval_max));
+                vPortFree(cmd_buf);
+            }
 
             if (state == -1)
             {
@@ -341,7 +371,7 @@ static void trsps_write_cmd_handler(uint8_t host_id, uint8_t length, uint8_t *da
             }
             else
             {
-                // set set parameteres request
+                // set test parameters request
                 if (ble_app_request_set(host_id, APP_REQUEST_TEST_PARAM_SET, false) == false)
                 {
                     // No application queue buffer. Error.
@@ -673,7 +703,10 @@ static void handle_adv_set_enable(ble_evt_adv_set_adv_enable_t *p_adv_enable)
 /**
  * @brief Handles the connection complete event.
  *
- * This function processes the event when a connection is established or failed.
+ * This function processes the event when a connection is established or failed. On a
+ * successful connection, it sets the link state to STATE_TEST_STANDBY and initializes the
+ * current test parameters from the connection result (interval, latency, supervision timeout)
+ * and to default values (PHY 1M, minimum MTU, and packet length derived from the minimum MTU).
  *
  * @param p_conn_param Pointer to the connection complete event parameters.
  */
@@ -710,6 +743,9 @@ static void handle_conn_complete(ble_evt_gap_conn_complete_t *p_conn_param)
  * @brief Handles the connection parameter update event.
  *
  * This function processes the event when a connection parameter update is successful or failed.
+ * On success, it refreshes the current test parameters (interval, latency, supervision timeout)
+ * from the updated connection. If the resulting latency is non-zero, it queues an
+ * APP_REQUEST_CONN_UPDATE request to re-apply the connection parameters with latency forced to 0.
  *
  * @param p_conn_param Pointer to the connection parameter update event parameters.
  * @return void This function does not return a value.
@@ -1089,6 +1125,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -1142,6 +1179,7 @@ static ble_err_t ble_service_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -1191,6 +1229,7 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -1352,10 +1391,11 @@ static void svcs_trsps_data_init(ble_svcs_trsps_data_t *p_data)
 
 /**
  * @brief Initializes the server profile for the TRSP service.
- * 
- * This function initializes the server profile for the TRSP service.
- * It sets up the GATT, GAP, and TRSPS services and configures the device name.
- * 
+ *
+ * This function sets the link state to STATE_STANDBY and initializes the GAP, GATT, DIS
+ * (Device Information Service), and TRSPS services for the given host, and configures the
+ * GAP device name.
+ *
  * @param host_id The ID of the host for which to initialize the profile.
  * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error code on failure).
  */
@@ -1414,11 +1454,14 @@ static ble_err_t server_profile_init(uint8_t host_id)
 
 /**
  * @brief Initializes the BLE stack and sets up the device address.
- * 
- * This function initializes the BLE stack, sets up the device address, and configures the
- * identity resolving key. It also initializes the resolvable address and sets the suggested
- * data length for GATT operations.
- * 
+ *
+ * This function registers the general event, service data, and L2CAP data callbacks with the
+ * BLE host, initializes the PHY controller, and sets the device address and identity resolving
+ * key (from the chip's unique code if available, otherwise falling back to the hardcoded
+ * DEVICE_ADDR). It also initializes LE Secure Connections, initializes the resolvable address,
+ * sets the suggested data length for GATT operations, and initializes the server profile for
+ * the single supported link (host id APP_DATA_RATE_P_HOST_ID).
+ *
  * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error code on failure).
  */
 static ble_err_t ble_init(void)
@@ -1511,11 +1554,12 @@ static ble_err_t ble_init(void)
 
 /**
  * @brief Initializes the application.
- * 
- * This function initializes the application by setting up the BLE stack, UART,
- * GPIO wake-up pin, and other necessary components. It also creates the application
- * queue and semaphores for inter-thread communication.
- * 
+ *
+ * This function prints the startup banner, creates the application message queue and the
+ * counting semaphores used for inter-thread/ISR communication, initializes the BLE host stack,
+ * and fills the TX test data buffer with an incrementing byte pattern for use during TX
+ * throughput tests.
+ *
  * @return void This function does not return any value.
  */
 static void app_init(void)
@@ -1572,8 +1616,10 @@ static void pin_mux_init(void)
 /**
  * @brief Main entry point for the application.
  *
- * This function initializes the RF module, starts the application initialization,
- * and enters an infinite loop to keep the application running.
+ * This function initializes the low power mode manager and the RF module (BLE controller
+ * mode), initializes the hardware timer used for throughput measurement, then runs the
+ * application initialization and the main application task. Since app_main_task() never
+ * returns (it runs its own infinite event loop), the trailing while(1) is not normally reached.
  *
  * @param pvParameters Pointer to parameters passed to the task (not used).
  * @return void This function does not return a value.

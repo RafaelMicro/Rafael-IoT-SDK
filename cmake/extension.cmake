@@ -269,6 +269,42 @@ function(get_all_source_files result)
     set(${result} ${all_source_files} PARENT_SCOPE)
 endfunction()
 
+# Read a flash MEMORY region out of a linker script without modifying it, so the
+# post-build size check knows where the image starts and where the region ends.
+# The app image is linked into LMA_CORE; the bootloader linker scripts call the
+# same region FLASH. Returns empty strings when nothing matches -- callers then
+# skip the check rather than reporting made-up addresses.
+function(sdk_parse_flash_region ld_file out_name out_origin out_end)
+  set(${out_name} "" PARENT_SCOPE)
+  set(${out_origin} "" PARENT_SCOPE)
+  set(${out_end} "" PARENT_SCOPE)
+
+  if(NOT EXISTS "${ld_file}")
+    return()
+  endif()
+  file(READ "${ld_file}" _ld)
+
+  foreach(_region LMA_CORE FLASH)
+    # <NAME> (rx) : ORIGIN = 0x10010000, LENGTH = 896K   (LENGTH may also be hex)
+    if(_ld MATCHES "${_region}[ \t]*\\([^)]*\\)[ \t]*:[ \t]*ORIGIN[ \t]*=[ \t]*(0[xX][0-9A-Fa-f]+|[0-9]+)[ \t]*,[ \t]*LENGTH[ \t]*=[ \t]*(0[xX][0-9A-Fa-f]+|[0-9]+)[ \t]*([KM]?)")
+      set(_origin "${CMAKE_MATCH_1}")
+      set(_length "${CMAKE_MATCH_2}")
+      set(_unit "${CMAKE_MATCH_3}")
+      if(_unit STREQUAL "K")
+        math(EXPR _length "${_length} * 1024")
+      elseif(_unit STREQUAL "M")
+        math(EXPR _length "${_length} * 1024 * 1024")
+      endif()
+      math(EXPR _origin_dec "${_origin}")
+      math(EXPR _end_dec "${_origin_dec} + ${_length}")
+      set(${out_name} "${_region}" PARENT_SCOPE)
+      set(${out_origin} "${_origin_dec}" PARENT_SCOPE)
+      set(${out_end} "${_end_dec}" PARENT_SCOPE)
+      return()
+    endif()
+  endforeach()
+endfunction()
+
 macro(setup_project name)
   # get_all_source_files(SOURCE_FILES)
   # foreach(file ${SOURCE_FILES})
@@ -351,6 +387,23 @@ macro(setup_project name)
     )
   endif()
 
+  # Report how much flash the image uses, and warn when it grows past
+  # CONFIG_IMAGE_END_ADDR_LIMIT. Kept as its own POST_BUILD command so it runs
+  # after the .bin exists on both branches above without duplicating anything.
+  sdk_parse_flash_region("${LINKER_SCRIPT_PROPERTY}" LMA_NAME LMA_ORIGIN LMA_END)
+  if(NOT LMA_ORIGIN STREQUAL "")
+    add_custom_command(TARGET ${proj_name}.elf POST_BUILD
+      COMMAND ${CMAKE_COMMAND}
+              -DBIN_FILE=${BIN_FILE}
+              -DIMAGE_ORIGIN=${LMA_ORIGIN}
+              -DREGION_NAME=${LMA_NAME}
+              -DREGION_END=${LMA_END}
+              -DIMAGE_END_LIMIT=${CONFIG_IMAGE_END_ADDR_LIMIT}
+              -P ${CMAKE_SOURCE_DIR}/cmake/check_image_size.cmake
+      VERBATIM
+    )
+  endif()
+
    configure_file(
     ${CMAKE_SOURCE_DIR}/.vscode/launch.json.in 
     ${CMAKE_SOURCE_DIR}/.vscode/launch.json @ONLY)
@@ -382,7 +435,7 @@ function(get_git_hash OUT_VAR)
     endif()
   endforeach()
 
-  set(_default_hash "05e6df6d")
+  set(_default_hash "792b09e3")
 
   find_package(Git QUIET)
 
@@ -562,6 +615,16 @@ function(config_parse config_file)
             add_compile_options(-D${var_name}="${var_value}")
             continue()
         endif()
+        # Hex must be handled before the decimal branch below: "[0-9]+" would
+        # only consume the leading "0" of "0x100D0000" and REGEX REPLACE keeps
+        # the unmatched tail, turning the variable name into CONFIG_FOOx100D0000.
+        if(line MATCHES "^CONFIG_[A-Za-z0-9_]+=0[xX][0-9A-Fa-f]+$")
+            string(REGEX REPLACE "^(CONFIG_[A-Za-z0-9_]+)=(0[xX][0-9A-Fa-f]+)$" "\\1" var_name "${line}")
+            string(REGEX REPLACE "^(CONFIG_[A-Za-z0-9_]+)=(0[xX][0-9A-Fa-f]+)$" "\\2" var_value "${line}")
+            set(${var_name} "${var_value}" PARENT_SCOPE)
+            add_compile_options(-D${var_name}=${var_value})
+            continue()
+        endif()
         if(line MATCHES "^CONFIG_[A-Za-z0-9_]+=[0-9]+")
             string(REGEX REPLACE "^(CONFIG_[A-Za-z0-9_]+)=([0-9]+)" "\\1" var_name "${line}")
             string(REGEX REPLACE "^(CONFIG_[A-Za-z0-9_]+)=([0-9]+)" "\\2" var_value "${line}")
@@ -586,7 +649,7 @@ function(app_git_version OUT_VAR)
 
     if(GIT_FOUND)
         execute_process(
-            COMMAND git describe --dirty=-test --always --tags --long --match "${CONFIG_BUILD_PORJECT}*"
+            COMMAND git describe --dirty=-test --always --tags --long --match "${CONFIG_BUILD_PROJECT}*"
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
             OUTPUT_VARIABLE GIT_REV OUTPUT_STRIP_TRAILING_WHITESPACE
             ERROR_QUIET
@@ -668,6 +731,6 @@ function(show_banner)
 
   # 
   message(STATUS "Current SDK version: ${RAFAEL_SDK_VER}")
-  message(STATUS "Build Project: ${CONFIG_BUILD_PORJECT}")
+  message(STATUS "Build Project: ${CONFIG_BUILD_PROJECT}")
 
 endfunction()

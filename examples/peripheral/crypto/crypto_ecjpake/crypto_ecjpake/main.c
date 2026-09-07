@@ -12,6 +12,7 @@
 #include "hosal_crypto_ecjpake.h"
 #include "hosal_trng.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 void lecp_print_hex_bytes( const uint8_t* data, uint32_t size) {
@@ -729,6 +730,7 @@ int main(void) {
     hosal_crypto_ecjpake_init();
 
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

@@ -123,7 +123,9 @@ static void app_gpio_handler(uint32_t pin, void *isr_param)
 /**
  * @brief HRS timer handler.
  *
- * This function is called when the HRS timer expires. It sends a notification to the connected client.
+ * This function is called when the HRS timer expires. If the peripheral link is connected,
+ * it queues an APP_REQUEST_HRS_NTF application request; the actual heart rate measurement
+ * notification is sent later, when app_peripheral_handler processes that request.
  *
  * @param timer The timer handle.
  * @return void This function does not return a value.
@@ -206,13 +208,17 @@ static void ble_svcs_hrs_evt_handler(ble_evt_att_param_t *p_param)
 }
 
 /**
- * @brief Handles peripheral role events.
+ * @brief Handles application requests for the peripheral role.
  *
- * This function processes events related to the peripheral role, such as connection and disconnection events.
+ * This function processes application requests for the peripheral role: APP_REQUEST_ADV_START
+ * initializes the GATTS/HRS service data, sets the preferred MTU size, and starts advertising;
+ * APP_REQUEST_HRS_NTF toggles the heart rate measurement "sensor contact status" bit and sends
+ * the heart rate measurement notification, and on a successful send it simulates an increasing
+ * heart rate by incrementing the heart rate data and RR-interval bytes.
  *
- * @param p_param Pointer to the event parameters.
- *                - host_id: The ID of the host that triggered the event.
- *                - app_req: The type of request (e.g., start advertising, send data).
+ * @param p_param Pointer to the request parameters.
+ *                - host_id: The ID of the host that triggered the request.
+ *                - app_req: The type of request (e.g., start advertising, send HRS notification).
  *                - other fields: Additional fields related to the event.
  *
  * @return void This function does not return a value.
@@ -764,6 +770,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -811,6 +818,7 @@ static ble_err_t ble_service_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -858,6 +866,7 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }

@@ -12,6 +12,7 @@
 #include "trng.h"
 #include "hosal_crypto_ctr_drbg.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 
@@ -926,6 +927,7 @@ error_5:
 int main(void)
 {
     uart_stdio_init();
+    _dump_boot_info();
     
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);

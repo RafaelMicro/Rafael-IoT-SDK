@@ -78,7 +78,7 @@ int main(void) {
     uart_stdio_init();
     vHeapRegionsInt();
     hosal_flash_init();
-    log_info("%s version : %s", CONFIG_BUILD_PORJECT, CONFIG_PROJECT_VERSION);
+    log_info("%s version : %s", CONFIG_BUILD_PROJECT, CONFIG_PROJECT_VERSION);
 
     enhanced_flash_dataset_init();
     check_reboot_count();

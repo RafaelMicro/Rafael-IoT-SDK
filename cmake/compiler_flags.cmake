@@ -26,7 +26,12 @@ sdk_add_compile_options(
     -lc -lm -lnosys
     -ffunction-sections -fdata-sections
     -fstrict-volatile-bitfields
-    -fcommon -ffreestanding
+    -fcommon
+    # -ffreestanding for C/ASM only. For C++ it puts libstdc++ in freestanding
+    # mode (_GLIBCXX_HOSTED=0), which strips hosted headers (<functional>,
+    # <vector>, <cmath> special funcs) that TFLM's C++ needs; -fhosted cannot
+    # undo it (GCC ignores -fhosted for C++). No C++ TU relies on freestanding.
+    $<$<NOT:$<COMPILE_LANGUAGE:CXX>>:-ffreestanding>
     -fno-strict-aliasing
     -fno-zero-initialized-in-bss
     -Wno-error=unused-function -Wno-error=unused-but-set-variable

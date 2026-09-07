@@ -5,6 +5,8 @@
 cscope*
 compile_commands.*
 Makefile
+CMakeUserPresets.json
+c_cpp_properties.json
 
 # IntelliJ/CLion
 .idea

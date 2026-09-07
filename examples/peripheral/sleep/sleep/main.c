@@ -16,6 +16,7 @@
 #include "hosal_lpm.h"
 #include "hosal_gpio.h"
 #include "hosal_sysctrl.h"
+#include "dump_boot_info.h"
 
 
 #define PWR_LEVEL3_KEY   GPIO3
@@ -187,6 +188,7 @@ void gpio_init(void) {
 int main(void) {
 
     uart_stdio_init();
+    _dump_boot_info();
     hosal_dma_init();
 
     printf("----------------------------------------------------------------\r\n");

@@ -128,11 +128,30 @@ static void trsp_data_send_from_isr(uint8_t *p_data, uint8_t length);
  *  Handler
  * ------------------------------
  */
+/**
+ * @brief GPIO interrupt handler.
+ *
+ * This function is triggered when a GPIO interrupt occurs. It masks the low-power mode.
+ *
+ * @param pin The GPIO pin number that triggered the interrupt.
+ * @param isr_param Additional parameters for the ISR (Interrupt Service Routine).
+ */
 static void app_gpio_handler(uint32_t pin, void *isr_param)
 {
     hosal_lpm_ioctrl(HOSAL_LPM_MASK, HOSAL_LOW_POWER_MASK_BIT_TASK_BLE_APP);
 }
 
+/**
+ * @brief Handles incoming UART data.
+ *
+ * This function processes each character received from the UART. It stores the character in a buffer
+ * and sends the buffer via the TRSP service when a certain condition is met (e.g., buffer is full or
+ * a newline character is received). It also resets the buffer index and returns a status indicating
+ * whether the system can enable sleep mode.
+ *
+ * @param ch The character received from the UART.
+ * @return true if the system can enable sleep mode, false otherwise.
+ */
 static bool uart_data_handler(char ch)
 {
     bool status = false;
@@ -164,6 +183,15 @@ static bool uart_data_handler(char ch)
     return status;
 }
 
+/**
+ * @brief UART receive line status callback.
+ *
+ * This function is called when there is a line status change (e.g. a break indication) on
+ * the UART. If a break condition is detected, it consumes one byte and masks the low-power mode.
+ *
+ * @param p_arg Pointer to the argument passed to the callback function.
+ * @return This function has no explicit return statement, so its returned value is undefined.
+ */
 static int uart0_receive_line_callback(void *p_arg)
 {
     if (hosal_uart_get_lsr(&uart0_dev) & UART_LSR_BI)
@@ -175,6 +203,15 @@ static int uart0_receive_line_callback(void *p_arg)
     }
 }
 
+/**
+ * @brief UART receive callback function.
+ *
+ * This function is invoked when data is received on the UART. It processes the received character
+ * and determines whether the system can transition to sleep mode based on the received data.
+ *
+ * @param p_arg Pointer to the argument provided to the callback function.
+ * @return Always returns 0.
+ */
 static int uart0_rx_callback(void *p_arg)
 {
     char ch;
@@ -182,13 +219,23 @@ static int uart0_rx_callback(void *p_arg)
     hosal_uart_receive(&uart0_dev, &ch, 1);
     if (uart_data_handler(ch) == true)
     {
-        // recieved '\n' or '\r' --> enable sleep mode
+        // received '\n' or '\r' --> enable sleep mode
         hosal_lpm_ioctrl(HOSAL_LPM_UNMASK, HOSAL_LOW_POWER_MASK_BIT_TASK_BLE_APP);
     }
 
     return 0;
 }
 
+/**
+ * @brief Handles DIS (Device Information Service) events from the server.
+ *
+ * This function processes read-response events for the DIS manufacturer name string and
+ * firmware revision string characteristics received from the connected server, and prints
+ * the returned value to the console.
+ *
+ * @param p_param Pointer to the BLE event parameters.
+ * @return void This function does not return any value.
+ */
 static void ble_svcs_dis_evt_handler(ble_evt_att_param_t *p_param)
 {
     uint8_t *p_data;
@@ -226,6 +273,16 @@ static void ble_svcs_dis_evt_handler(ble_evt_att_param_t *p_param)
     }
 }
 
+/**
+ * @brief Handles TRSPS (Transparent Service Profile Server) events from the server.
+ *
+ * This function processes notification and indication events for the TRSPS UDATNI01
+ * characteristic received from the connected server, and prints the received data to
+ * the console.
+ *
+ * @param p_param Pointer to the BLE event parameters.
+ * @return void This function does not return any value.
+ */
 static void ble_svcs_trsps_evt_handler(ble_evt_att_param_t *p_param)
 {
     if (p_param->gatt_role == BLE_GATT_ROLE_CLIENT)
@@ -256,6 +313,21 @@ static void ble_svcs_trsps_evt_handler(ble_evt_att_param_t *p_param)
     }
 }
 
+/**
+ * @brief Executes the sequence of setup commands against the connected TRSPC server.
+ *
+ * This function is called repeatedly (via APP_REQUEST_TRSPC_MULTI_CMD) after a connection
+ * has been established, and advances through a small state machine that: 0. exchanges the
+ * MTU size, 1. updates the data length, 2. enables the TRSPS notification CCCD, 3. enables
+ * the GATT service-changed indication CCCD, 4. reads the DIS manufacturer name string, and
+ * 5. reads the DIS firmware revision string. The internal command index only advances to the
+ * next step once the previous command returns BLE_ERR_OK. If the link is not in
+ * STATE_CONNECTED, the internal command index is reset to 0.
+ *
+ * @param host_id The host ID of the link to run the command sequence on.
+ * @return BLE_ERR_OK once all commands in the sequence have completed; BLE_BUSY while the
+ *         sequence is still in progress or the link is not yet connected.
+ */
 static ble_err_t svcs_trspc_multi_cmd_handler(uint8_t host_id)
 {
     // after received "BLECMD_EVENT_ATT_DATABASE_PARSING_FINISHED" event, do
@@ -345,6 +417,22 @@ static ble_err_t svcs_trspc_multi_cmd_handler(uint8_t host_id)
     return BLE_BUSY;
 }
 
+/**
+ * @brief Handles application requests for the central role.
+ *
+ * This function processes various application requests, such as starting/stopping scanning,
+ * creating a connection, running the TRSPC setup command sequence, and sending TRSP data to
+ * the connected server. It manages the state of the central device and interacts with the
+ * BLE stack to perform the requested actions.
+ *
+ * @param p_param Pointer to the request parameters.
+ *                - host_id: The ID of the host that triggered the request.
+ *                - app_req: The type of request (e.g., start scanning, create connection).
+ * @return void This function does not return any value.
+ * @note This function is called from the main application loop and is responsible for
+ * handling the requests related to the central role of the BLE device.
+ * @note The function uses a switch-case structure to handle different types of requests.
+ */
 // TRSPS Central
 static void app_central_handler(app_req_param_t *p_param)
 {
@@ -498,6 +586,20 @@ static void app_central_handler(app_req_param_t *p_param)
     }
 }
 
+/**
+ * @brief Handles BLE events.
+ *
+ * This function processes BLE events for the central role, including scan enable/disable,
+ * advertising report reception (matching against the target device name and initiating a
+ * connection), connection completion, connection parameter update, PHY read/update, MTU
+ * exchange, data length change, disconnection, and ATT database parsing completion. It
+ * updates the application state, issues follow-up application requests where required,
+ * and prints relevant information to the console.
+ *
+ * @param p_param Pointer to the BLE event parameters.
+ *                - Contains details about the event, such as the event type and associated data.
+ * @return void This function does not return any value.
+ */
 static void ble_evt_handler(ble_evt_param_t *p_param)
 {
     switch (p_param->event)
@@ -706,6 +808,17 @@ static void ble_evt_handler(ble_evt_param_t *p_param)
  *  Methods
  * ------------------------------
  */
+/**
+ * @brief Sends data from the UART buffer to the TRSP service in an ISR context.
+ *
+ * This function is responsible for transmitting data from the UART buffer to the
+ * Transparent Service Profile (TRSP) service. It ensures that pending data is sent
+ * before processing new data. The function operates in an interrupt service routine (ISR)
+ * context and manages the UART buffer indices for data transmission.
+ *
+ * @param p_data Pointer to the data buffer to be sent.
+ * @param length Length of the data to be sent.
+ */
 static void trsp_data_send_from_isr(uint8_t *p_data, uint8_t length)
 {
     // if there is data pending, still send old data and skip new data
@@ -727,6 +840,18 @@ static void trsp_data_send_from_isr(uint8_t *p_data, uint8_t length)
     }
 }
 
+/**
+ * @brief Sets the application request for the specified host ID.
+ *
+ * This function adds a request to the application queue for the specified host ID.
+ * It can be called from both normal and ISR contexts. The function handles the
+ * synchronization of the queue and semaphore appropriately.
+ *
+ * @param host_id The ID of the host for which to set the request.
+ * @param request The application request to set.
+ * @param from_isr Indicates whether the function is called from an ISR context (true) or not (false).
+ * @return true if the request was successfully set, false otherwise.
+ */
 bool app_request_set(uint8_t host_id, app_request_t request, bool from_isr)
 {
     app_queue_t p_app_q;
@@ -780,6 +905,14 @@ bool app_request_set(uint8_t host_id, app_request_t request, bool from_isr)
  *  Application Task
  * ------------------------------
  */
+/**
+ * @brief Callback function for BLE application events.
+ *
+ * This function handles general BLE application events and queues them for processing.
+ *
+ * @param p_param Pointer to the event parameters.
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t ble_app_event_cb(void *p_param)
 {
     ble_err_t status;
@@ -800,6 +933,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -817,6 +951,14 @@ static ble_err_t ble_app_event_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief Callback function for BLE service data events.
+ *
+ * This function handles service data events and queues them for processing.
+ *
+ * @param p_param Pointer to the event parameters.
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t ble_service_data_cb(void *p_param)
 {
     ble_err_t status;
@@ -845,6 +987,7 @@ static ble_err_t ble_service_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -857,6 +1000,14 @@ static ble_err_t ble_service_data_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief Callback function for BLE L2CAP data events.
+ *
+ * This function handles L2CAP data events and queues them for processing.
+ *
+ * @param p_param Pointer to the event parameters.
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t ble_l2cap_data_cb(void *p_param)
 {
     ble_err_t status;
@@ -885,6 +1036,7 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -897,6 +1049,16 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief Main task for the BLE application.
+ *
+ * This function initializes the BLE stack, starts scanning, and processes incoming
+ * events from the application queue. It handles requests related to the TRSP client
+ * role, including connection establishment, the TRSPC setup command sequence, and
+ * data transmission.
+ *
+ * @return void This function does not return a value.
+ */
 static void app_main_task(void)
 {
     ble_err_t status;
@@ -993,6 +1155,14 @@ static void app_main_task(void)
     }
 }
 
+/**
+ * @brief Main application handler for BLE requests.
+ *
+ * This function handles various BLE requests for the central role.
+ * It processes requests such as starting a scan and sending data.
+ *
+ * @param p_param Pointer to the request parameters.
+ */
 static void ble_app_main(app_req_param_t *p_param)
 {
     // Link 0 (Central)
@@ -1002,6 +1172,14 @@ static void ble_app_main(app_req_param_t *p_param)
 /* ------------------------------
  *  Application Initializations
  * ------------------------------
+ */
+/**
+ * @brief Initializes the UART.
+ *
+ * This function initializes the UART for communication.
+ * It configures the UART to interrupt mode and sets the UART Rx interrupt callback function.
+ *
+ * @return void This function does not return a value.
  */
 static void app_uart_init(void)
 {
@@ -1023,16 +1201,45 @@ static void app_uart_init(void)
     __NVIC_SetPriority(Uart0_IRQn, 6);
 }
 
+/**
+ * @brief Initializes the GATT service data.
+ *
+ * This function initializes the GATT client-role service data structure used by the
+ * central role. It sets the service changed characteristic client configuration
+ * descriptor (CCCD) to 0.
+ *
+ * @param p_data Pointer to the GATT service data structure.
+ * @return void This function does not return a value.
+ */
 static void svcs_gatts_data_init(ble_svcs_gatts_data_t *p_data)
 {
     p_data->service_changed_cccd = 0;
 }
 
+/**
+ * @brief Initializes the TRSPS service data.
+ *
+ * This function initializes the TRSPS client-role service data structure used by the
+ * central role. It sets the user data notification characteristic client configuration
+ * descriptor (CCCD) to 0.
+ *
+ * @param p_data Pointer to the TRSPS service data structure.
+ * @return void This function does not return a value.
+ */
 static void svcs_trsps_data_init(ble_svcs_trsps_data_t *p_data)
 {
     p_data->udatni01_cccd = 0;
 }
 
+/**
+ * @brief Initializes the client profile for the specified host ID.
+ *
+ * This function initializes the client profile for the specified host ID.
+ * It sets up the GAP, GATT, DIS, and TRSPS services in the client role.
+ *
+ * @param host_id The ID of the host for which to initialize the client profile.
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error code on failure).
+ */
 static ble_err_t client_profile_init(uint8_t host_id)
 {
     ble_err_t status = BLE_ERR_OK;
@@ -1079,6 +1286,15 @@ static ble_err_t client_profile_init(uint8_t host_id)
     return status;
 }
 
+/**
+ * @brief Initializes the BLE stack and sets up callbacks.
+ *
+ * This function initializes the BLE stack, sets up necessary callbacks, and configures the
+ * device address. It also initializes the PHY controller, LE Secure Connections (LESC), and
+ * resolvable address, and sets the suggested data length.
+ *
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t ble_init(void)
 {
     ble_err_t status;
@@ -1167,6 +1383,14 @@ static ble_err_t ble_init(void)
     return status;
 }
 
+/**
+ * @brief Initializes the application.
+ *
+ * This function sets up the application by initializing the BLE stack, UART, and GPIO.
+ * It also creates the necessary queues and semaphores for handling BLE events and requests.
+ *
+ * @return void This function does not return a value.
+ */
 static void app_init(void)
 {
     ble_task_priority_t ble_task_level;

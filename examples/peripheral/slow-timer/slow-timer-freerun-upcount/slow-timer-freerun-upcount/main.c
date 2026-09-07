@@ -13,6 +13,7 @@
 #include "hosal_slow_timer.h"
 #include "app_hooks.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 #define RT_SLOW_TIMER0     0
@@ -82,6 +83,7 @@ void slow_timer_freerun_upcnt(void) {
 int main(void) {
     uart_stdio_init();
     vHeapRegionsInt();
+    _dump_boot_info();
 
     printf("Starting %s now %d.... \r\n", CONFIG_CHIP,
            CONFIG_HOSAL_SOC_MAIN_ENTRY_TASK_SIZE);

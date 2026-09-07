@@ -92,11 +92,31 @@ static bool app_request_set(uint8_t host_id, app_request_t request, bool from_is
  *  Handler
  * ------------------------------
  */
+/**
+ * @brief GPIO interrupt handler.
+ *
+ * This function is triggered when a GPIO interrupt occurs. It masks the low-power mode.
+ *
+ * @param pin The GPIO pin number that triggered the interrupt.
+ * @param isr_param Additional parameters for the ISR (Interrupt Service Routine).
+ */
 static void app_gpio_handler(uint32_t pin, void *isr_param)
 {
     hosal_lpm_ioctrl(HOSAL_LPM_MASK, HOSAL_LOW_POWER_MASK_BIT_TASK_BLE_APP);
 }
 
+/**
+ * @brief Handles application requests for the peripheral role.
+ *
+ * This function processes application requests for the peripheral role. Currently
+ * the only supported request is starting advertising, which initializes the
+ * advertising parameters/data and then enables advertising for the given host.
+ *
+ * @param p_param Pointer to the request parameters.
+ *                - host_id: The ID of the host that triggered the request.
+ *                - app_req: The type of request (only APP_REQUEST_ADV_START is handled).
+ * @return void This function does not return any value.
+ */
 static void app_peripheral_handler(app_req_param_t *p_param)
 {
     ble_err_t status;
@@ -131,6 +151,19 @@ static void app_peripheral_handler(app_req_param_t *p_param)
     }
 }
 
+/**
+ * @brief Handles BLE events.
+ *
+ * This function processes the advertising set enable event: it updates the link's
+ * state to STATE_ADVERTISING/STATE_STANDBY and prints the current status. Since this
+ * iBeacon demo only advertises (non-connectable advertising, no GATT server usage),
+ * all other listed BLE events (connection, PHY, MTU, data length, disconnection) are
+ * received but intentionally not acted upon.
+ *
+ * @param p_param Pointer to the BLE event parameters.
+ *                - Contains details about the event, such as the event type and associated data.
+ * @return void This function does not return any value.
+ */
 static void ble_evt_handler(ble_evt_param_t *p_param)
 {
     switch (p_param->event)
@@ -190,6 +223,16 @@ static void ble_evt_handler(ble_evt_param_t *p_param)
  *  Methods
  * ------------------------------
  */
+/**
+ * @brief Initializes the advertising parameters and iBeacon advertising data.
+ *
+ * This function sets up non-connectable advertising parameters (type, interval,
+ * channel map, and filter policy) and builds the advertising data payload in the
+ * Apple iBeacon format (flags, manufacturer-specific data with company ID, proximity
+ * UUID, major/minor IDs, and measured TX power). No scan response data is configured.
+ *
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error code on failure).
+ */
 static ble_err_t adv_init(void)
 {
     ble_err_t status;
@@ -244,6 +287,15 @@ static ble_err_t adv_init(void)
     return status;
 }
 
+/**
+ * @brief Enables advertising for the specified host ID.
+ *
+ * This function starts advertising for the specified host ID. It sends a command to the BLE stack
+ * to enable advertising and checks the status of the operation.
+ *
+ * @param host_id The ID of the host for which to enable advertising.
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error code on failure).
+ */
 static ble_err_t adv_enable(uint8_t host_id)
 {
     ble_err_t status;
@@ -257,6 +309,18 @@ static ble_err_t adv_enable(uint8_t host_id)
     return status;
 }
 
+/**
+ * @brief Sets the application request for the specified host ID.
+ *
+ * This function adds a request to the application queue for the specified host ID.
+ * It can be called from both normal and ISR contexts. The function handles the
+ * synchronization of the queue and semaphore appropriately.
+ *
+ * @param host_id The ID of the host for which to set the request.
+ * @param request The application request to set.
+ * @param from_isr Indicates whether the function is called from an ISR context (true) or not (false).
+ * @return true if the request was successfully set, false otherwise.
+ */
 static bool app_request_set(uint8_t host_id, app_request_t request, bool from_isr)
 {
     app_queue_t p_app_q;
@@ -310,6 +374,14 @@ static bool app_request_set(uint8_t host_id, app_request_t request, bool from_is
  *  Application Task
  * ------------------------------
  */
+/**
+ * @brief Callback function for BLE application events.
+ *
+ * This function handles general BLE application events and queues them for processing.
+ *
+ * @param p_param Pointer to the event parameters.
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t ble_app_event_cb(void *p_param)
 {
     ble_err_t status;
@@ -330,6 +402,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -347,6 +420,14 @@ static ble_err_t ble_app_event_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief Callback function for BLE service data events.
+ *
+ * This function handles service data events and queues them for processing.
+ *
+ * @param p_param Pointer to the event parameters.
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t ble_service_data_cb(void *p_param)
 {
     ble_err_t status;
@@ -375,6 +456,7 @@ static ble_err_t ble_service_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -387,6 +469,14 @@ static ble_err_t ble_service_data_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief Callback function for BLE L2CAP data events.
+ *
+ * This function handles L2CAP data events and queues them for processing.
+ *
+ * @param p_param Pointer to the event parameters.
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t ble_l2cap_data_cb(void *p_param)
 {
     ble_err_t status;
@@ -415,6 +505,7 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -427,6 +518,15 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
     return status;
 }
 
+/**
+ * @brief Main task for the BLE application.
+ *
+ * This function initializes the BLE stack and profiles, requests advertising to
+ * start, and then loops forever processing incoming events from the application
+ * queue: application requests (advertising start) and BLE/service/L2CAP events.
+ *
+ * @return void This function does not return a value.
+ */
 static void app_main_task(void)
 {
     ble_err_t status;
@@ -519,6 +619,14 @@ static void app_main_task(void)
     }
 }
 
+/**
+ * @brief Main application handler for BLE requests.
+ *
+ * This function dispatches application requests to the peripheral role handler.
+ *
+ * @param p_param Pointer to the request parameters.
+ * @return void This function does not return any value.
+ */
 static void ble_app_main(app_req_param_t *p_param)
 {
     // Link - Peripheral
@@ -528,6 +636,16 @@ static void ble_app_main(app_req_param_t *p_param)
 /* ------------------------------
  *  Application Initializations
  * ------------------------------
+ */
+/**
+ * @brief Initializes the server profile for the specified host ID.
+ *
+ * This function sets the link's state to STATE_STANDBY and initializes the GAP, GATT,
+ * and DIS services for the given host (server role). This iBeacon demo does not
+ * initialize any custom service profile since it only performs advertising.
+ *
+ * @param host_id The ID of the host for which to initialize the server profile.
+ * @return ble_err_t Status of the operation (BLE_ERR_OK on success, error code on failure).
  */
 static ble_err_t server_profile_init(uint8_t host_id)
 {
@@ -574,6 +692,17 @@ static ble_err_t server_profile_init(uint8_t host_id)
     return status;
 }
 
+/**
+ * @brief Initializes the BLE stack and sets up callbacks.
+ *
+ * This function registers the general/service/L2CAP event callbacks, initializes the
+ * PHY controller, sets the device address (from the unique code region if available,
+ * otherwise the hard-coded default address, also writing the IRK when the unique code
+ * is used), initializes LESC and resolvable address, sets the suggested data length,
+ * and initializes the server profile for the single supported link (host id = 0).
+ *
+ * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
+ */
 static ble_err_t ble_init(void)
 {
     ble_err_t status;
@@ -662,6 +791,15 @@ static ble_err_t ble_init(void)
     return status;
 }
 
+/**
+ * @brief Initializes the application.
+ *
+ * This function prints the startup banner, creates the application message queue and
+ * semaphores, initializes the BLE host stack, and configures the wake-up GPIO pin
+ * (interrupt on falling edge) as a low-power wake-up source.
+ *
+ * @return void This function does not return a value.
+ */
 static void app_init(void)
 {
     ble_task_priority_t ble_task_level;
@@ -744,6 +882,15 @@ static void app_main_entry(void* pvParameters)
 /**************************************************************************************************
  *    GLOBAL FUNCTIONS
  *************************************************************************************************/
+/**
+ * @brief Main function.
+ *
+ * This is the entry point of the application. It configures pin multiplexing,
+ * initializes UART stdio, initializes the heap regions, dumps boot info, creates
+ * the main application task, and starts the FreeRTOS scheduler.
+ *
+ * @return int This function does not return a value.
+ */
 int main(void)
 {
     pin_mux_init();

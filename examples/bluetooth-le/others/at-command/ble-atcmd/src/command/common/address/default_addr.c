@@ -81,7 +81,7 @@ static void test_cmd(atcmd_item_t *item)
         "      format : XX:XX:XX:XX:XX:XX\n"
         "      ex. 01:02:03:04:05:FF, addr[0] = 0xFF, addr[5] = 0x01\n"
         "    notice\n"
-        "      If BLE Address Type is set to ramdom address,"
+        "      If BLE Address Type is set to random address,"
         "      addr[5] >= 0xC0 (the two most significant bits"
         "      of the address shall be equal to 1).\n"
     );

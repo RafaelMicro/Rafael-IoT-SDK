@@ -12,6 +12,7 @@
 #include "hosal_swi.h"
 #include "hosal_dma.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 
@@ -32,6 +33,7 @@ void swi_1_callback(uint32_t id) {
 int main(void) {
 
     uart_stdio_init();
+    _dump_boot_info();
     hosal_dma_init();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);

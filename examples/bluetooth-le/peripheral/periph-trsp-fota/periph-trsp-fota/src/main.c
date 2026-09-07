@@ -139,6 +139,7 @@ static void trsp_data_send_from_isr(uint8_t *p_data, uint8_t length);
  *
  * @param pin The GPIO pin number that triggered the interrupt.
  * @param isr_param Additional parameters for the ISR (Interrupt Service Routine).
+ * @return void This function does not return a value.
  */
 static void app_gpio_handler(uint32_t pin, void *isr_param)
 {
@@ -508,6 +509,7 @@ static void handle_adv_set_enable(ble_evt_adv_set_adv_enable_t *p_adv_enable)
  * This function processes the event when a connection is established or failed.
  *
  * @param p_conn_param Pointer to the connection complete event parameters.
+ * @return void This function does not return a value.
  */
 static void handle_conn_complete(ble_evt_gap_conn_complete_t *p_conn_param)
 {
@@ -621,8 +623,10 @@ static void handle_data_length_change(ble_evt_data_length_change_t *p_data_len_p
 /**
  * @brief Handles the disconnection complete event.
  *
- * This function processes the event when a disconnection is complete.
- * The STATE_STANDBY state indicates that the device is not connected and is ready to start advertising again.
+ * This function processes the event when a disconnection is complete. On success, it also
+ * terminates any ongoing FOTA session, transitions the link to the STATE_STANDBY state
+ * (indicating that the device is not connected and is ready to start advertising again), and
+ * requests advertising to restart.
  *
  * @param p_disconnect_param Pointer to the disconnection complete event parameters.
  * @return void This function does not return a value.
@@ -737,6 +741,7 @@ static bool fota_sw_timer_start(void)
  *
  * @param p_data Pointer to the data buffer to be sent.
  * @param length Length of the data to be sent.
+ * @return void This function does not return a value.
  */
 static void trsp_data_send_from_isr(uint8_t *p_data, uint8_t length)
 {
@@ -951,6 +956,7 @@ static ble_err_t ble_app_event_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -1004,6 +1010,7 @@ static ble_err_t ble_service_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -1052,6 +1059,7 @@ static ble_err_t ble_l2cap_data_cb(void *p_param)
             if (xQueueSendToBack(g_app_msg_q, &p_app_q, 1) != pdTRUE)
             {
                 status = BLE_BUSY;
+                vPortFree(p_tlv);
                 xSemaphoreGive(semaphore_cb);
             }
         }
@@ -1176,6 +1184,7 @@ static void app_main_task(void)
  * It processes requests such as starting advertising and sending data.
  *
  * @param p_param Pointer to the request parameters.
+ * @return void This function does not return a value.
  */
 static void ble_app_main(app_req_param_t *p_param)
 {
@@ -1331,8 +1340,11 @@ static ble_err_t server_profile_init(uint8_t host_id)
 /**
  * @brief Initializes the BLE stack and sets up callbacks.
  *
- * This function initializes the BLE stack, sets up necessary callbacks, and configures the device address.
- * It also initializes the PHY controller, LESC, and resolvable address, and sets the suggested data length.
+ * This function initializes the BLE stack, sets up necessary callbacks, and configures the device
+ * address (using the unique code and identity resolving key if available, otherwise the default
+ * address). It also initializes the PHY controller and resolvable address, sets the suggested data
+ * length, initializes the server profile, and performs the FOTA firmware buffer flash check and
+ * FOTA initialization.
  *
  * @return ble_err_t Returns BLE_ERR_OK on success, or an error code on failure.
  */
@@ -1425,8 +1437,9 @@ static ble_err_t ble_init(void)
  * @brief Initializes the application.
  *
  * This function sets up the application by initializing the BLE stack, UART, and GPIO.
- * It also creates the necessary queues and semaphores for handling BLE events and requests.
- * 
+ * It also creates the necessary queues and semaphores for handling BLE events and requests,
+ * and creates the FOTA software timer used to poll for FOTA transfer expiry.
+ *
  * @return void This function does not return a value.
  */
 static void app_init(void)
@@ -1519,8 +1532,9 @@ static void app_main_entry(void* pvParameters)
 /**
  * @brief Main function.
  *
- * This is the entry point of the application. It initializes the RF module,
- * application, and starts the main application task.
+ * This is the entry point of the application. It configures the pin multiplexing and UART stdio,
+ * dumps the boot information, creates the main application task (which performs the RF and
+ * application initialization), and starts the FreeRTOS scheduler.
  *
  * @return int This function does not return a value.
  */

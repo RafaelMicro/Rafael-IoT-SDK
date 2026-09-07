@@ -17,6 +17,7 @@
 #include "queue.h"
 #include "string.h"
 #include "util_string.h"
+#define CONFIG_APP_TASK_UDP_QUEUE_SIZE 3
 
 typedef enum {
     THREAD_UDP_EVENT_SEND = 0x01,
@@ -44,24 +45,33 @@ void app_udpSend_task(uint8_t* data, uint16_t data_lens,
 
     otMessage* pmsg;
     otMessageInfo messageInfo;
+    otBufferInfo bufInfo;
+    otMessageSettings settings = {true, OT_MESSAGE_PRIORITY_LOW};
     otInstance* instance = otrGetInstance();
+
+    otMessageGetBufferInfo(instance, &bufInfo);
+    if (bufInfo.m6loSendQueue.mNumMessages > CONFIG_APP_TASK_UDP_QUEUE_SIZE)
+        return;
 
     memset(&messageInfo, 0, sizeof(messageInfo));
 
     memcpy(messageInfo.mPeerAddr.mFields.m8, &dst_ipv6.mFields.m8,
            OT_IP6_ADDRESS_SIZE);
-    // messageInfo.mSockAddr = *otThreadGetMeshLocalEid(otrGetInstance());
     messageInfo.mPeerPort = appUdpPort;
     messageInfo.mHopLimit = 255;
     messageInfo.mAllowZeroHopLimit = false;
 
-    pmsg = otIp6NewMessage(instance, NULL);
+    /* Low priority so MLE/control preempts app traffic in the send queue. */
+    pmsg = otUdpNewMessage(instance, &settings);
+    if (pmsg == NULL)
+        return;
+
     if (OT_ERROR_NONE == otMessageAppend(pmsg, data, data_lens)
-        && OT_ERROR_NONE == otMessageSetLength(pmsg, data_lens)) {
-        if (OT_ERROR_NONE != otUdpSendDatagram(instance, pmsg, &messageInfo)) {
-            otMessageFree(pmsg);
-        }
+        && OT_ERROR_NONE == otMessageSetLength(pmsg, data_lens)
+        && OT_ERROR_NONE == otUdpSend(instance, &appSock, pmsg, &messageInfo)) {
+        return; /* ownership passed to the stack */
     }
+    otMessageFree(pmsg); /* any failure after alloc: free to avoid leak */
 }
 
 void app_udp_task(void* arg) {
@@ -151,7 +161,7 @@ uint8_t app_sockInit(otInstance* instance, uint16_t udp_port) {
             log_info("UDP PORT           : 0x%x", sockAddr.mPort);
         }
         /* Init rx done queue*/
-        app_udp_msg_queue = xQueueCreate(5, sizeof(app_udp_msg_t));
+        app_udp_msg_queue = xQueueCreate(CONFIG_APP_TASK_UDP_QUEUE_SIZE, sizeof(app_udp_msg_t));
     }
 
     return ret;

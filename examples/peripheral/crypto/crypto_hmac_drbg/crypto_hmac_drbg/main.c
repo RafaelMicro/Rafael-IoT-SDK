@@ -15,6 +15,7 @@
 #include "hosal_crypto_hmac_drbg.h"
 #include "app_hooks.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 #define NUMBER_OF_GENERATES 2
 /*
@@ -309,6 +310,7 @@ int main(void) {
 
     
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

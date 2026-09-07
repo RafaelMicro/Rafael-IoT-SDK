@@ -196,7 +196,7 @@ int main(void) {
         printf("Internal test: TX mode\r\n");
     }
 #else
-    rfb_pci_test_case = SUBG_RX_TEST;
+    rfb_pci_test_case = SUBG_BURST_TX_TEST;
 #endif
     printf("Test Case:%X\n", rfb_pci_test_case);
 

@@ -50,7 +50,7 @@ int main(void) {
     uart_stdio_init();
     vHeapRegionsInt();
     hosal_flash_init();
-    log_info("%s version : %s", CONFIG_BUILD_PORJECT, CONFIG_PROJECT_VERSION);
+    log_info("%s version : %s", CONFIG_BUILD_PROJECT, CONFIG_PROJECT_VERSION);
 
     hosal_rf_init(HOSAL_RF_MODE_RUCI_CMD);
     hosal_lpm_init();

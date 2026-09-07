@@ -13,6 +13,7 @@
 #include "hosal_pwm.h"
 #include "hosal_dma.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 void pwm_call_back_fun(uint32_t id, uint32_t status) {
@@ -28,6 +29,7 @@ int main(void) {
     uint32_t status = 0;
 
     uart_stdio_init();
+    _dump_boot_info();
     hosal_dma_init();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);

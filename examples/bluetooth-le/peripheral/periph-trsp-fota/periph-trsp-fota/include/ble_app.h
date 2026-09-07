@@ -100,7 +100,7 @@ typedef struct
     union
     {
         app_req_param_t  app_req;   /**< Application queue parameter: application request event. */
-        ble_tlv_t        *pt_tlv;   /**< Application queue parameter: parameters (type: @ref ble_event_t, length, and value). */
+        ble_tlv_t        *pt_tlv;   /**< Application queue parameter: parameters (type: @ref ble_app_event_t, length, and value). */
     } param;
 } app_queue_t;
 

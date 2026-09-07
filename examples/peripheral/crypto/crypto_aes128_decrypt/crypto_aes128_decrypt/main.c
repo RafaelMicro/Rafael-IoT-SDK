@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include "hosal_crypto_aes.h"
 #include "uart_stdio.h"
+#include "dump_boot_info.h"
 
 
 /*below test vector is RFC 4493 Test (Appendix A.) data*/
@@ -63,6 +64,7 @@ int main(void) {
 	hosal_aes_dev_t aes_dev;
 
     uart_stdio_init();
+    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);

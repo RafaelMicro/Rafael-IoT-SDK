@@ -29,18 +29,18 @@
 //#define SUPPORT_DEBUG_CONSOLE_CLI           1
 //#define SUPPORT_SHELL_CMD_HISTORY           1
 #define SET_SYS_CLK    SYS_CLK_48MHZ
-#define RF_FW_INCLUDE_PCI           (FALSE)
-#define RF_FW_INCLUDE_BLE           (FALSE)
-#define RF_FW_INCLUDE_MULTI_2P4G    (TRUE)
+#define CONFIG_RF_FW_INCLUDE_PCI           (FALSE)
+#define CONFIG_RF_FW_INCLUDE_BLE           (FALSE)
+#define CONFIG_RF_FW_INCLUDE_MULTI_2P4G    (TRUE)
 
-#if  MODULE_ENABLE(RF_FW_INCLUDE_MULTI_2P4G)
+#if  MODULE_ENABLE(CONFIG_RF_FW_INCLUDE_MULTI_2P4G)
 #define SUPPORT_BLE                 (TRUE)
 #define SUPPORT_15P4                (TRUE)
 #define RFB_ZIGBEE_ENABLED          (TRUE)
 #define RFB_MULTI_ENABLED           (TRUE)
 #endif
 
-#if  MODULE_ENABLE(RF_FW_INCLUDE_BLE)
+#if  MODULE_ENABLE(CONFIG_RF_FW_INCLUDE_BLE)
 #define SUPPORT_BLE                 (TRUE)
 #define SUPPORT_15P4                (FALSE)
 #define RFB_ZIGBEE_ENABLED          (FALSE)

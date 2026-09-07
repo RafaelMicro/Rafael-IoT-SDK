@@ -1,0 +1,84 @@
+TensorFlow Lite for Microcontrollers (TFLM, vendored)
+=====================================================
+
+Vendored from : https://github.com/tensorflow/tflite-micro
+Commit        : b15beb9d49e5830ce66666c90d353939aa8e0d4f  (main, 2025-03-17)
+License       : Apache-2.0  (see LICENSE)
+Imported on   : 2026-07-06
+
+Why a commit and not a release tag
+----------------------------------
+TFLM has no semantic-version releases: upstream ships continuously from `main`
+with no tags and no release binaries. Third-party integrators are expected to
+pin a known-good commit. This commit was chosen deliberately (see next section).
+
+CMSIS-NN backend alignment (important)
+--------------------------------------
+TFLM's cmsis_nn kernels (tensorflow/lite/micro/kernels/cmsis_nn/*.cc) are written
+against the exact CMSIS-NN version that the TFLM commit pins in
+tensorflow/lite/micro/tools/make/ext_libs/cmsis_nn_download.sh.
+
+This commit (b15beb9d) pins CMSIS-NN 22080c68d040c98139e6cb1549473e3149735f4d,
+which is the v7.0.0 release tag - exactly the CMSIS-NN already vendored at
+components/platform/common/CMSIS-NN (VERSION.txt there). So this SDK does NOT
+carry a second copy of CMSIS-NN: the vendored v7.0.0 is reused as TFLM's
+optimized kernel backend. b15beb9d is the newest TFLM snapshot that still pins
+v7.0.0 (the next change, 392b78f2f3 on 2025-03-20, bumped CMSIS-NN to an
+untagged main commit). If the CMSIS-NN under components/platform/common is ever
+upgraded, re-pin TFLM to a commit whose cmsis_nn_download.sh matches.
+
+How this tree was produced
+--------------------------
+  git clone https://github.com/tensorflow/tflite-micro
+  git checkout b15beb9d49e5830ce66666c90d353939aa8e0d4f
+  python tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py \
+      <out> -e hello_world \
+      --makefile_options="OPTIMIZED_KERNEL_DIR=cmsis_nn"
+
+create_tflm_tree.py flattens only the sources/headers needed for the TFLM
+library (with the cmsis_nn kernel variants substituted for the reference ones)
+plus its third-party header dependencies.
+
+Contents imported
+-----------------
+  tensorflow/        TFLM core runtime + kernels (incl. kernels/cmsis_nn/*.cc)
+  signal/            TFLM signal library (RFFT/IRFFT/window/...). Required: the
+                     base kernels/micro_ops.h #includes signal/micro/kernels
+                     headers, so signal is not optional even for models that do
+                     not use it.
+  third_party/flatbuffers/include   FlatBuffers headers (v23.5.26)  - schema
+  third_party/gemmlowp              gemmlowp fixedpoint headers      - quant math
+  third_party/ruy                   ruy profiler headers (header-only)
+  third_party/kissfft               kiss_fft.c/kiss_fftr.c (+headers) - the
+                     signal kiss_fft wrappers #include the .c directly (unity
+                     build), so they are NOT compiled as standalone TUs.
+  LICENSE            Apache-2.0 license text
+  CMakeLists.txt     Rafael build wiring (this SDK; see below)
+
+Deliberately NOT imported (reused / not needed)
+-----------------------------------------------
+  third_party/cmsis, third_party/cmsis_nn : reuse components/platform/common
+        CMSIS-Core and CMSIS-NN v7.0.0 instead of a second copy.
+  examples/ : the generated hello_world example app lives under
+        examples/tflm/hello_world, not inside the library.
+  Upstream build files (Makefile/*.inc, BUILD/BUILD.bazel/*.bzl, *_test.cc,
+        *_benchmark.cc, test_helpers*, testdata/) were removed; the library is
+        built by thirdparty/tflite-micro/CMakeLists.txt via CONFIG_TFLM.
+
+Build notes
+-----------
+- C++17, static memory: compiled with -std=c++17 -DTF_LITE_STATIC_MEMORY.
+- CMSIS-NN path: -DCMSIS_NN selects the cmsis_nn kernel headers; the kernels
+  include "Include/arm_nnfunctions.h", resolved by the CMSIS-NN parent dir added
+  to the include path in components/platform/common/CMakeLists.txt.
+- Only Cortex-M33 (RT584 family) is supported (CONFIG_TFLM depends on it); the
+  DSP-extension SIMD path in CMSIS-NN is selected automatically from -mcpu.
+- No custom platform port is required: the reference debug_log.cc
+  (vfprintf/vsnprintf), micro_time.cc (returns 0, profiling off) and
+  system_setup.cc (no-op) compile against nano newlib and the SDK's UART stdio.
+
+To update
+---------
+  Re-run create_tflm_tree.py at the new pinned commit (see recipe above),
+  replace tensorflow/ + third_party/ + LICENSE, keep CMakeLists.txt, and update
+  this file. Keep the CMSIS-NN alignment invariant described above.

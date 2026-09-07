@@ -68,7 +68,7 @@
       "servertype": "jlink",
       "device": "Cortex-M33",
       "interface": "swd",
-      "serverpath": "JLinkGDBServerCL.exe"
+      "serverpath": "JLinkGDBServerCL.exe",
       "serverArgs": [
         "-singlerun",
         "-if", "SWD",
