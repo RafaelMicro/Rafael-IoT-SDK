@@ -86,6 +86,7 @@ typedef struct __attribute__((packed)) uart_io {
     uint16_t end;
 
     uint32_t recvLen;
+    uint8_t overflow;
     uint8_t uart_cache[UART_HANDLER_RX_CACHE_SIZE];
 } uart_io_t;
 
@@ -105,64 +106,51 @@ static uint8_t g_uart_buffer[MAX_UART_BUFFER_SIZE];
 //=============================================================================
 
 static int uart_handler_rx_cb(void* p_arg) {
-    uint32_t len = 0;
-    if (g_uart_rx_io.start >= g_uart_rx_io.end) {
-        g_uart_rx_io.start += hosal_uart_receive(
-            p_arg, g_uart_rx_io.uart_cache + g_uart_rx_io.start,
-            UART_HANDLER_RX_CACHE_SIZE - g_uart_rx_io.start - 1);
-        if (g_uart_rx_io.start == (UART_HANDLER_RX_CACHE_SIZE - 1)) {
-            g_uart_rx_io.start = hosal_uart_receive(
-                p_arg, g_uart_rx_io.uart_cache,
-                (UART_HANDLER_RX_CACHE_SIZE + g_uart_rx_io.end - 1)
-                    % UART_HANDLER_RX_CACHE_SIZE);
-        }
-    } else if (((g_uart_rx_io.start + 1) % UART_HANDLER_RX_CACHE_SIZE)
-               != g_uart_rx_io.end) {
-        g_uart_rx_io.start += hosal_uart_receive(
-            p_arg, g_uart_rx_io.uart_cache,
-            g_uart_rx_io.end - g_uart_rx_io.start - 1);
+    uint8_t discard;
+
+    /* the cache is linear: uart_handler_data_read() empties it on every read */
+    g_uart_rx_io.start += hosal_uart_receive(
+        p_arg, g_uart_rx_io.uart_cache + g_uart_rx_io.start,
+        UART_HANDLER_RX_CACHE_SIZE - g_uart_rx_io.start);
+
+    /* cache full: drain the FIFO so the RX interrupt clears. The lost bytes
+     * fail the frame checksum and the host retransmits. */
+    while (hosal_uart_receive(p_arg, &discard, 1)) {
+        g_uart_rx_io.overflow = 1;
     }
 
-    if (g_uart_rx_io.start != g_uart_rx_io.end) {
-
-        len = (g_uart_rx_io.start + UART_HANDLER_RX_CACHE_SIZE
-               - g_uart_rx_io.end)
-              % UART_HANDLER_RX_CACHE_SIZE;
-        if (g_uart_rx_io.recvLen != len) {
-            g_uart_rx_io.recvLen = len;
-        }
-    }
+    g_uart_rx_io.recvLen = g_uart_rx_io.start;
     return 0;
 }
 
 static int uart_handler_data_read(uint8_t* p_data) {
     uint32_t byte_cnt = 0;
+    uint8_t overflow;
     enter_critical_section();
 
-    if (g_uart_rx_io.start != g_uart_rx_io.end) {
-        if (g_uart_rx_io.start > g_uart_rx_io.end) {
-            memcpy(p_data, g_uart_rx_io.uart_cache + g_uart_rx_io.end,
-                   g_uart_rx_io.start - g_uart_rx_io.end);
-            g_uart_rx_io.end = g_uart_rx_io.start;
-        } else {
-            memcpy(p_data, g_uart_rx_io.uart_cache + g_uart_rx_io.end,
-                   UART_HANDLER_RX_CACHE_SIZE - g_uart_rx_io.end);
-            g_uart_rx_io.end = UART_HANDLER_RX_CACHE_SIZE - 1;
-            if (g_uart_rx_io.start) {
-                memcpy(p_data, g_uart_rx_io.uart_cache, g_uart_rx_io.start);
-                g_uart_rx_io.end = (UART_HANDLER_RX_CACHE_SIZE
-                                    + g_uart_rx_io.start - 1)
-                                   % UART_HANDLER_RX_CACHE_SIZE;
-            }
-        }
-    }
-
     byte_cnt = g_uart_rx_io.recvLen;
+    memcpy(p_data, g_uart_rx_io.uart_cache, byte_cnt);
+    overflow = g_uart_rx_io.overflow;
 
     g_uart_rx_io.start = g_uart_rx_io.end = 0;
     g_uart_rx_io.recvLen = 0;
+    g_uart_rx_io.overflow = 0;
     leave_critical_section();
+
+    if (overflow) {
+        log_warn("uart rx cache overflow, data dropped");
+    }
     return byte_cnt;
+}
+
+static void uart_handler_drop(uint16_t* total_len, uint16_t len) {
+    if (len > *total_len) {
+        len = *total_len;
+    }
+    *total_len -= len;
+    if (*total_len > 0) {
+        memmove(g_uart_buffer, g_uart_buffer + len, *total_len);
+    }
 }
 
 static void uart_handler_task(void* pvParameters) {
@@ -173,6 +161,7 @@ static void uart_handler_task(void* pvParameters) {
     uint16_t uart_len = 0;
     uint16_t data_len = 0;
     uint8_t i = 0;
+    uint8_t progress;
 
     while (1) {
         uart_len = uart_handler_data_read(temp_buffer);
@@ -181,39 +170,48 @@ static void uart_handler_task(void* pvParameters) {
             continue;
         }
         // log_info_hexdump("UART", temp_buffer, uart_len);
+        if (total_len + uart_len > MAX_UART_BUFFER_SIZE) {
+            /* no complete frame in a full buffer: it is garbage */
+            log_warn("uart buffer full, drop %d bytes", total_len);
+            total_len = 0;
+        }
         memcpy(g_uart_buffer + total_len, temp_buffer, uart_len);
         total_len += uart_len;
 
-        for (i = 0; i < UART_HANDLER_PARSER_CB_NUM; i++) {
-            if (uart_handler_param.parser_cb[i] == NULL) {
-                continue;
-            }
-
-            status = uart_handler_param.parser_cb[i](g_uart_buffer, total_len,
-                                                     &data_len, &offset);
-            if (status == UART_HANDLER_PARSER_VALID
-                || status == UART_HANDLER_PARSER_VALID_CRC_OK) {
-                if (uart_handler_param.rx_cb[i] == NULL) {
+        /* keep parsing until no parser can consume anything more */
+        do {
+            progress = 0;
+            for (i = 0; i < UART_HANDLER_PARSER_CB_NUM; i++) {
+                if (uart_handler_param.parser_cb[i] == NULL) {
                     continue;
                 }
 
-                uart_handler_param.rx_cb[i](g_uart_buffer + offset, data_len);
+                status = uart_handler_param.parser_cb[i](
+                    g_uart_buffer, total_len, &data_len, &offset);
+                if (status == UART_HANDLER_PARSER_VALID
+                    || status == UART_HANDLER_PARSER_VALID_CRC_OK) {
+                    if (uart_handler_param.rx_cb[i] == NULL) {
+                        continue;
+                    }
 
-                if (status == UART_HANDLER_PARSER_VALID_CRC_OK) {
-                    total_len -= (data_len + offset);
-                } else {
-                    total_len -= data_len;
+                    uart_handler_param.rx_cb[i](g_uart_buffer + offset,
+                                                data_len);
+
+                    if (status == UART_HANDLER_PARSER_VALID_CRC_OK) {
+                        uart_handler_drop(&total_len, data_len + offset);
+                    } else {
+                        uart_handler_drop(&total_len, data_len);
+                    }
+                    progress = 1;
+                    break;
+                } else if (status == UART_HANDLER_PARSER_INVALID_CRC_ERR) {
+                    /* skip only this header, a valid frame may follow it */
+                    uart_handler_drop(&total_len, offset + 1);
+                    progress = 1;
+                    break;
                 }
-                if (total_len > 0) {
-                    memmove(g_uart_buffer, g_uart_buffer + data_len + offset,
-                            total_len);
-                }
-                break;
-            } else if (status == UART_HANDLER_PARSER_INVALID_CRC_ERR) {
-                total_len = 0;
-                break;
             }
-        }
+        } while (progress && total_len > 0);
     }
 }
 

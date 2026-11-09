@@ -23,16 +23,20 @@ Commands and events share the same little-endian frame:
 
 | Header | Length | Command ID | Sub-Header | Parameter | Checksum |
 |---|---|---|---|---|---|
-| 4 octets | 1 octet | 4 octets | n octets | n octets | 1 octet |
+| 4 octets | 2 octets | 4 octets | n octets | n octets | 1 octet |
 
 - **Header** — 4 bytes: `0xFF 0xFC 0xFC 0xFF`. Unlike the sibling ESL AP protocol (which uses a
   distinct header for events), this gateway protocol uses the **same** header magic for both
   host→gateway commands and gateway→host events/status — confirmed via source
   (`ble_mesh_gateway_cmd_send()` is the single function used for both outbound command
   acknowledgements and unsolicited event forwarding).
-- **Length** — 1 octet (`uint8_t`). The sum of the Command ID, Sub-Header, and Parameter field
-  lengths (i.e. everything between Length and Checksum). Confirmed genuinely 1 octet via source
-  (`gateway_cmd_hdr.len`, `uart_handler.c`).
+- **Length** — 2 octets (`uint16_t`, little-endian). The sum of the Command ID, Sub-Header, and
+  Parameter field lengths (i.e. everything between Length and Checksum). Widened from the
+  original 1-byte field (which capped the whole body at 255 bytes) to allow full-size
+  Transparent Transport Set/Status parameters — the mesh access layer permits up to ~377 bytes of
+  Parameter data, which a 1-byte Length field could never represent. Confirmed via source
+  (`gateway_cmd_hdr.len`, `uart_handler.c` — `MAX_UART_BUFFER_SIZE` was widened alongside it, from
+  256 to 512, so the RX accumulation buffer can hold a full-size frame).
 - **Command ID** — 4 octets, one of:
 
   | Command ID | Description |
@@ -64,9 +68,9 @@ Commands and events share the same little-endian frame:
 - **App key index** — 2 octets.
 - **Parameter** — variable length, defined per command below.
 - **Checksum** — 1 byte: bitwise NOT of the sum of every byte from Length through the end of
-  Parameter (header excluded): `checksum = ~(length + command_id[0..3] + sub_header[...] + parameter[0] + ... + parameter[n-1])`.
+  Parameter (header excluded): `checksum = ~(length[0..1] + command_id[0..3] + sub_header[...] + parameter[0] + ... + parameter[n-1])`.
   Confirmed via source (`_gateway_checksum_calc()`, computed over `&hdr->len` through
-  `hdr->len + 1` bytes).
+  `hdr->len + 2` bytes — the `+2` accounts for the 2-byte Length field itself).
 
 ## 4. Supplemental Parameter Requirements
 

@@ -1,1 +1,1 @@
-sdk_add_include_directories(config/rt584)
+sdk_set_freertos_config_directory(config/rt584)

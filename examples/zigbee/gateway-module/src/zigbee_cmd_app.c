@@ -1337,13 +1337,18 @@ void zigbee_gw_cmd_proc(uint8_t* pBuf, uint16_t len) {
     pt_hd = (gateway_cmd_hdr*)&pBuf[0];
     pt_pd = (gateway_cmd_pd*)&pBuf[5];
 
+    if (pt_hd->len < sizeof(gateway_cmd_pd)) {
+        return;
+    }
+
     if ((pt_pd->command_id < ZIGBEE_CMD_FINISH)) {
         zigbee_cmd_request(pt_pd->address, pt_pd->command_id, (pt_hd->len - 7),
                            pt_pd->parameter);
     } else {
         if (pt_pd->command_id >= GW_CMD_OTA_START && pt_pd->command_id < GW_CMD_OTA_END)
         {
-            _gw_ota_cmd_handle(pt_pd->command_id, pt_pd->parameter);
+            _gw_ota_cmd_handle(pt_pd->command_id, pt_pd->parameter,
+                               pt_hd->len - sizeof(gateway_cmd_pd));
         } else {
             _gw_app_cmd_service_handle(pt_pd->command_id, pBuf);
         }
@@ -1365,16 +1370,17 @@ static uart_handler_parser_status_t zigbee_gw_cmd_parser(uint8_t* pBuf,
             break;
         }
 
-        for (i = 0; i < len; i++) {
+        for (i = 0; i + 3 < len; i++) {
             if ((pBuf[i] == 0xFF) && (pBuf[i + 1] == 0xFC)
                 && (pBuf[i + 2] == 0xFC) && (pBuf[i + 3] == 0xFF)) {
-
-                if (poffset) {
-                    idx = i;
-                }
+                idx = i;
                 find = 1;
                 break;
             }
+        }
+
+        if (!find) {
+            break;
         }
 
         if ((len - idx) < (sizeof(gateway_cmd_hdr) + sizeof(gateway_cmd_end))) {
@@ -1395,6 +1401,8 @@ static uart_handler_parser_status_t zigbee_gw_cmd_parser(uint8_t* pBuf,
         if (cs != pt_end->cs) {
             status = UART_HANDLER_PARSER_INVALID_CRC_ERR;
             log_error("checksum error:0x%02x, correct:0x%02x", pt_end->cs, cs);
+            /* caller drops up to and including this header byte, then resyncs */
+            *poffset = idx;
             break;
         } else {
             status = UART_HANDLER_PARSER_VALID_CRC_OK;

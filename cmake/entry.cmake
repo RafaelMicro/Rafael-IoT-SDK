@@ -20,9 +20,15 @@ set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
 
 add_library(sdk_intf_lib INTERFACE)
 
+# Include paths only. Split out of sdk_intf_lib so a library can opt out of
+# the global include pool (sdk_library_strict_includes()) while still
+# getting every CONFIG_* compile definition and compile/link option, which
+# stay on sdk_intf_lib. See docs/internal/adr/0001-additive-only-sdk-dsl.md.
+add_library(sdk_intf_includes INTERFACE)
+
 include(${CMAKE_CURRENT_LIST_DIR}/extension.cmake)
 sdk_ifndef(CUSTOM_CONFIG_DIR ".config")
-config_parse(${CMAKE_SOURCE_DIR}/${CUSTOM_CONFIG_DIR})
+config_parse("${CMAKE_SOURCE_DIR}/${CUSTOM_CONFIG_DIR}")
 
 include(${CMAKE_CURRENT_LIST_DIR}/toolchain.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/compiler_flags.cmake)

@@ -3,7 +3,16 @@ if((${CONFIG_CHIP} STREQUAL "RT581")
    OR (${CONFIG_CHIP} STREQUAL "RT582")
    OR (${CONFIG_CHIP} STREQUAL "RT583"))
 sdk_generate_library(rt582_freertos)
+add_library(sdk::freertos ALIAS rt582_freertos)
 sdk_add_include_directories(
+    portable/GCC/ARM_CM3/
+    Include
+)
+sdk_library_add_public_include_directories(
+    portable/GCC/ARM_CM3/
+    Include
+)
+sdk_add_private_include_directories(
     portable/GCC/ARM_CM3/
     Include
 )
@@ -19,6 +28,12 @@ sdk_library_add_sources(
     portable/MemMang/heap_5.c
 )
 
+# Continuing the library-boundary rework (docs/internal/architecture/lib-dependencies.md).
+# FreeRTOSConfig.h (attached PUBLIC once known, setup_project() in
+# cmake/extension.cmake) itself #includes "mcu.h" -- same chain as log/libc.
+sdk_library_depends_on(sdk::soc_driver)
+sdk_library_strict_includes()
+
 elseif(
   (${CONFIG_CHIP} STREQUAL "RF1301")
   OR (${CONFIG_CHIP} STREQUAL "RT584H")
@@ -26,6 +41,7 @@ elseif(
   OR (${CONFIG_CHIP} STREQUAL "RT584L"))
 
     sdk_generate_library(rt584_freertos)
+    add_library(sdk::freertos ALIAS rt584_freertos)
 
     sdk_library_add_sources(
         croutine.c
@@ -59,6 +75,12 @@ elseif(
     sdk_add_include_directories(
         Include
     )
+    sdk_library_add_public_include_directories(
+        Include
+    )
+    sdk_add_private_include_directories(
+        Include
+    )
 
     if((${CONFIG_TRUST_ZONE} STREQUAL "TRUST_ZONE_SECURE"))
         sdk_add_include_directories(
@@ -66,10 +88,28 @@ elseif(
         #portable/GCC/ARM_CM33/non_secure
         portable/GCC/ARM_CM33_NTZ/non_secure
     )
+        sdk_library_add_public_include_directories(
+        portable/GCC/ARM_CM33_NTZ/non_secure
+    )
+        sdk_add_private_include_directories(
+        portable/GCC/ARM_CM33_NTZ/non_secure
+    )
     elseif((${CONFIG_TRUST_ZONE} STREQUAL "TRUST_ZONE_NONSECURE"))
         sdk_add_include_directories(
         portable/GCC/ARM_CM33/non_secure
     )
+        sdk_library_add_public_include_directories(
+        portable/GCC/ARM_CM33/non_secure
+    )
+        sdk_add_private_include_directories(
+        portable/GCC/ARM_CM33/non_secure
+    )
     endif()
-    
+
+    # Continuing the library-boundary rework (docs/internal/architecture/lib-dependencies.md).
+    # FreeRTOSConfig.h (attached PUBLIC once known, setup_project() in
+    # cmake/extension.cmake) itself #includes "mcu.h" -- same chain as log/libc.
+    sdk_library_depends_on(sdk::soc_driver)
+    sdk_library_strict_includes()
+
 endif()

@@ -62,6 +62,42 @@ identical every time.
 > [`app_ota.h`](../../../examples/sub-g/mesh-it-up/miu-common/include/app_ota.h);
 > they ship with sensible defaults.
 
+### 1.3 Signed images (optional)
+
+A device with an ECDSA-P256 public key burnt into it will only run firmware
+carrying a matching signature. Devices without a key still accept unsigned
+images, so signing is opt-in.
+
+**The keypair is generated in the IOT Evaluation Tool**, on its "FOTA update
+tool" page — not here. Type a filename and click **Generate** once for the
+private key and once for the public key; both land next to
+`IoT_EVALUATION_TOOL.exe`.
+
+<div align="center">
+<img src="picture/iot-eval-fota-tool.jpg" width="500" alt="IOT Evaluation Tool FOTA page">
+
+<em>Figure 1: Generating the keypair in the IOT Evaluation Tool. Only the two
+<strong>Generate</strong> buttons are needed for Sub-G — Output, Signature,
+Compress and "Output bin For ISP Tool" belong to the ISP/BLE flow.</em>
+</div>
+
+This tool only **loads** `private.pem` to sign with; it never generates a key,
+and burning the public key into a device is done with the Security Boot Tool.
+
+To sign, pick the key in the **Signing key** row of the **OTA Download** tab
+(Figure 3):
+
+- **Browse...** — choose `private.pem`. Picking a public key by mistake is
+  rejected with an explanation.
+- **Clear** — back to an unsigned image.
+- No key set shows `None -- image will be UNSIGNED`.
+
+The **FOTA image** box then reports the result on its `Signing:` line — either
+`UNSIGNED` or `signed, stage-1 verify size N`. Check that line before sending.
+
+The tool then verifies the image exactly the way the bootloader will. **If that
+fails, nothing is built and nothing is sent.**
+
 ---
 
 ## 2. UART Firmware Download (PC → Leader)
@@ -84,7 +120,7 @@ not type any CLI commands during the transfer.
 <div align="center">
 <img src="picture/ota-tool-connection.jpg" width="600" alt="Tool Connection">
 
-<em>Figure 1: Serial port configuration</em>
+<em>Figure 2: Serial port configuration</em>
 </div>
 
 **Step 2 — Select firmware**
@@ -92,12 +128,13 @@ not type any CLI commands during the transfer.
 1. Click **Browse...** and select the compiled binary (`miu-ftd.bin`,
    `miu-mtd.bin`, etc.).
 2. The tool automatically reads the firmware version and bin_type, compresses
-   the image, and adds the FOTA header.
+   the image, and adds the FOTA header. If a signing key is configured
+   (see 1.3) it also signs the image and self-checks it before sending.
 
 <div align="center">
 <img src="picture/ota-tool-load-file.jpg" width="450" alt="File Selection">
 
-<em>Figure 2: Selecting the firmware binary</em>
+<em>Figure 3: Selecting the firmware binary and the signing key</em>
 </div>
 
 **Step 3 — Start download**
@@ -109,7 +146,7 @@ not type any CLI commands during the transfer.
 <div align="center">
 <img src="picture/ota-tool-progress.jpg" width="600" alt="Download Progress">
 
-<em>Figure 3: Download in progress</em>
+<em>Figure 4: Download in progress</em>
 </div>
 
 **Step 4 — Verify**
@@ -135,7 +172,7 @@ re-read it.
 <div align="center">
 <img src="picture/ota-tool-flash-info.jpg" width="600" alt="OTA Flash Image bar">
 
-<em>Figure 4: OTA Flash Image bar showing the stored version and bin_type</em>
+<em>Figure 5: OTA Flash Image bar showing the stored version and bin_type</em>
 </div>
 
 ---
@@ -180,7 +217,7 @@ Open the **Network OTA** tab and connect to the Leader node.
 <div align="center">
 <img src="picture/ota-tool-network-ota-overview.jpg" width="700" alt="Network OTA Tab Overview">
 
-<em>Figure 5: Network OTA tab — controls (left), live device table (right)</em>
+<em>Figure 6: Network OTA tab — controls (left), live device table (right)</em>
 </div>
 
 **Step 1 — Confirm the image on the Leader**
@@ -216,7 +253,7 @@ on the new version.
 <div align="center">
 <img src="picture/ota-tool-network-ota-table.jpg" width="700" alt="Network OTA device table">
 
-<em>Figure 6: Live device table during a network OTA</em>
+<em>Figure 7: Live device table during a network OTA</em>
 </div>
 
 > Use **⟳ Poll Now** to force an immediate table refresh, and **🕒 Timeline
@@ -233,7 +270,7 @@ If a few nodes are still not `Done` after the network settles:
 3. Click **→ Unicast: Selected**.
 
 Both the **Stop OTA** and **→ Unicast: Selected** buttons are visible in the
-controls panel (see Figure 5) — no extra screen is needed for this step.
+controls panel (see Figure 6) — no extra screen is needed for this step.
 
 The tool updates those nodes one at a time over unicast until they finish. The
 button turns into **■ Stop Unicast** while running.
@@ -345,7 +382,7 @@ Before transmission the tool builds a FOTA image from the raw firmware binary:
 | crc32 | 4 bytes | CRC32 of the compressed payload (big-endian) |
 | start_address | 4 bytes | `00 00 00 00` (reserved) |
 | end_address | 4 bytes | Compressed payload size in bytes (big-endian) |
-| reserved | 4 bytes | `00 00 00 00` |
+| signature_len | 4 bytes | Length of the compressed payload that the signature covers (big-endian). `00 00 00 00` for an unsigned image; see 1.3 |
 | payload | N bytes | LZMA-compressed firmware (FORMAT_ALONE, dict=64KB, lc=3, lp=0, pb=2) |
 
 ## Appendix C — Network OTA Protocol (Thread mesh side)

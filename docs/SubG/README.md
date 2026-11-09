@@ -19,6 +19,12 @@ examples/sub-g/
 
 ---
 
+## 📄 API Reference
+
+- [RT58x RF Sub-G User Guide](RT58x_RF_SubG_User_Guide.md) — SubG API usage (V1.2), plus an old-to-new API mapping table.
+
+---
+
 ## 🔍 Example Descriptions
 
 | Example Directory         | Description                                                                 | More Info |

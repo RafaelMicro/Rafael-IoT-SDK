@@ -14,6 +14,8 @@
 #include "app_hooks.h"
 #include "uart_stdio.h"
 #include "dump_boot_info.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 
 struct spake2p_fe_mul_tv {
@@ -2040,7 +2042,12 @@ void becp_print_hex_bytes( const uint8_t* data, uint32_t size) {
 }
 
 
-int main(void) {
+#define APP_MAIN_TASK_STACK_SIZE 1024
+
+static TaskHandle_t app_main_task_handle;
+
+static void app_main_task(void* parameters_ptr) {
+    (void)parameters_ptr;
 
     uint32_t              i;
 
@@ -2062,8 +2069,6 @@ int main(void) {
     ECPoint_P256   Public_key, Public_key2, Result_point ;
 
 
-    uart_stdio_init();
-    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);
@@ -2285,7 +2290,24 @@ int main(void) {
     printf("\r\n\r\n");
     printf("Examples    : hosal crypto SPAKE2+ MISC finish \r\n");
     
-    while (1);
+    while (1) {
+        vTaskDelay(5000);
+    }
+}
+
+int main(void) {
+    uart_stdio_init();
+    vHeapRegionsInt();
+    _dump_boot_info();
+
+    if (xTaskCreate(app_main_task, (char*)"app_main", APP_MAIN_TASK_STACK_SIZE,
+                    NULL, E_TASK_PRIORITY_NORMAL, &app_main_task_handle)
+        != pdPASS) {
+        printf("app_main task create fail....\r\n");
+    }
+
+    vTaskStartScheduler();
+    while (1) {}
 }
 
 

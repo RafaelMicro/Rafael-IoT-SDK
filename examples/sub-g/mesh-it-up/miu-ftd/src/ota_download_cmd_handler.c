@@ -159,6 +159,9 @@ static void ota_download_handle(uint32_t cmd_id, uint8_t* pBuf) {
     static uint32_t page_buf_u32[64]; /* 4-byte aligned for DMA */
     uint8_t* const page_buf = (uint8_t*)page_buf_u32;
     static uint32_t buf_len = 0;
+    static uint32_t file_off = 0;
+    static uint32_t read_buf_u32[64];
+    static uint8_t hdr_ok = 0;
 
     uint32_t crc32 = 0;
     ota_img_info_t* upg_data;
@@ -192,8 +195,12 @@ static void ota_download_handle(uint32_t cmd_id, uint8_t* pBuf) {
 
                 // Reset buffer length and set default flash erased state (0xFF)
                 buf_len = 0;
+                file_off = 0;
+                hdr_ok = 0;
                 memset(page_buf, 0xFF, 256);
-                flash_addr = FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB;
+                /* The 0x20 file header is stored in the last sector of the
+                 * bank; the payload then starts at the 4K-aligned bank base. */
+                flash_addr = OTA_IMG_HEADER_FLASH_ADDR;
             }
 
             log_info("block %d / %d", upg_data->cur_pkt,
@@ -209,22 +216,42 @@ static void ota_download_handle(uint32_t cmd_id, uint8_t* pBuf) {
                 if (copy_len > remain_pkt_len) {
                     copy_len = remain_pkt_len;
                 }
+                /* Never copy across the end of the file header: it is
+                 * stored in a different sector from the payload. */
+                if (file_off < OTA_IMG_FILE_HEADER_SIZE
+                    && copy_len > (OTA_IMG_FILE_HEADER_SIZE - file_off)) {
+                    copy_len = OTA_IMG_FILE_HEADER_SIZE - file_off;
+                }
 
                 // Copy data to the buffer
                 memcpy(&page_buf[buf_len], p_pkt_data, copy_len);
                 buf_len += copy_len;
                 p_pkt_data += copy_len;
                 remain_pkt_len -= copy_len;
+                file_off += copy_len;
 
-                // Once the buffer is full (256 bytes), write it to flash immediately
-                if (buf_len == 256) {
+                // Once the buffer is full (256 bytes), or the header is
+                // complete, write it out; the header page is followed by a
+                // jump back to the bank base where the payload begins
+                if (buf_len == 256 || file_off == OTA_IMG_FILE_HEADER_SIZE) {
                     while (flash_check_busy())
                         ;
                     flash_write_page((uint32_t)page_buf, flash_addr);
                     while (flash_check_busy())
                         ;
                     flush_cache();
-                    flash_addr += 256;
+                    if (file_off == OTA_IMG_FILE_HEADER_SIZE) {
+                        // Probe: was the header ever good on flash?
+                        hosal_flash_read(HOSAL_FLASH_READ_PAGE,
+                                         OTA_IMG_HEADER_FLASH_ADDR,
+                                         (uint8_t*)read_buf_u32);
+                        hdr_ok = ((SWAP_UINT32(read_buf_u32[6])
+                                   + OTA_IMG_FILE_HEADER_SIZE)
+                                  == gt_img_info.image_size);
+                    }
+                    flash_addr = (file_off == OTA_IMG_FILE_HEADER_SIZE)
+                                     ? OTA_FLASH_START
+                                     : (flash_addr + 256);
 
                     // Reset the buffer and fill with 0xFF for the next chunk
                     buf_len = 0;
@@ -248,24 +275,23 @@ static void ota_download_handle(uint32_t cmd_id, uint8_t* pBuf) {
                     ;
 
                 // Verify the downloaded image via CRC check (4-byte aligned for DMA)
-                static uint32_t read_buf_u32[64];
                 uint8_t* read_buf = (uint8_t*)read_buf_u32;
                 hosal_flash_read(HOSAL_FLASH_READ_PAGE,
-                                 FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB,
-                                 read_buf);
+                                 OTA_IMG_HEADER_FLASH_ADDR, read_buf);
 
                 uint32_t img_size = SWAP_UINT32(*(uint32_t*)(read_buf + 24))
-                                    + 0x20;
+                                    + OTA_IMG_FILE_HEADER_SIZE;
                 uint32_t img_ver = SWAP_UINT32(*(uint32_t*)read_buf);
                 uint32_t img_crc = SWAP_UINT32(*(uint32_t*)(read_buf + 16));
 
                 if (img_size == gt_img_info.image_size) {
                     crc32 = crc32checksum(
-                        (FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB + 0x20),
-                        (img_size - 0x20));
+                        (OTA_FLASH_START),
+                        (img_size - OTA_IMG_FILE_HEADER_SIZE));
                 } else {
-                    // Size mismatch error
-                    status = 0xFFFFFFED;
+                    // E1 = header never made it to flash,
+                    // E2 = header was good at write time, lost since.
+                    status = hdr_ok ? 0xFFFFFFE2 : 0xFFFFFFE1;
                     break; // Exit do-while loop
                 }
 

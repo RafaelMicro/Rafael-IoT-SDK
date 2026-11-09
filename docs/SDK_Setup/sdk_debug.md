@@ -1,69 +1,38 @@
-# Debug
-### 
+# VS Code Debug Reference
 
-## 1. VS Code Debug Mode
-- Choose the VS Code Debug Icon  
-  <img src="../SDK_Setup/picture/debug/DebugIcon.jpg" alt="drawing" style="width:200px  height=200"/>  
-- Enter Debug Mode Succes  
-  <img src="../SDK_Setup/picture/debug/EnterDebugMode.jpg" alt="drawing" style="width:200px  height=200"/>
-  
-## 2. VS Code Debug Tool Bar
+To start a debug session, use the Rafael extension. See
+[Rafael Extension, "Debug"](sdk_extension.md#debug). This page lists the debug toolbar buttons
+and panels that appear when a session is running.
 
-- <img src="../SDK_Setup/picture/debug/Debugtoolbar.jpg" alt="drawing" style="width:200px  height=200"/>
-        
-  <img src="../SDK_Setup/picture/debug/toolbarreset.jpg" alt="drawing" style="width:200px  height=200"/>**Reset Device**    : 	Reset program execution
-    
-   <img src="../SDK_Setup/picture/debug/toolbarcontinue.jpg" alt="drawing" style="width:200px  height=200"/>  **Continue**        :	Continue program execution  
-     - Shortcuts : F5  
-  
-  <img src="../SDK_Setup/picture/debug/toolbarstepover.jpg" alt="drawing" style="width:200px  height=200"/>  **Step Over**       : Skip the current function and move to the next line  
-     - Shortcuts : F10 
+## Debug toolbar
 
-  <img src="../SDK_Setup/picture/debug/toolbarstepinfo.jpg" alt="drawing" style="width:200px  height=200"/>  **Step Into**       : 	Step into the function for line-by-line execution  
-     - Shortcuts : F11 
+| Button | Function | Shortcut |
+|---|---|---|
+| Reset Device | Reset program execution | |
+| Continue | Continue program execution | F5 |
+| Step Over | Run the current line, then stop at the next line in this function | F10 |
+| Step Into | Step into the called function, one line at a time | F11 |
+| Step Out | Run until the current function returns | Shift+F11 |
+| Restart | Restart the debug session | Ctrl+Shift+F5 |
+| Stop | Stop the debug session | Shift+F5 |
 
-  <img src="../SDK_Setup/picture/debug/toolbarstepout.jpg" alt="drawing" style="width:200px  height=200"/>  **Step Out**        : Step out of the current function   
-     - Shortcuts : Shift+F11
+## Debug panels
 
-  <img src="../SDK_Setup/picture/debug/toolbarrestart.jpg" alt="drawing" style="width:200px  height=200"/>  **Restart**         : Restart the debugging session   
-     - Shortcuts : Ctrl+Shift+F5
+- **Variables** — shows the current variable values in scope. You can inspect or change them
+  while the program runs.
+- **Watch** — tracks the values of variables or expressions you select.
+- **Call Stack** — shows the sequence of active function calls.
+- **Breakpoints** — lists all breakpoints. You can enable or disable each one.
+- **XPeripherals** — shows the values of MCU peripheral registers, by name. It reads the
+  register names from the chip's SVD file.
+- **Debug Console** — an interactive console for debugger commands and program output.
 
-  <img src="../SDK_Setup/picture/debug/toolbarstop.jpg" alt="drawing" style="width:200px  height=200"/>  **Stop**            : Sotp Debug  
-     - Shortcuts : Shift+F5
+## Optional extras
 
-## 3. VS Code Debug Panels
+These extras are not required.
 
-  <img src="../SDK_Setup/picture/debug/debugpanel.jpg" alt="drawing" style="width:200px  height=200"/>  
-
-- **Variables Panel**  
-  Shows current variable values in scope. Inspect or modify them during runtime.  
-      - <img src="../SDK_Setup/picture/debug/variablepanel.jpg" alt="drawing" style="width:200px  height=200"/>  
-
-- **Watch Panel**  
-  Track specific variables or expressions continuously.  
-      -  <img src="../SDK_Setup/picture/debug/watchpanel.jpg" alt="drawing" style="width:200px  height=200"/>
-
-- **Call Stack Panel**  
-  Displays the sequence of active function calls.  
-      -  <img src="../SDK_Setup/picture/debug/callstackpanel.jpg" alt="drawing" style="width:200px  height=200"/>  
-
-- **Breakpoints Panel**  
-  Lists and manages all active breakpoints.
-      -  <img src="../SDK_Setup/picture/debug/breakpointspanel.jpg" alt="drawing" style="width:200px  height=200"/>  
-  
-- **XPeripherals Panel**  
-  Lists and manages all active breakpoints.  
-      -  <img src="../SDK_Setup/picture/debug/Peripheralpane.jpg" alt="drawing" style="width:200px  height=200"/>  
-
-- **Debug Console**  
-  Interactive console for commands and program output.  
-      -  <img src="../SDK_Setup/picture/debug/debugconsole.jpg" alt="drawing" style="width:200px  height=200"/>
-  
-- **Memory View**  
-Displays memory contents at selected addresses. Requires **Memory View** extension: `mcu-debug.memory-view`.  
-      -  <img src="../SDK_Setup/picture/debug/memoryview.jpg" alt="drawing" style="width:200px  height=200"/>
-  
-- **Serial Monitor**  
-  View and send data through serial ports. Requires **Serial Monitor** extension: `ms-vscode.vscode-serial-monitor`.
-      -  <img src="../SDK_Setup/picture/debug/serialmonitor.jpg" alt="drawing" style="width:200px  height=200"/>
-  
+- **Memory View** — a hex memory viewer. Use this if you want more than the Debug Console's
+  `-exec x/10x <addr>` command. It needs the separate `mcu-debug.memory-view` extension.
+- For the serial console, use the Rafael extension's own **Serial Monitor**. See
+  [Rafael Extension, "Serial Monitor"](sdk_extension.md#serial-monitor). This does not need a
+  separate extension.

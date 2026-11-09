@@ -27,7 +27,7 @@ see `FOTA_UPDATE_BANK_INFO_ADDRESS`, `FOTA_UPDATE_BUFFER_FW_ADDRESS`, `SIZE_OF_F
 
 A complete FOTA update involves four tools/actors:
 
-1. **KEIL/GCC** builds the new FW as a plain `.bin` file.
+1. The new FW is built as a plain `.bin` file.
 2. **PC tool** combines the new FW binary with system-information/address metadata into a FOTA
    bin file.
 3. **Smart phone** app loads the FOTA bin file, parses out the system information and new FW,
@@ -36,7 +36,7 @@ A complete FOTA update involves four tools/actors:
    the update, then streams the new FW over the connection.
 
 ```
-KEIL/GCC        PC tool                    Smart phone                BLE device
+Build tool        PC tool                    Smart phone                BLE device
    |                |                            |                        |
    |-- BLE bin ---->|                            |                        |
    |         combine FW + sysinfo                |                        |
@@ -92,7 +92,7 @@ Open the IOT Evaluation Tool and click the "FOTA" icon to reach the "FOTA update
 #### 1.2.1 Normal Mode
 
 1. Set the active FW start address (default `0x8000`) — usually left unchanged.
-2. Select the `.bin` file already built by KEIL/GCC.
+2. Select the `.bin` file already built.
 3. Click "Output" to produce the FOTA bin file.
 
 Since SDK v1.3.0, it's recommended to check the "Compress(LZMA)" option.
@@ -120,17 +120,26 @@ The `bootloader.bin` file cannot have "Compress(LZMA)" checked.
 The PC tool generates 32 bytes of signing information, stored at the front of the FOTA bin file:
 
 ```
-Octet: 0               4               8               12               16
-       +---------------+---------------+---------------+----------------+
+Octet: 0               4               8               12  13           16
+       +---------------+---------------+---------------+---+------------+
        |                      BLE FW information                        |   <- PC-tool generated
-       +---------------+---------------+---------------+----------------+
-       |      CRC      |     Start     |      End      |    Reserved    |   <- PC-tool generated
-       +---------------+---------------+---------------+----------------+
+       +---------------+---------------+---------------+---+------------+
+       |      CRC      |     Start     |      End      |OTA| Signature  |   <- PC-tool generated
+       |               |               |               |inf| image len  |
+       +---------------+---------------+---------------+---+------------+
        |     Padding data (= active FW start address, default 0x8000)   |   <- PC-tool generated
        +----------------------------------------------------------------+
-       |                Updating FW (built by KEIL/GCC)                 |
+       |                      Updating FW (built)                       |
        +----------------------------------------------------------------+
 ```
+
+The last 4 bytes of the second row (offsets 28–31 of the FOTA bin file) were previously
+reserved and are now used as follows:
+
+| Offset | Size | Field | Description |
+|---|---|---|---|
+| 28 | 1 byte | OTA information | bit0 = 1: the image is compressed (LZMA).<br>bit1 = 1: the image is signed.<br>Other bits are reserved. |
+| 29–31 | 3 bytes | Signature image length | Valid only when bit1 of OTA information is 1: the length of the signed image (the data covered by the signature), stored big-endian (offset 29 = most significant byte). |
 
 #### 1.2.3 Complete Steps to Operate Security Boot Mode
 

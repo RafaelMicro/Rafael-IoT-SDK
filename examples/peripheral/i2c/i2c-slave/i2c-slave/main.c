@@ -12,7 +12,7 @@
 #include "hosal_gpio.h"
 #include "hosal_sysctrl.h"
 #include "hosal_timer.h"
-#include "hosal_i2c_master.h"
+#include "hosal_i2c_master.h" 
 #include "hosal_i2c_slave.h"
 #include "hosal_status.h"
 #include "task.h"
@@ -22,9 +22,12 @@
 
 
 /**
- * \brief           I2C Slave storage start address
+ * \brief           I2C Slave emulated storage (power of two, wraps on overflow)
  */
-#define  BASE_ADDRESS  0x30002000
+#define  I2C_SLAVE_MEM_SIZE  4096
+#define  I2C_SLAVE_MEM_MASK  (I2C_SLAVE_MEM_SIZE - 1)
+
+static uint8_t* i2c_slave_mem = NULL;
 
 /**
  * \brief           I2C Slave 
@@ -59,7 +62,7 @@
 volatile uint8_t transfer_done;
 volatile uint32_t  i2c_status;
 
-static uint8_t *operation_addr;
+static uint16_t operation_offset;
 
 static int8_t read_count = I2C_SLAVE_UNINIT;
 
@@ -131,7 +134,8 @@ void i2c_slave_user_cb(uint32_t status) {
                 hosal_i2c_slave_write_byte(0x00);
                 read_count = I2C_SLAVE_ERROR_REQUEST;
             } else {
-                hosal_i2c_slave_write_byte(*operation_addr++);
+                hosal_i2c_slave_write_byte(i2c_slave_mem[operation_offset]);
+                operation_offset = (operation_offset + 1) & I2C_SLAVE_MEM_MASK;
                 /* 
                  * because this read request does NOT require read_count anymore
                  * so we reset read_count to -1 to avoid next read request without
@@ -154,19 +158,13 @@ void i2c_slave_user_cb(uint32_t status) {
                 hosal_i2c_slave_read_byte(&i2c_register_addr_low);
                 i2c_register_addr += i2c_register_addr_low;
 
-                /* 
-                 * We should check i2c_register_addr range
-                 * if the size is too large... maybe we should return dummy data or round off data
-                 * But 16 bits data is just 64KB, the same as this project assumption.
-                 * If the system support small memory, we may round off the i2c_register_addr like
-                 *  i2c_register_addr = i2c_register_addr & 0xFFF;  (for 4KB)
-                 */
-
-                operation_addr = (uint8_t *) (BASE_ADDRESS + i2c_register_addr);
+                /* round off the 16-bit register address to the emulated storage */
+                operation_offset = i2c_register_addr & I2C_SLAVE_MEM_MASK;
                 read_count++;
             } else {
                 /* host write data to slave */
-                hosal_i2c_slave_read_byte(operation_addr++);
+                hosal_i2c_slave_read_byte(&i2c_slave_mem[operation_offset]);
+                operation_offset = (operation_offset + 1) & I2C_SLAVE_MEM_MASK;
                 //printf("write:%x,data:%x\n",operation_addr,I2c_Slave_Read_Byte());
             }
         } else {
@@ -181,8 +179,8 @@ void i2c_slave_user_cb(uint32_t status) {
                  */
                 hosal_i2c_slave_write_byte(0x00);
             } else {
-                /*TODO: we should do some address range check...*/
-                hosal_i2c_slave_write_byte(*operation_addr++);
+                hosal_i2c_slave_write_byte(i2c_slave_mem[operation_offset]);
+                operation_offset = (operation_offset + 1) & I2C_SLAVE_MEM_MASK;
             }
         }
     } else if (status & HOSAL_I2C_SLAVE_STATUS_ERROR) {
@@ -196,7 +194,15 @@ void i2c_slave_init(void) {
     hosal_i2c_slave_mode_t   slave_cfg;
     uint32_t           status;
 
-    operation_addr = pvPortMalloc(400);
+    /* allocate the emulated storage before the slave ISR can touch it */
+    if (i2c_slave_mem == NULL) {
+        i2c_slave_mem = pvPortMalloc(I2C_SLAVE_MEM_SIZE);
+        if (i2c_slave_mem == NULL) {
+            puts("i2c slave memory allocate fail\r\n");
+            while (1);
+        }
+        memset(i2c_slave_mem, 0, I2C_SLAVE_MEM_SIZE);
+    }
 
     slave_cfg.i2c_slave_cb_func = i2c_slave_user_cb;
 
@@ -298,9 +304,6 @@ void i2c_master_slaver_read_write(void) {
 
 
 int main(void) {
-    uint32_t  i, random_value;
-    uint32_t   *ptr;
-
     uart_stdio_init();
     vHeapRegionsInt();
     _dump_boot_info();
@@ -318,14 +321,7 @@ int main(void) {
 
     printf("Please notice: in FPGA I2C is 1.8V \r\n");
     printf("Please do NOT connect 3.3V host \r\n");
-
-    ptr = (uint32_t*)BASE_ADDRESS;
-
-    /*clear 2KB to zero*/
-    for (i = 0; i < 512; i++) {
-        *ptr++ = 0;
-    }
-
+printf("!!!!!!!!!!\r\n");
     /*test I2C master*/
     i2c_master_slaver_read_write();
 

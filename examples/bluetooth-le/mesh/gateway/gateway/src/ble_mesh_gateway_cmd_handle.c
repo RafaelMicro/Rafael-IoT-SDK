@@ -54,7 +54,9 @@ typedef enum
 typedef struct __attribute__((packed))
 {
     uint8_t header[4];
-    uint8_t len;
+    uint16_t len;  /* widened from uint8_t: 1 byte only reached 255, too
+                    * small for a full-size Transparent Transport Set
+                    * (mesh access layer allows up to ~377 bytes of data) */
     uint8_t parameter[];
 }
 gateway_cmd_hdr;
@@ -99,7 +101,7 @@ uint8_t unprov_device_scan = false;
 //=============================================================================
 //                Functions
 //=============================================================================
-static uint8_t _gateway_checksum_calc(uint8_t *pBuf, uint8_t len)
+static uint8_t _gateway_checksum_calc(uint8_t *pBuf, uint16_t len)
 {
     uint8_t cs = 0;
 
@@ -112,7 +114,13 @@ static uint8_t _gateway_checksum_calc(uint8_t *pBuf, uint8_t len)
 
 void ble_mesh_gateway_cmd_send(uint32_t cmd_id, uint16_t addr, uint16_t key_index, uint32_t opcode, uint8_t *p_param, uint32_t len)
 {
-    uint8_t *p_gw_cmd_pkt, idx = 0, i;
+    /* idx/i widened from uint8_t: packets now routinely exceed 255 bytes
+     * (e.g. a full-size Transparent Transport Set/Status), and a uint8_t
+     * loop counter wraps back to 0 before reaching pkt_len -- an infinite
+     * loop in the debug printf below, and silent buffer corruption at the
+     * idx-based offsets above it (checksum written at the wrong address). */
+    uint8_t *p_gw_cmd_pkt;
+    uint32_t idx = 0, i;
     uint32_t pkt_len;
     uint32_t opcode_size = 0, sub_hdr_len = 0;
 
@@ -198,10 +206,10 @@ void ble_mesh_gateway_cmd_send(uint32_t cmd_id, uint16_t addr, uint16_t key_inde
             idx += (sizeof(app_service_cmd_pd) + len + opcode_size);
         }
 
+        /* +2: sum starts at the (now 2-byte) length field itself, through
+         * the end of Parameter -- i.e. length-field-width + body length */
         ((gateway_cmd_end *)(&p_gw_cmd_pkt[idx]))->cs = _gateway_checksum_calc((uint8_t *) & (((gateway_cmd_hdr *)(p_gw_cmd_pkt))->len),
-                ((gateway_cmd_hdr *)(p_gw_cmd_pkt))->len + 1);
-
-        uart_handler_send(p_gw_cmd_pkt, pkt_len);
+                ((gateway_cmd_hdr *)(p_gw_cmd_pkt))->len + 2);
 
 #if (!SUPPORT_DEBUG_CONSOLE_CLI)
         printf("------------------------      GW >>>> ------------------------\n");
@@ -211,6 +219,7 @@ void ble_mesh_gateway_cmd_send(uint32_t cmd_id, uint16_t addr, uint16_t key_inde
         }
         printf("\n");
 #endif
+        uart_handler_send(p_gw_cmd_pkt, pkt_len);
     } while (0);
 
 }
@@ -458,29 +467,29 @@ int8_t (* const prcss_mesh_nwk_cmd[])(uint8_t *p_data, uint8_t length) =
 {
     mesh_nwk_cmd_unprov_device_scan_get, /* MESH_NWK_OPCODE_UNPROV_DEVICE_SCAN_STATUS_GET */
     mesh_nwk_cmd_unprov_device_scan_set, /* MESH_NWK_OPCODE_UNPROV_DEVICE_SCAN_STATUS_SET */
-    mesh_nwk_cmd_null,                /* MESH_NWK_OPCODE_UNPROV_DEVICE_SCAN_STATUS */
-    mesh_nwk_cmd_null,                /* MESH_NWK_OPCODE_UNPROV_DEVICE_LIST */
-    mesh_nwk_cmd_prov_device,          /* MESH_NWK_OPCODE_DEVICE_PROV_SET */
-    mesh_nwk_cmd_null,                /* MESH_NWK_OPCODE_DEVICE_PROV_STAUS */
-    mesh_nwk_cmd_null,                /* 0x06 */
-    mesh_nwk_cmd_null,                /* 0x07 */
-    mesh_nwk_cmd_null,                /* 0x08 */
-    mesh_nwk_cmd_null,                /* 0x09 */
-    mesh_nwk_cmd_null,                /* 0x0a */
-    mesh_nwk_cmd_null,                /* 0x0b */
-    mesh_nwk_cmd_null,                /* 0x0c */
-    mesh_nwk_cmd_null,                /* 0x0d */
-    mesh_nwk_cmd_null,                /* 0x0e */
-    mesh_nwk_cmd_null,                /* 0x0f */
-    mesh_nwk_cmd_nwk_key_get,         /* 0x10 */
-    mesh_nwk_cmd_nwk_key_set,         /* 0x11 */
-    mesh_nwk_cmd_null,                /* 0x12 MESH_NWK_OPCODE_NWK_KEY_STAUS*/
-    mesh_nwk_cmd_app_key_get,         /* 0x13 MESH_NWK_OPCODE_APP_KEY_GET*/
-    mesh_nwk_cmd_app_key_set,         /* 0x14 MESH_NWK_OPCODE_APP_KEY_SET*/
-    mesh_nwk_cmd_null,                /* 0x15 MESH_NWK_OPCODE_APP_KEY_STAUS*/
-    mesh_nwk_cmd_dev_key_get,         /* 0x16 MESH_NWK_OPCODE_DEV_KEY_GET*/
-    mesh_nwk_cmd_dev_key_set,         /* 0x17 MESH_NWK_OPCODE_DEV_KEY_SET*/
-    mesh_nwk_cmd_null,                /* 0x18 MESH_NWK_OPCODE_DEV_KEY_STAUS*/
+    mesh_nwk_cmd_null,                   /* MESH_NWK_OPCODE_UNPROV_DEVICE_SCAN_STATUS */
+    mesh_nwk_cmd_null,                   /* MESH_NWK_OPCODE_UNPROV_DEVICE_LIST */
+    mesh_nwk_cmd_prov_device,            /* MESH_NWK_OPCODE_DEVICE_PROV_SET */
+    mesh_nwk_cmd_null,                   /* MESH_NWK_OPCODE_DEVICE_PROV_STAUS */
+    mesh_nwk_cmd_null,                   /* 0x06 */
+    mesh_nwk_cmd_null,                   /* 0x07 */
+    mesh_nwk_cmd_null,                   /* 0x08 */
+    mesh_nwk_cmd_null,                   /* 0x09 */
+    mesh_nwk_cmd_null,                   /* 0x0a */
+    mesh_nwk_cmd_null,                   /* 0x0b */
+    mesh_nwk_cmd_null,                   /* 0x0c */
+    mesh_nwk_cmd_null,                   /* 0x0d */
+    mesh_nwk_cmd_null,                   /* 0x0e */
+    mesh_nwk_cmd_null,                   /* 0x0f */
+    mesh_nwk_cmd_nwk_key_get,            /* 0x10 */
+    mesh_nwk_cmd_nwk_key_set,            /* 0x11 */
+    mesh_nwk_cmd_null,                   /* 0x12 MESH_NWK_OPCODE_NWK_KEY_STAUS*/
+    mesh_nwk_cmd_app_key_get,            /* 0x13 MESH_NWK_OPCODE_APP_KEY_GET*/
+    mesh_nwk_cmd_app_key_set,            /* 0x14 MESH_NWK_OPCODE_APP_KEY_SET*/
+    mesh_nwk_cmd_null,                   /* 0x15 MESH_NWK_OPCODE_APP_KEY_STAUS*/
+    mesh_nwk_cmd_dev_key_get,            /* 0x16 MESH_NWK_OPCODE_DEV_KEY_GET*/
+    mesh_nwk_cmd_dev_key_set,            /* 0x17 MESH_NWK_OPCODE_DEV_KEY_SET*/
+    mesh_nwk_cmd_null,                   /* 0x18 MESH_NWK_OPCODE_DEV_KEY_STAUS*/
 };
 void ble_mesh_nwk_handle(uint8_t opcode, uint8_t *p_parm, uint8_t parm_len)
 {
@@ -503,8 +512,8 @@ uint8_t ble_mesh_gateway_cmd_proc(uint32_t data, mesh_tlv_t *p_mesh_tlv)
     }
     printf("\n");
 
-    //cmd_index = ((gateway_cmd_pd *)(&p_buf[5]))->command_id;
-    gateway_cmd_pd *p_pd = (gateway_cmd_pd *)&p_buf[5];
+    //cmd_index = ((gateway_cmd_pd *)(&p_buf[sizeof(gateway_cmd_hdr)]))->command_id;
+    gateway_cmd_pd *p_pd = (gateway_cmd_pd *)&p_buf[sizeof(gateway_cmd_hdr)];
 
     param_len = len - sizeof(gateway_cmd_hdr) - sizeof(gateway_cmd_pd) - sizeof(gateway_cmd_end);
     if (p_pd->command_id == DEVICE_CONFIGURATION_SVC_CMD)
@@ -602,7 +611,7 @@ uint8_t ble_mesh_gateway_cmd_proc(uint32_t data, mesh_tlv_t *p_mesh_tlv)
 uart_handler_data_sts_t ble_mesh_gateway_cmd_parser(uint8_t *p_buf, uint16_t len, uint16_t *p_data_len, uint16_t *p_offset)
 {
     //+-------------+-----------+---------------+------------+---------------+--------+
-    //|  Header(4)  | Length(1) | Command ID(4) | Address(2) |  Parameter(N) | CS (1) |
+    //|  Header(4)  | Length(2) | Command ID(4) | Address(2) |  Parameter(N) | CS (1) |
     //+-------------+-----------+---------------+------------+---------------+--------+
     //| FF FC FC FF |           |               |            |               |        |
     //+-------------+-----------+---------------+------------+---------------+--------+
@@ -655,7 +664,8 @@ uart_handler_data_sts_t ble_mesh_gateway_cmd_parser(uint8_t *p_buf, uint16_t len
         }
 
         end = (gateway_cmd_end *)&p_buf[idx + sizeof(gateway_cmd_hdr) + hdr->len];
-        cs = _gateway_checksum_calc(&p_buf[idx + 4], (hdr->len + 1));
+        /* +2: length field is 2 bytes wide, checksum region starts there */
+        cs = _gateway_checksum_calc(&p_buf[idx + 4], (hdr->len + 2));
         if (cs != end->cs)
         {
             t_return = UART_DATA_CS_ERROR;

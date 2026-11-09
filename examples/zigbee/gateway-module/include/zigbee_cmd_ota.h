@@ -41,7 +41,7 @@ typedef enum {
     GW_CMD_OTA_QUERY_IMAGE_INFO = 0xF0008009,
 } ota_cmd_t;
 
-void _gw_ota_cmd_handle(uint32_t cmd_id, uint8_t *pBuf);
+void _gw_ota_cmd_handle(uint32_t cmd_id, uint8_t *pBuf, uint16_t len);
 void zigbee_gw_ota_cb(uint8_t param);
 
 #ifdef __cplusplus

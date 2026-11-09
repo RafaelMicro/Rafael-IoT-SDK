@@ -8,9 +8,6 @@ include(config/proj_default.conf)
 show_banner()
 sdk_add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/components)
 sdk_add_subdirectory_ifdef(CONFIG_FREERTOS ${CMAKE_CURRENT_LIST_DIR}/thirdparty/freertos)
-sdk_add_subdirectory_ifdef(CONFIG_TFLM ${CMAKE_CURRENT_LIST_DIR}/thirdparty/tflite-micro)
-
-
 
 
 if(DEFINED CONFIG_USER_PROJECT AND CONFIG_USER_PROJECT)
@@ -21,13 +18,7 @@ ${CMAKE_CURRENT_LIST_DIR}/user_project/${CONFIG_BUILD_PROJECT}
 else()
 
 sdk_add_subdirectory_ifdef(CONFIG_HELLOWORLD ${CMAKE_CURRENT_LIST_DIR}/examples/${CONFIG_BUILD_PROJECT})
-sdk_add_subdirectory_ifdef(CONFIG_DSP_EXAMPLE ${CMAKE_CURRENT_LIST_DIR}/examples/dsp/${CONFIG_BUILD_PROJECT})
-sdk_add_subdirectory_ifdef(CONFIG_TFLM_EXAMPLE ${CMAKE_CURRENT_LIST_DIR}/examples/tflm/${CONFIG_BUILD_PROJECT})
 sdk_add_subdirectory_ifdef(CONFIG_BOOTLOADER ${CMAKE_CURRENT_LIST_DIR}/examples/${CONFIG_BUILD_PROJECT})
-sdk_add_subdirectory_ifdef(CONFIG_RF_LABTEST_TOOL ${CMAKE_CURRENT_LIST_DIR}/examples/${CONFIG_BUILD_PROJECT})
-sdk_add_subdirectory_ifdef(CONFIG_RF_EV_UB ${CMAKE_CURRENT_LIST_DIR}/examples/${CONFIG_BUILD_PROJECT})
-sdk_add_subdirectory_ifdef(CONFIG_MULTI_PROTOCOL_RCP ${CMAKE_CURRENT_LIST_DIR}/examples/${CONFIG_BUILD_PROJECT})
-sdk_add_subdirectory_ifdef(CONFIG_HCI_RAW ${CMAKE_CURRENT_LIST_DIR}/examples/${CONFIG_BUILD_PROJECT})
 sdk_add_subdirectory_ifdef(CONFIG_PERIPHERAL_EXAMPLE_AUX ${CMAKE_CURRENT_LIST_DIR}/examples/peripheral/aux-comp/${CONFIG_BUILD_PROJECT})
 sdk_add_subdirectory_ifdef(CONFIG_PERIPHERAL_EXAMPLE_BOD ${CMAKE_CURRENT_LIST_DIR}/examples/peripheral/bod-comp/${CONFIG_BUILD_PROJECT})
 sdk_add_subdirectory_ifdef(CONFIG_PERIPHERAL_EXAMPLE_COMP ${CMAKE_CURRENT_LIST_DIR}/examples/peripheral/comp/${CONFIG_BUILD_PROJECT})
@@ -54,16 +45,10 @@ sdk_add_subdirectory_ifdef(CONFIG_BLE_CENTRAL_ROLE ${CMAKE_CURRENT_LIST_DIR}/exa
 sdk_add_subdirectory_ifdef(CONFIG_BLE_MULTI_LINK ${CMAKE_CURRENT_LIST_DIR}/examples/bluetooth-le/multi-link/${CONFIG_BUILD_PROJECT})
 sdk_add_subdirectory_ifdef(CONFIG_BLE_OTHERS ${CMAKE_CURRENT_LIST_DIR}/examples/bluetooth-le/others/${CONFIG_BUILD_PROJECT})
 sdk_add_subdirectory_ifdef(CONFIG_BLE_MESH ${CMAKE_CURRENT_LIST_DIR}/examples/bluetooth-le/mesh/${CONFIG_BUILD_PROJECT})
-sdk_add_subdirectory_ifdef(CONFIG_THREAD_EXAMPLE ${CMAKE_CURRENT_LIST_DIR}/examples/thread/${CONFIG_BUILD_PROJECT})
 if(CONFIG_MESH_IT_UP_EXAMPLE)
     sdk_add_subdirectory_ifdef(CONFIG_MESH_IT_UP_EXAMPLE ${CMAKE_CURRENT_LIST_DIR}/examples/sub-g/mesh-it-up/${CONFIG_BUILD_PROJECT})
 else()
     sdk_add_subdirectory_ifdef(CONFIG_SUBG_EXAMPLE ${CMAKE_CURRENT_LIST_DIR}/examples/sub-g/${CONFIG_BUILD_PROJECT})
 endif()
-sdk_add_subdirectory_ifdef(CONFIG_RF_EV_15P4 ${CMAKE_CURRENT_LIST_DIR}/examples/${CONFIG_BUILD_PROJECT})
 sdk_add_subdirectory_ifdef(CONFIG_ZIGBEE_EXAMPLE ${CMAKE_CURRENT_LIST_DIR}/examples/zigbee/${CONFIG_BUILD_PROJECT})
-sdk_add_subdirectory_ifdef(CONFIG_ZIGBEE_BLE_EXAMPLE ${CMAKE_CURRENT_LIST_DIR}/examples/zigbee-ble/${CONFIG_BUILD_PROJECT})
-
-
-
 endif()

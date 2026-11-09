@@ -694,10 +694,8 @@ void button_init(void)
     NVIC_SetPriority(Gpio_IRQn, 7);
     for (i = 0; i < 5; i++)
     {
-        hosal_gpio_debounce_enable(i);
+        hosal_gpio_cfg_input_parameters(i, pin_cfg, true);
         hosal_pin_set_pullopt(i, HOSAL_PULL_UP_100K);
-        hosal_gpio_cfg_input(i, pin_cfg);    
-        hosal_gpio_int_enable(i);
     }
     NVIC_EnableIRQ(Gpio_IRQn);
 }

@@ -12,6 +12,8 @@
 #include "app_hooks.h"
 #include "uart_stdio.h"
 #include "dump_boot_info.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 
 /*below test vector is RFC 4493 Test (Appendix A.) data*/
@@ -53,13 +55,16 @@ static uint8_t g_encryption_text_buf[128];
 static uint8_t g_decryption_text_buf[128];
 
 
-int main(void) {
+#define APP_MAIN_TASK_STACK_SIZE 1024
+
+static TaskHandle_t app_main_task_handle;
+
+static void app_main_task(void* parameters_ptr) {
+    (void)parameters_ptr;
 
     uint32_t i;
     hosal_aes_dev_t aes_dev;
 
-    uart_stdio_init();
-    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);
@@ -92,5 +97,22 @@ int main(void) {
     
     printf("\r\n\r\n");
     printf("hosal crypto aes 128 encryption finish!\r\n");
-    while (1);
+    while (1) {
+        vTaskDelay(5000);
+    }
+}
+
+int main(void) {
+    uart_stdio_init();
+    vHeapRegionsInt();
+    _dump_boot_info();
+
+    if (xTaskCreate(app_main_task, (char*)"app_main", APP_MAIN_TASK_STACK_SIZE,
+                    NULL, E_TASK_PRIORITY_NORMAL, &app_main_task_handle)
+        != pdPASS) {
+        printf("app_main task create fail....\r\n");
+    }
+
+    vTaskStartScheduler();
+    while (1) {}
 }

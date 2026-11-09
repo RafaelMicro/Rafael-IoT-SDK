@@ -85,7 +85,22 @@ static void jump_to_application(uint32_t AppAddress) {
         return;
     }
 
+    /* Leave no bootloader interrupt enabled or pending, otherwise it fires
+       into the application's vector table before the app has set it up. */
+    __disable_irq();
+    SysTick->CTRL = 0;
+    for (uint32_t n = 0; n < (sizeof(NVIC->ICER) / sizeof(NVIC->ICER[0])); n++) {
+        NVIC->ICER[n] = 0xFFFFFFFF;
+        NVIC->ICPR[n] = 0xFFFFFFFF;
+    }
+    __DSB();
+    __ISB();
+    /* Every NVIC source is now disabled, so re-enabling PRIMASK is safe and
+       keeps the reset-like state the application's startup code expects. */
+    __enable_irq();
+
     SCB->VTOR = (uint32_t)AppAddress;
+    __DSB();
     __set_MSP(*(uint32_t*)AppAddress);
     AppStart = (FUNC_PTR*)(*(uint32_t*)(AppAddress + 4));
     AppStart();
@@ -124,6 +139,11 @@ static int load_image_into_flash(uint32_t image_base, uint32_t flash_addr,
 
     /*programming new image by page read/write*/
     for (i = 0; i < image_size; i += FLASH_PAGE_PROGRAMMING_SIZE) {
+
+        if (i + FLASH_PAGE_PROGRAMMING_SIZE > image_size)
+        {
+            break;
+        }
         flash_read_page((uint32_t)readBuff, image_base + i);
         while (flash_check_busy())
             ;
@@ -135,13 +155,13 @@ static int load_image_into_flash(uint32_t image_base, uint32_t flash_addr,
 
     /* if image size not align with page erase size*/
     if (image_size != i) {
-        u32RemainSize = i - image_size;
+        u32RemainSize = image_size - i;
 
         /*programming new image by single byte read/write*/
         for (j = 0; j < u32RemainSize; j += 1) //write 1 bytes
         {
-            Read = flash_read_byte(image_base + (i << 8) + j);
-            flash_write_byte(flash_addr + (i << 8) + j, Read);
+            Read = flash_read_byte(image_base + i + j);
+            flash_write_byte(flash_addr + i + j, Read);
             while (flash_check_busy())
                 ;
         }
@@ -392,16 +412,19 @@ static SRes Decode(uint32_t OutAddress, uint32_t InAddress) {
 
     DEBUG_PRINT("unpackSize = %x\r\n", unpackSize);
     LzmaDec_Construct(&state);
-    LzmaDec_Allocate(&state, header, LZMA_PROPS_SIZE, &g_Alloc);
+    res = LzmaDec_Allocate(&state, header, LZMA_PROPS_SIZE, &g_Alloc);
+    if (res != SZ_OK) {
+        DEBUG_PRINT("[FOTA] Error: LzmaDec_Allocate fail %d.\r\n", res);
+        return res;
+    }
 
     res = Decode2(&state, OutAddress, (InAddress + sizeof(header)), unpackSize);
     LzmaDec_Free(&state, &g_Alloc);
     return res;
 }
 
-static SRes check_decode_unpack_size(uint32_t InAddress) {
+static SRes check_decode_unpack_size(uint32_t InAddress, uint32_t OutAddress) {
     uint32_t unpackSize;
-    uint32_t local_flash_model;
     uint32_t local_app_max_size;
     int i;
     SRes res;
@@ -437,6 +460,30 @@ static SRes check_decode_unpack_size(uint32_t InAddress) {
         DEBUG_PRINT("[FOTA] Error: unpackSize is 0xFFFFFFFF, not supported.\r\n");
         return SZ_ERROR_DATA;
     }
+
+    /* Decode() writes whole pages from OutAddress while reading the FOTA bank
+       at InAddress, so the page-rounded output must end at or before it. */
+    if (InAddress <= OutAddress) {
+        DEBUG_PRINT("[FOTA] Error: fotabank 0x%08x is not above target 0x%08x.\r\n", InAddress, OutAddress);
+        return SZ_ERROR_DATA;
+    }
+
+    local_app_max_size = InAddress - OutAddress;
+    if ((unpackSize > local_app_max_size) ||
+        (((unpackSize + FLASH_PAGE_PROGRAMMING_SIZE - 1) & FLASH_PAGE_MASK) > local_app_max_size)) {
+        DEBUG_PRINT("[FOTA] Error: unpackSize 0x%08x is invalid, local_app_max_size 0x%08x.\r\n", unpackSize, local_app_max_size);
+        return SZ_ERROR_DATA;
+    }
+
+    /* The application area is erased before Decode() runs, so make sure the
+       decoder's dictionary can be allocated now rather than failing after. */
+    LzmaDec_Construct(&state);
+    res = LzmaDec_Allocate(&state, header, LZMA_PROPS_SIZE, &g_Alloc);
+    if (res != SZ_OK) {
+        DEBUG_PRINT("[FOTA] Error: LzmaDec_Allocate fail %d.\r\n", res);
+        return res;
+    }
+    LzmaDec_Free(&state, &g_Alloc);
 
     return SZ_OK;
 }
@@ -524,7 +571,6 @@ int main(void) {
 
     DEBUG_PRINT("[BOOT] App Version: %.4d.%.4d\r\n", ver_major, ver_minor);
 #endif
-
     // Bootloader main loop
     bootloader_uart_init();
     bootloader_run_loop();
@@ -599,12 +645,10 @@ int main(void) {
                         while (flash_check_busy());
                         break;
                     }
-                    flash_model_info = flash_get_deviceinfo();
-                    fota_max_size = ((1 << ((flash_model_info >> 16) & 0xFF)) - BOOTLOADER_SIZE - MP_SECTOR_SIZE - FLASH_PAGE_PROGRAMMING_SIZE) >> 1;
-                    check_verify_size &= 0xEFFFFFFF;
-                    fota_max_size &= 0xEFFFFFFF;
 
-                    if (check_verify_size >= fota_max_size)
+                    fota_max_size = (FOTA_UPDATE_BUFFER_FW_ADDRESS - APP_START_ADDRESS - FLASH_PAGE_PROGRAMMING_SIZE);
+
+                    if (check_verify_size > fota_max_size)
                     {
                         DEBUG_PRINT("[SECURE_BOOT] FOTA image overflow.\r\n");
                         flash_write_byte((uint32_t)&p_fota_info->fota_result, FOTA_RESULT_ERR_IMAGE_SIZE);
@@ -612,7 +656,8 @@ int main(void) {
                         break;
                     }
 
-                    fota_signature_address =  ((uint32_t)ptr + check_verify_size + FLASH_PAGE_PROGRAMMING_SIZE - 1) & FLASH_PAGE_MASK;      /*page alignment*/
+                    /*the signature page follows the page-padded image, counted from the image start (ptr may not be page aligned)*/
+                    fota_signature_address =  ((uint32_t)ptr + ((check_verify_size + FLASH_PAGE_PROGRAMMING_SIZE - 1) & FLASH_PAGE_MASK));
                     /*read the signature sector of APP image*/
                     flash_read_page((uint32_t)sig_buf, fota_signature_address);
                     while (flash_check_busy());
@@ -712,9 +757,9 @@ int main(void) {
                 if ( p_fota_info->fota_image_info & FOTA_IMAGE_INFO_COMPRESSED )
                 {
                     DEBUG_PRINT("[FOTA] FOTA_IMAGE_INFO_COMPRESSED.\r\n");
-                    res = check_decode_unpack_size(p_fota_info->fotabank_startaddr);
+                    res = check_decode_unpack_size(p_fota_info->fotabank_startaddr, p_fota_info->target_startaddr);
                     if( res == SZ_OK ) {
-                        set_flash_erase(APP_START_ADDRESS, (p_fota_info->fotabank_startaddr - APP_START_ADDRESS));
+                        set_flash_erase(APP_START_ADDRESS, (FOTA_UPDATE_BUFFER_FW_ADDRESS - APP_START_ADDRESS));
                         res = Decode(p_fota_info->target_startaddr, p_fota_info->fotabank_startaddr);
                     }
                 }
@@ -766,14 +811,11 @@ int main(void) {
             
             check_verify_size = *((uint32_t *) (APP_START_ADDRESS + 0x28)) ;
 
-            /*Here we don't limit image size */
-            flash_model_info = flash_get_deviceinfo();
-            app_max_size = ((1 << ((flash_model_info >> 16) & 0xFF)) - BOOTLOADER_SIZE - MP_SECTOR_SIZE - FLASH_PAGE_PROGRAMMING_SIZE) >> 1;
-            check_verify_size &= 0xEFFFFFFF;
-            app_max_size &= 0xEFFFFFFF;
+            /*the app and its signature page must fit below the FOTA bank*/
+            app_max_size = (FOTA_UPDATE_BUFFER_FW_ADDRESS - APP_START_ADDRESS - FLASH_PAGE_PROGRAMMING_SIZE);
 
             /*check image size can not over flash size*/
-            if ((check_verify_size == 0) || (check_verify_size >= app_max_size))
+            if ((check_verify_size == 0) || (check_verify_size > app_max_size))
             {
                 DEBUG_PRINT("[SECURE_BOOT] Error, APP has no size information %d %d\r\n", check_verify_size, app_max_size);
                 break;

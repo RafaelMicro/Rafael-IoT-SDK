@@ -13,6 +13,9 @@
 #include "hosal_crypto_ctr_drbg.h"
 #include "uart_stdio.h"
 #include "dump_boot_info.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "app_hooks.h"
 
 
 #define curve25519_in_bytes       32
@@ -45,14 +48,17 @@ void lecp_print_hex_bytes(const char* name, const uint8_t* data,
 
 //------------------ ECC GF(2m) ------------------
 
-int main(void) {
+#define APP_MAIN_TASK_STACK_SIZE 1024
+
+static TaskHandle_t app_main_task_handle;
+
+static void app_main_task(void* parameters_ptr) {
+    (void)parameters_ptr;
 
     
      int i;
     hosal_crypto_curve25519_t curve25519;
 
-    uart_stdio_init();
-    _dump_boot_info();
     
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
@@ -101,5 +107,22 @@ int main(void) {
     printf("\r\n\r\n");
     printf("curve25519 loop 1000 finsih \r\n");
 
-    while (1);
+    while (1) {
+        vTaskDelay(5000);
+    }
+}
+
+int main(void) {
+    uart_stdio_init();
+    vHeapRegionsInt();
+    _dump_boot_info();
+
+    if (xTaskCreate(app_main_task, (char*)"app_main", APP_MAIN_TASK_STACK_SIZE,
+                    NULL, E_TASK_PRIORITY_NORMAL, &app_main_task_handle)
+        != pdPASS) {
+        printf("app_main task create fail....\r\n");
+    }
+
+    vTaskStartScheduler();
+    while (1) {}
 }

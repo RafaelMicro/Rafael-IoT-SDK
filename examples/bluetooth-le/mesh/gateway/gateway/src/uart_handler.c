@@ -32,7 +32,12 @@
 //                Private Definitions of const value
 //=============================================================================
 #define UART_HANDLER_RX_CACHE_SIZE          16
-#define MAX_UART_BUFFER_SIZE                256
+/* Must hold one full gateway command frame: Header(4) + Length(2) +
+ * CommandID(4) + sub-header(<=4) + opcode(<=3) + Parameter + CS(1). Widened
+ * from 256 to fit the largest Transparent Transport Set/Status frame (mesh
+ * access layer allows up to ~377 bytes of Parameter data) now that the
+ * Length field is 2 bytes (see gateway_cmd_hdr in ble_mesh_gateway_cmd_handle.c). */
+#define MAX_UART_BUFFER_SIZE                512
 //=============================================================================
 //                Private ENUM
 //=============================================================================

@@ -63,7 +63,30 @@ function(sdk_add_include_directories)
       set(path ${CMAKE_CURRENT_SOURCE_DIR}/${arg})
     endif()
 
-    target_include_directories(sdk_intf_lib INTERFACE ${path})
+    target_include_directories(sdk_intf_includes INTERFACE ${path})
+  endforeach()
+endfunction()
+
+# Every example's rtos/CMakeLists.txt calls this (instead of the plain
+# sdk_add_include_directories()) to publish its board's FreeRTOSConfig.h
+# directory. Behaves identically to sdk_add_include_directories() (same
+# global-pool publish, so no non-strict library's behavior changes) but also
+# records the path so setup_project() can attach it directly to whichever
+# FreeRTOS target this build uses (rt582_freertos / rt584_freertos) -- the
+# only way a strict library that needs <FreeRTOS.h> (via
+# sdk_library_depends_on(sdk::freertos)) can reach FreeRTOSConfig.h, since
+# that header is owned per-example, not by any library. See
+# docs/internal/adr/0002-six-layer-dependency-order.md.
+function(sdk_set_freertos_config_directory)
+  foreach(arg ${ARGV})
+    if(IS_ABSOLUTE ${arg})
+      set(path ${arg})
+    else()
+      set(path ${CMAKE_CURRENT_SOURCE_DIR}/${arg})
+    endif()
+
+    target_include_directories(sdk_intf_includes INTERFACE ${path})
+    set_property(GLOBAL PROPERTY FREERTOS_CONFIG_DIR ${path})
   endforeach()
 endfunction()
 
@@ -79,9 +102,45 @@ function(sdk_add_private_include_directories)
   endforeach()
 endfunction()
 
+# Publishes include dirs on this library's own INTERFACE, independent of the
+# global sdk_intf_includes pool. Needed by any dependency of a strict library
+# (sdk_library_strict_includes()), since that library only sees paths reached
+# via sdk_library_depends_on(), not the global pool. Safe to call alongside
+# sdk_add_include_directories() for the same path -- non-strict consumers keep
+# reading the global pool exactly as before.
+function(sdk_library_add_public_include_directories)
+  foreach(arg ${ARGV})
+    if(IS_ABSOLUTE ${arg})
+      set(path ${arg})
+    else()
+      set(path ${CMAKE_CURRENT_SOURCE_DIR}/${arg})
+    endif()
+
+    target_include_directories(${CURRENT_STATIC_LIBRARY} INTERFACE ${path})
+  endforeach()
+endfunction()
+
+# Declares that the current library needs the public include dirs of each
+# named dependency. Include-propagation only: this does not affect the final
+# link line (setup_project() links every SDK_LIBS name inside
+# -Wl,--whole-archive regardless of this graph), so it cannot reorder or
+# duplicate anything on the link line.
+function(sdk_library_depends_on)
+  target_link_libraries(${CURRENT_STATIC_LIBRARY} PUBLIC ${ARGV})
+endfunction()
+
+# Opts the current library out of the global sdk_intf_includes pool (the 500+
+# include dirs every other library still sees). It keeps sdk_intf_lib
+# (CONFIG_* defines, compile/link options) unconditionally -- only include
+# paths are affected. Call sdk_library_depends_on() for everything the library
+# actually needs first.
+function(sdk_library_strict_includes)
+  set_property(GLOBAL APPEND PROPERTY SDK_STRICT_LIBS ${CURRENT_STATIC_LIBRARY})
+endfunction()
+
 function(sdk_use_app_lib)
 	add_library(app STATIC)
-	target_link_libraries(app sdk_intf_lib)
+	target_link_libraries(app sdk_intf_lib sdk_intf_includes)
 endfunction()
 
 function(sdk_add_system_include_directories)
@@ -92,7 +151,7 @@ function(sdk_add_system_include_directories)
       set(path ${CMAKE_CURRENT_SOURCE_DIR}/${arg})
     endif()
 
-    target_include_directories(sdk_intf_lib SYSTEM INTERFACE ${path})
+    target_include_directories(sdk_intf_includes SYSTEM INTERFACE ${path})
   endforeach()
 endfunction()
 
@@ -233,13 +292,13 @@ macro(sdk_ifndef define val)
 endmacro()
 
 function(sdk_set_linker_script ld)
-  if(IS_ABSOLUTE ${ld})
-    set(path ${ld})
+  if(IS_ABSOLUTE "${ld}")
+    set(path "${ld}")
   else()
-    set(path ${CMAKE_CURRENT_SOURCE_DIR}/${ld})
+    set(path "${CMAKE_CURRENT_SOURCE_DIR}/${ld}")
   endif()
 
-  set_property(GLOBAL PROPERTY LINKER_SCRIPT ${path})
+  set_property(GLOBAL PROPERTY LINKER_SCRIPT "${path}")
 endfunction()
 
 macro(sdk_set_vscode_dir dir)
@@ -319,7 +378,7 @@ macro(setup_project name)
   # add_custom_target(verify ALL COMMAND ${CMAKE_COMMAND} --build . --target verify_list)
   # target_link_libraries(sdk_intf_lib INTERFACE verify)
   set(rf_suffix "") 
-  if (CONFIG_RF_LABTEST_TOOL) 
+  if (CONFIG_RF_LABTEST_TOOL AND NOT DEFINED CONFIG_RT581) 
    if (CONFIG_RF_POWER_0DBM) 
     set(rf_suffix "_0DBM") 
    elseif (CONFIG_RF_POWER_10DBM) 
@@ -345,20 +404,57 @@ macro(setup_project name)
   set(ASM_FILE ${CMAKE_BINARY_DIR}/${proj_name}.asm)
 
   add_executable(${proj_name}.elf ${CURRENT_MAIN_FILE})
-  target_link_libraries(${proj_name}.elf sdk_intf_lib)
+  target_link_libraries(${proj_name}.elf sdk_intf_lib sdk_intf_includes)
   get_property(LINKER_SCRIPT_PROPERTY GLOBAL PROPERTY LINKER_SCRIPT)
 
   set(ELF_FILE "${CMAKE_BINARY_DIR}/${proj_name}.elf")
   #message(STATUS "[VSCode] ELF output: ${ELF_FILE}")
   
-  if(EXISTS ${LINKER_SCRIPT_PROPERTY})
-    set_target_properties(${proj_name}.elf PROPERTIES LINK_FLAGS "-T${LINKER_SCRIPT_PROPERTY} -Wl,-Map=${MAP_FILE}")
-    set_target_properties(${proj_name}.elf PROPERTIES LINK_DEPENDS ${LINKER_SCRIPT_PROPERTY})
+  if(EXISTS "${LINKER_SCRIPT_PROPERTY}")
+    # One argument per option (not a LINK_FLAGS string) so CMake quotes each
+    # path itself; a SDK/build path containing spaces otherwise splits in two.
+    target_link_options(${proj_name}.elf PRIVATE "-T${LINKER_SCRIPT_PROPERTY}" "-Wl,-Map=${MAP_FILE}")
+    set_target_properties(${proj_name}.elf PROPERTIES LINK_DEPENDS "${LINKER_SCRIPT_PROPERTY}")
   endif()
 
   get_property(SDK_LIBS_PROPERTY GLOBAL PROPERTY SDK_LIBS)
   get_property(SDK_STATIC_LIBS_PROPERTY GLOBAL PROPERTY SDK_STATIC_LIBS)
-    
+
+  # Deferred: every library still gets the global include pool by default,
+  # unless it opted out via sdk_library_strict_includes(). Deferred to here
+  # (once all components/ subdirectories have run) so a library can call
+  # sdk_library_strict_includes() at any point in its own CMakeLists.txt --
+  # target_link_libraries() has no "unlink", so this can only be applied once,
+  # after every strict declaration is known.
+  get_property(SDK_STRICT_LIBS_PROPERTY GLOBAL PROPERTY SDK_STRICT_LIBS)
+  foreach(sdk_lib ${SDK_LIBS_PROPERTY})
+    if(NOT sdk_lib IN_LIST SDK_STRICT_LIBS_PROPERTY)
+      # PRIVATE: this library's own sources still see the global pool
+      # (unchanged behavior), but the pool does not leak to whoever
+      # declares a dependency on this library via sdk_library_depends_on() --
+      # otherwise a strict library depending on any non-strict one would
+      # transitively regain the entire pool through PUBLIC propagation.
+      target_link_libraries(${sdk_lib} PRIVATE sdk_intf_includes)
+    endif()
+  endforeach()
+
+  # Give the FreeRTOS target this build actually uses the current example's
+  # FreeRTOSConfig.h directory, so a strict library reaching it via
+  # sdk_library_depends_on(sdk::freertos) can resolve <FreeRTOS.h>'s
+  # #include "FreeRTOSConfig.h". Set by whichever example called
+  # sdk_set_freertos_config_directory() in its rtos/CMakeLists.txt.
+  # PUBLIC, not INTERFACE: rt58x_freertos's own sources (tasks.c etc.) need
+  # this too if that library itself opts into strict includes.
+  get_property(FREERTOS_CONFIG_DIR_PROPERTY GLOBAL PROPERTY FREERTOS_CONFIG_DIR)
+  if(FREERTOS_CONFIG_DIR_PROPERTY)
+    if(TARGET rt582_freertos)
+      target_include_directories(rt582_freertos PUBLIC ${FREERTOS_CONFIG_DIR_PROPERTY})
+    endif()
+    if(TARGET rt584_freertos)
+      target_include_directories(rt584_freertos PUBLIC ${FREERTOS_CONFIG_DIR_PROPERTY})
+    endif()
+  endif()
+
   if (TARGET app)
       target_link_libraries(${proj_name}.elf -Wl,--whole-archive ${SDK_LIBS_PROPERTY} ${SDK_STATIC_LIBS_PROPERTY} app -Wl,--no-whole-archive)
   else()
@@ -368,7 +464,7 @@ macro(setup_project name)
   if(OUTPUT_DIR)
     add_custom_command(TARGET ${proj_name}.elf POST_BUILD
       COMMAND ${CMAKE_OBJCOPY} -Obinary $<TARGET_FILE:${proj_name}.elf> ${BIN_FILE}
-      COMMAND ${CMAKE_OBJDUMP} -d -S $<TARGET_FILE:${proj_name}.elf> >${ASM_FILE}
+      COMMAND ${CMAKE_OBJDUMP} -d -S $<TARGET_FILE:${proj_name}.elf> > ${ASM_FILE}
       COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${proj_name}.elf> ${HEX_FILE}
       COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${proj_name}.elf> ${OUTPUT_DIR}/${name}/${proj_name}.elf
       COMMAND ${CMAKE_COMMAND} -E copy ${ASM_FILE} ${OUTPUT_DIR}/${name}/${proj_name}.asm
@@ -376,14 +472,14 @@ macro(setup_project name)
       COMMAND ${CMAKE_COMMAND} -E copy ${BIN_FILE} ${OUTPUT_DIR}/${name}/${proj_name}.bin
       COMMAND ${CMAKE_COMMAND} -E copy ${HEX_FILE} ${OUTPUT_DIR}/${name}/${proj_name}.hex
       #COMMAND ${CMAKE_COMMAND} -E copy ${BIN_FILE} ${OUTPUT_DIR}/project.bin
-      COMMENT "Generate ${BIN_FILE}\r\n"
+      COMMENT "Generate ${BIN_FILE}"
     )
   else()
     add_custom_command(TARGET ${proj_name}.elf POST_BUILD
       COMMAND ${CMAKE_OBJCOPY} -Obinary $<TARGET_FILE:${proj_name}.elf> ${BIN_FILE}
-      COMMAND ${CMAKE_OBJDUMP} -d -S $<TARGET_FILE:${proj_name}.elf> >${ASM_FILE}
+      COMMAND ${CMAKE_OBJDUMP} -d -S $<TARGET_FILE:${proj_name}.elf> > ${ASM_FILE}
       COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${proj_name}.elf> ${HEX_FILE}
-      COMMENT "Generate ${BIN_FILE}\r\n"
+      COMMENT "Generate ${BIN_FILE}"
     )
   endif()
 
@@ -435,7 +531,7 @@ function(get_git_hash OUT_VAR)
     endif()
   endforeach()
 
-  set(_default_hash "792b09e3")
+  set(_default_hash "20ed44ee")
 
   find_package(Git QUIET)
 

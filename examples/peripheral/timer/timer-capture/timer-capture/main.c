@@ -125,11 +125,32 @@ void timer_capture(void) {
     NVIC_EnableIRQ((IRQn_Type)(Timer2_IRQn));
 }
 
+void pin_init(void) {
+    hosal_gpio_input_config_t pin_cfg;
+    
+    hosal_pin_set_mode(30, HOSAL_MODE_GPIO);
+    hosal_pin_set_mode(31, HOSAL_MODE_GPIO);
+    pin_cfg.param = NULL;
+    pin_cfg.pin_int_mode = HOSAL_GPIO_PIN_NOINT;
+    pin_cfg.usr_cb = NULL;
+
+    hosal_gpio_set_debounce_time(DEBOUNCE_SLOWCLOCKS_1024);
+    hosal_pin_set_pullopt(GPIO30, HOSAL_PULL_UP_100K);
+    hosal_gpio_cfg_input_parameters(GPIO30, pin_cfg, true);
+
+    hosal_pin_set_pullopt(GPIO31, HOSAL_PULL_UP_100K);
+    hosal_gpio_cfg_input_parameters(GPIO31, pin_cfg, true);
+
+    return;
+}
+
+
 int main(void) {
     
     uart_stdio_init();
     vHeapRegionsInt();
     _dump_boot_info();
+    pin_init();
 
     printf("Starting %s now %d.... \r\n", CONFIG_CHIP,
            CONFIG_HOSAL_SOC_MAIN_ENTRY_TASK_SIZE);

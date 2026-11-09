@@ -1,36 +1,35 @@
-﻿# J-Link Setup Guide
-## Recommended Versions
+# J-Link Setup Guide
 
-|Tool|Version|Notes|
-| :-: | :-: | :-: |
-|J-Link|v8.18(or later)|Recommended for flashing MCU firmware|
+## Recommended Version
 
-## 4. Download & Install J-Link
+| Tool | Version | Notes |
+|:-:|:-:|:-:|
+| J-Link | v8.18 or later | Recommended, to flash MCU firmware |
 
-- J-Link Website: https://www.segger.com/downloads/jlink 
+## Download and Install J-Link
+
+J-Link website: https://www.segger.com/downloads/jlink
 
 <img alt="drawing" src="picture/tool/DownloadJLinkPage.jpg" style="width:700px"/>
 
-### J-Link Installation Instructions
+### Installation steps
 
-1. Run the installer. You can keep the default options. Recommended settings:
-   1. **Install J-Link Software and Documentation**: Checked
-   1. **Adjusting your PATH environment**: Choose **Add J-Link to PATH**
-   1. Keep other options as default
-1. Click **Install** to start the installation.
+1. Run the installer.
+2. Check **Install J-Link Software and Documentation**.
+3. Set **Adjusting your PATH environment** to **Add J-Link to PATH**.
+4. Keep all other options at their default value.
+5. Click **Install**.
 
-### Verify Installed Version (Windows / Linux)
+### Verify the installed version (Windows or Linux)
 
-1. Open the command tool:
-   1. **Windows** → Command Prompt
-   1. **Linux** → Terminal
-1. Type the command:
+1. Open a terminal. On Windows, use Command Prompt. On Linux, use Terminal.
+2. Run this command:
 
    ```
    JLinkExe
    ```
 
-   Expected output:
+   The command prints this output:
 
    ```
    SEGGER J-Link Commander Vx.xx (Compiled Sep xx xx:xx:xx)
@@ -38,41 +37,38 @@
 
 ### Update JLinkDevices.xml
 
-**Option A: Overwrite the File**
+You have two ways to add the SDK's chip definitions to J-Link.
 
-Copy the JLinkDevices.xml provided by the Rafael SDK into the J-Link installation directory, replacing the existing file:
+**Option A: Replace the file**
+
+Copy the SDK's `JLinkDevices.xml` file over the existing J-Link file:
 
 ```
 copy "<SDK_PATH>\tools\JLink\JLinkDevices.xml" "C:\Program Files (x86)\SEGGER\JLink\JLinkDevices.xml"
 ```
 
-> ⚠️ Caution: Make sure the Rafael-provided file already includes all other MCU definitions.
-> Otherwise, overwriting the file may cause J-Link to lose support for other devices.
+Warning: Check that the SDK's file already has the definitions for your other MCUs. If it does
+not, this replacement removes J-Link support for those other devices.
 
-**Option B: Merge Manually (Recommended)**
+**Option B: Merge the files by hand (recommended)**
 
-If you want to preserve support for all other MCUs, manually merge only the `<Device>` entries for RT58x into the existing JLinkDevices.xml.
+This option keeps support for all your other MCUs.
 
-Steps:
+1. Open the existing `JLinkDevices.xml` in a text editor.
+2. Open `<SDK_PATH>\tools\JLink\JLinkDevices.xml` in a text editor.
+3. Copy the `<Device>` entries for the RT58x and RT584 series from the SDK file.
+4. Paste these entries inside the `<Database>` section of the existing file.
+5. Save the file.
 
-1. Open the original `JLinkDevices.xml` in a text editor.
-1. Open the `JLinkDevices.xml` from `<SDK_PATH>\tools\JLink\JLinkDevices.xml`.
-1. Copy the `<Device>` entries related to RT58x RT584 series from the SDK file and paste them inside the `<Database>` section of the original file.
-1. Save the file.
-
-> ✅ This approach keeps support for all other devices while adding RT58x and RT584 series definitions.
-
-### Reference the picture below:
+This keeps your other devices, and adds the RT58x and RT584 series definitions.
 
 <img src="picture/tool/jlink_devicexml.jpg" alt="drawing" style="width:700px"/>
 
----
+## Set the J-Link path in VS Code
 
-## Configure J-Link Path in VS Code
-
-Modify `.vscode/settings.json` to configure the J-Link path in VS Code.
-
-Open your SDK folder, locate `.vscode/settings.json`, and add the following settings:
+1. Open your SDK folder.
+2. Open the file `.vscode/settings.json`.
+3. Add this setting:
 
 ```json
 {

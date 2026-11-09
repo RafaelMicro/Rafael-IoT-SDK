@@ -11,6 +11,9 @@
 #include "hosal_crypto_sm4.h"
 #include "uart_stdio.h"
 #include "dump_boot_info.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "app_hooks.h"
 
 
 void sm4_test_encode(void) {
@@ -178,11 +181,14 @@ void sm4_test_decode(void) {
 
 }
 
-int main(void) {
+#define APP_MAIN_TASK_STACK_SIZE 1024
+
+static TaskHandle_t app_main_task_handle;
+
+static void app_main_task(void* parameters_ptr) {
+    (void)parameters_ptr;
 
     
-    uart_stdio_init();
-    _dump_boot_info();
     printf("\r\n----------------------------------------------------------------\r\n");
     printf("Build Date:%s \r\n",__DATE__);
     printf("Build Time:%s \r\n",__TIME__);
@@ -199,7 +205,24 @@ int main(void) {
     printf("\r\n\r\n");
     printf("hosal crypto SM4 finish \r\n");
 
-    while (1) {;}
+    while (1) {
+        vTaskDelay(5000);
+    }
 
+}
+
+int main(void) {
+    uart_stdio_init();
+    vHeapRegionsInt();
+    _dump_boot_info();
+
+    if (xTaskCreate(app_main_task, (char*)"app_main", APP_MAIN_TASK_STACK_SIZE,
+                    NULL, E_TASK_PRIORITY_NORMAL, &app_main_task_handle)
+        != pdPASS) {
+        printf("app_main task create fail....\r\n");
+    }
+
+    vTaskStartScheduler();
+    while (1) {}
 }
 

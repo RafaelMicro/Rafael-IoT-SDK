@@ -1,155 +1,120 @@
-# Rafael IoT SDK 2.1.0 
+# Rafael IoT SDK
 ### Development Environment Setup Guide
 
-## Recommended Versions
-| Tool              | Version       | Notes                                           |
-| ----------------- | ------------- | ----------------------------------------------- |
-| ARM GNU Toolchain | 14.2 | Official precompiled binaries                   |
-| CMake             | 3.24 | Requires support for `Presets` and Ninja        |
-| Ninja             | 1.11 | Typically used with CMake                       |
-| Git               | 2.39 or later | Git LFS recommended                             |
-| Python            | 3.12 | Used for CMake scripts and toolchain management |
-| VS Code           | 1.96 or later | Recommended with CMake Tools / Cortex-Debug     |
-| J-Link            | v6.88a        | Recommended for flashing MCU firmware           |
+Do the steps below one time. After that, use the Rafael VS Code extension to build, flash, and
+debug. See [Rafael Extension](sdk_extension.md).
+
+## What you install
+
+| Tool | Version | Why |
+|---|---|---|
+| VS Code | 1.96 or later | The IDE the Rafael extension runs in |
+| Git | 2.39 or later | To clone the SDK |
+| ARM GNU Toolchain, CMake, Ninja | See [toolchain/README.md](../../toolchain/README.md) | Required. Put these tools on the PATH. You must download ARM GCC by hand. The Rafael extension can install CMake and Ninja for you. See step 3. |
+| Python | 3.10 or later | Optional. Only needed for the Kconfig editor's full `menuconfig` mode. A simpler mode works without Python. |
 
 ## 1. Install VS Code
-  **VS Code Website:** https://code.visualstudio.com/  
-  Choose the appropriate version (Windows/Mac/Linux)
-  <img src="../SDK_Setup/picture/tool/VsCodeDownloadPage.jpg" alt="drawing" style="width:200px  height=200"/>
-  
-# Install Visual Studio Code (Default Settings)
 
-1. Download the **Windows Installer** (User Installer recommended).  
-2. Run the installer. During installation, you can safely leave all default options checked, including:  
-   - Add **"Open with Code"** action to context menu  
-   - Add to **PATH**  
-   - Register as the default editor for supported file types  
-3. Click **Install** to start the installation.  
-4. Once installed, you can launch VS Code from the **Start menu**.  
+**Website:** https://code.visualstudio.com/
 
-> Default settings are sufficient. You can customize later via **File > Preferences > Settings**.
+Download and run the installer for your operating system. Keep the default options. The default
+options add VS Code to the PATH. You need VS Code on the PATH.
 
+<img src="../SDK_Setup/picture/tool/VsCodeDownloadPage.jpg" alt="drawing" style="width:200px  height=200"/>
 
-  Verify Installed Version (Windows / Linux)
+To check the installed version, run this command in a terminal:
 
-  1. Open the command tool:
-      - **Windows** → Command Prompt
-      - **Linux** → Terminal
-  2. Type the command:
-      ```bash
-      code -v
-      ```
+```bash
+code -v
+```
 
-## 2. Install Python
-- Python Website: https://www.python.org/downloads/
-  <img src="../SDK_Setup/picture/tool/PythonDownloadPage.jpg" alt="drawing" style="width:200px  height=200"/>  
+## 2. Install Git and clone the SDK
 
-### Install Python (Default Settings)
+**Website:** https://git-scm.com/downloads
 
-  1. Run the installer. During installation, it is recommended to select:  
-     - **Add Python to PATH**  
-     - Keep the default installation directory  
-  2. Click **Install Now** to start the installation.  
+Run the installer. Keep the default options.
 
-- Verify Installed Version (Windows / Linux)
+<img src="../SDK_Setup/picture/tool/GitDownloadPage.jpg" alt="drawing" style="width:200px  height=200"/>
 
-  1. Open the command tool:
-      - **Windows** → Command Prompt
-      - **Linux** → Terminal
-  2. Type the command:
-      ```bash
-      python --version
-      ```
+Clone the SDK with this command:
 
-## 3. Install Git
-- Git Website: : https://git-scm.com/downloads
-  <img src="../SDK_Setup/picture/tool/GitDownloadPage.jpg" alt="drawing" style="width:200px  height=200"/>  
+```sh
+git clone --recursive https://github.com/RafaelMicro/Rafael-IoT-SDK.git
+```
 
-### Git Installation Instructions
+If you already cloned without `--recursive`, run this instead:
 
-Run the installer. You can keep the default options. Recommended settings:
+```sh
+git submodule update --init --recursive
+```
 
-- **Adjusting your PATH environment**: Choose **Git from the command line and also from 3rd-party software**  
-- **Choosing HTTPS transport backend**: Choose **Use the OpenSSL library**  
-- Keep other options as default
+## 3. Install the ARM toolchain and add it to the PATH
 
-Click **Install** to start the installation.
+Install these tools in one permanent location on your machine, outside the SDK checkout. Put that
+location on the PATH.
 
-- Verify Installed Version (Windows / Linux)
+Older guidance told you to unzip the tools inside the SDK's own `toolchain/` folder. This meant
+every fresh `git clone` needed a new copy of the tools. Install on the PATH instead. Then you set
+up the tools once. Every SDK checkout you clone after that reuses the same install.
 
-  1. Open the command tool:
-      - **Windows** → Command Prompt
-      - **Linux** → Terminal
-  2. Type the command:
-      ```bash
-      git --version
-      ```
-- Clone Rafael-Iot-SDK repository:
-  ```sh
-  git clone https://github.com/RafaelMicro/Rafael-IoT-SDK.git
-  ```
----
-## 4. J-Link Setup Reference Documents
-- [J-Link Setup](../SDK_Setup/sdk-setup-jlink.md) 
----
+**ARM GCC** has no automatic installer. Download it by hand. See
+[toolchain/README.md](../../toolchain/README.md) for the download link. Unzip it to a permanent
+folder, not inside the SDK folder. Add its `bin` directory to the PATH.
 
----
-## 5. Toolchain Install Reference Documents  
-- [Toolcahin Setup](../../toolchain/README.md) 
----
+**CMake and Ninja** have two install methods. You can download them by hand, the same way as ARM
+GCC. Or you can install the Rafael extension first (step 4 below), then run **Rafael: Install /
+Manage Toolchain**. This command installs both tools through your system's package manager:
+winget, Homebrew, apt, dnf, pacman, or zypper. This is a permanent, machine-wide install. We
+recommend the automatic method. It needs less setup. It needs no reinstall after a new clone.
 
----
+Do this step in every environment where you build the SDK. Windows, native Linux, and WSL each
+have a separate PATH. If you install the toolchain in Windows, it is not visible in WSL. Set up
+each environment on its own.
 
-## 6. Install Rafael Extension Reference Documents  
-- ### [Rafael Extension](../SDK_Setup/sdk_extension.md) 
-  **Open SDK folder using VS Code**
+To check the installation, run these commands:
+
+```sh
+arm-none-eabi-gcc --version
+cmake --version
+ninja --version
+```
+
+After you change the PATH, close VS Code. Open it again. The extension then picks up the new
+tools.
+
+Note: The Rafael extension's **Tools** panel can also find a toolchain inside the SDK's own
+`toolchain/` folder. This is the older, per-clone method. Or the panel can use a toolchain path
+you set in its settings. We recommend the PATH method. It survives future clones. If the
+extension still cannot find a tool, right-click the tool in the **Tools** panel. Select **Change
+path…**. See [Rafael Extension](sdk_extension.md).
+
+## 4. Install the Rafael VS Code extension
+
+Find the `.vsix` file in the SDK checkout, at `tools/rafael_extension/rafael-iot-<version>.vsix`.
+Run this command from the SDK root, to install it:
+
+```sh
+code --install-extension tools/rafael_extension/rafael-iot-<version>.vsix
+```
+
+Open the cloned SDK folder in VS Code. Use **File → Open Folder**.
 
 <div style="display: flex; align-items: center; gap: 20px;">
   <div style="text-align: center;">
-    <p><strong>VS Code File-->Open Folder</strong></p>
-   <img src="../SDK_Setup/picture/tool/open-folder.jpg" alt="drawing" style="width:200px  height=200"/>  
+    <p><strong>VS Code File→Open Folder</strong></p>
+   <img src="../SDK_Setup/picture/tool/open-folder.jpg" alt="drawing" style="width:200px  height=200"/>
   </div>
   <div style="text-align: center;">
-    <p><strong>Open Rafael-IoT-SDK Foler</strong></p>
+    <p><strong>Open the Rafael-IoT-SDK folder</strong></p>
       <img src="../SDK_Setup/picture/tool/open-sdk-folder.jpg" alt="drawing" style="width:200px  height=200"/>
   </div>
 </div>
 
-  1. Open the command tool:
-      - **Windows** → Command Prompt
-      - **Linux** → Terminal
-  2. Install Rafael VS Code extension:
-      ```sh
-      code --install-extension tools/rafael_extension/rafael-extension-0.0.2.vsix
-      ```
-      <img src="../SDK_Setup/picture/rf_ext/rafael_extension_finish.jpg" alt="drawing" style="width:200px  height=200"/>   
----
+Setup is now complete. See [Rafael Extension](sdk_extension.md) for how to build, flash, and
+debug.
 
----
-## 6. Check Toolchain, CMake, and Python Environment Variables
-- Ensure `PATH` variable includes the Toolchain `bin\`directory
-- Add `TOOLCHAIN_PATH` environment variable pointing to the GCC Toolchain directory
-- Check Python paths:
-     - C:\Users\user\AppData\Local\Programs\Python\Python312\Scripts\
-     - C:\Users\user\AppData\Local\Programs\Python\Python312\
-        <img src="../SDK_Setup/picture/tool/envpath.jpg" alt="drawing" style="width:200px  height=200"/> 
+## Optional steps
 
-
-### Other
-
-####  Manual Install Requriemtn Tool (extensions.txt/requirements.txt)
-- File path: `SDK\tools\requirements.txt`
-- Open terminal and navigate:
-  cd SDK\tools\requriement
-- Install using pip:
-  ```sh
-  pip install -r requirements.txt
-  ```
-- Install rafael extension:
-  ```sh
-  code --install-extension rafael-extension-0.0.2.vsix
-  ```
-- Install using Python script:
-  ```sh
-  Python extensions.py
-  ```
+- If you use a J-Link probe instead of a CMSIS-DAP probe, see [J-Link setup](sdk-setup-jlink.md).
+- If you want a faster build on Windows, or you want to develop from WSL, see
+  [WSL setup](sdk-wsl-setup.md).

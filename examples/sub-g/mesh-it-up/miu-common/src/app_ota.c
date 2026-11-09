@@ -592,6 +592,21 @@ static void ota_execute_phase3_child_respond(otIp6Address router_addr,
         otThreadSetLinkMode(otrGetInstance(), cfg);
     }
 
+    // A bitmap left over from an earlier round can never be filled: our REQUEST carries the
+    // old version and the Router rejects it ("push: bitmap ver mismatch"), so no DATA ever
+    // arrives -- and the version test on the multicast path only runs when DATA arrives.
+    // This trigger is the one packet a sleeping child does receive, so resync from it here.
+    if (exec != NULL && g_ota_bitmap != NULL) {
+        const uint32_t* meta = (const uint32_t*)exec->bin_type;
+        if (meta[0] != 0 && meta[0] != g_ota_image_version) {
+            log_info("[Rafael] Phase3: stale bitmap v%08X vs round v%08X, "
+                     "dropping for cold start",
+                     (unsigned int)g_ota_image_version, (unsigned int)meta[0]);
+            ota_bitmap_delete(g_ota_bitmap);
+            g_ota_bitmap = NULL;
+        }
+    }
+
     // If the MTD has no bitmap yet (first trigger seen), cold-start from metadata embedded in the EXECUTE_PHASE3_CHILD packet: time=total_num, bin_type=version/size/crc
     if (g_ota_bitmap == NULL && exec != NULL) {
         uint16_t total_num = exec->time;
@@ -630,8 +645,8 @@ static void ota_execute_phase3_child_respond(otIp6Address router_addr,
         && ota_bitmap_get_remain(g_ota_bitmap, g_ota_total_num) == 0) {
         // All segments already received — verify CRC then reboot, no need to request anything
         uint32_t crc32 = crc32checksum(
-            (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-            (g_ota_image_size - OTA_INFO_HEADER_OFFSET));
+            (OTA_FLASH_START),
+            (g_ota_image_size - OTA_IMG_FILE_HEADER_SIZE));
         if (crc32 == g_ota_image_crc) {
             log_info("[Rafael] Phase3 EXECUTE: MTD already has all segments, "
                      "CRC OK → reboot");
@@ -1115,8 +1130,15 @@ static void ota_phase3_finish_ftd(void) {
 
 // Runs on the OT app task (never the timer task, since it chains into a flash erase+write); re-verifies CRC like the immediate-reboot path, mirroring ota_execute_received_event_handler().
 static void ota_phase3_execute_pending_reboot(void) {
-    uint32_t crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-                                   (g_ota_image_size - OTA_INFO_HEADER_OFFSET));
+    if (g_ota_image_size <= OTA_IMG_FILE_HEADER_SIZE) {
+        ota_printf("phase3 reboot: no image info in RAM (size %X)",
+                   g_ota_image_size);
+        ota_change_state_and_timer(OTA_IDLE, 0);
+        return;
+    }
+
+    uint32_t crc32 = crc32checksum((OTA_FLASH_START),
+                                   (g_ota_image_size - OTA_IMG_FILE_HEADER_SIZE));
     if (crc32 != g_ota_image_crc) {
         ota_printf("ota request upgrade fail %X %X", crc32, g_ota_image_crc);
         ota_change_state_and_timer(OTA_IDLE, 0);
@@ -1279,6 +1301,8 @@ static const char* fota_result_to_str(uint8_t r) {
 void ota_bootloader_info_check() {
     uint32_t file_ver, crc32;
     fota_information_t t_bootloader_ota_info = {0};
+    uint32_t program_data_u32[256 / 4] __attribute__((aligned(4)));
+    uint8_t* const program_data = (uint8_t*)program_data_u32;
     hosal_flash_read_n_bytes(FOTA_UPDATE_BANK_INFO_ADDRESS,
                              (uint8_t*)&t_bootloader_ota_info,
                              sizeof(t_bootloader_ota_info));
@@ -1309,7 +1333,7 @@ void ota_bootloader_info_check() {
                          (unsigned int)file_ver);
                 ota_set_image_version(file_ver);
                 ota_set_image_size((t_bootloader_ota_info.fotabank_datalen
-                                    + OTA_INFO_HEADER_OFFSET));
+                                    + OTA_IMG_FILE_HEADER_SIZE));
                 ota_set_image_crc(t_bootloader_ota_info.fotabank_crc);
             } else {
                 log_warn("[FOTA] OTA result: 0x%02X (%s)",
@@ -1321,10 +1345,11 @@ void ota_bootloader_info_check() {
             t_bootloader_ota_info.fotabank_datalen = 0;
             t_bootloader_ota_info.fotabank_crc = 0;
         } else {
-            if (t_bootloader_ota_info.fotabank_startaddr
-                    == (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET)
+            /* The last sector of the bank holds the file header, so the
+             * payload may not reach it. */
+            if (t_bootloader_ota_info.fotabank_startaddr == OTA_FLASH_START
                 && t_bootloader_ota_info.fotabank_datalen
-                       <= SIZE_OF_FOTA_BANK_1MB) {
+                       <= (SIZE_OF_FOTA_BANK_1MB - OTA_FLASH_SECTOR_SIZE)) {
                 uint32_t first_word = 0xFFFFFFFF;
                 hosal_flash_read_n_bytes(
                     t_bootloader_ota_info.fotabank_startaddr,
@@ -1342,7 +1367,7 @@ void ota_bootloader_info_check() {
                         ota_set_image_version(file_ver);
                         ota_set_image_size(
                             (t_bootloader_ota_info.fotabank_datalen
-                             + OTA_INFO_HEADER_OFFSET));
+                             + OTA_IMG_FILE_HEADER_SIZE));
                         ota_set_image_crc(t_bootloader_ota_info.fotabank_crc);
                     } else {
                         log_warn("ota crc fail %04X %04X", crc32,
@@ -1356,11 +1381,17 @@ void ota_bootloader_info_check() {
                 t_bootloader_ota_info.fotabank_ready = FOTA_IMAGE_READY + 1;
             }
         }
+        /* HOSAL_FLASH_WRITE_PAGE DMAs a whole 256-byte page, so the source
+         * must be a 256-byte buffer padded with 0xFF - passing the 72-byte
+         * struct directly wrote 184 bytes of stack garbage into the page. */
+        memset(program_data, 0xFF, 256);
+        memcpy(program_data, (uint8_t*)&t_bootloader_ota_info,
+               sizeof(fota_information_t));
         enter_critical_section();
         hosal_flash_erase(HOSAL_FLASH_ERASE_SECTOR,
                           FOTA_UPDATE_BANK_INFO_ADDRESS);
         hosal_flash_write(HOSAL_FLASH_WRITE_PAGE, FOTA_UPDATE_BANK_INFO_ADDRESS,
-                          (uint8_t*)&t_bootloader_ota_info);
+                          program_data);
         leave_critical_section();
     } while (0);
 
@@ -1372,38 +1403,28 @@ static void ota_reboot_handler() {
     otPlatReset(NULL);
 }
 
-static void ota_bootinfo_ready() {
-    uint32_t program_data_u32[256 / 4] __attribute__((aligned(4)));
-    uint8_t* const program_data = (uint8_t*)program_data_u32;
-    fota_information_t t_bootloader_ota_info = {0};
-
-    hosal_flash_read_n_bytes(FOTA_UPDATE_BANK_INFO_ADDRESS,
-                             (uint8_t*)&t_bootloader_ota_info,
-                             sizeof(t_bootloader_ota_info));
-
-    t_bootloader_ota_info.fotabank_ready = FOTA_IMAGE_READY;
-
-    memset(program_data, 0xFF, 256);
-    memcpy(program_data, (uint8_t*)&t_bootloader_ota_info,
-           sizeof(fota_information_t));
-
-    enter_critical_section();
-    while (flash_check_busy())
-        ;
-    flash_erase(FLASH_ERASE_SECTOR, FOTA_UPDATE_BANK_INFO_ADDRESS);
+/* Stage-1 ECDSA verify size from file header [28..31] big-endian; 0 = unsigned. */
+static uint32_t ota_flash_read_signature_len(void) {
+    /* Must be 4-byte aligned for DMA. */
+    static uint32_t read_buf_u32[OTA_FLASH_SECTOR_SIZE / 4];
+    uint8_t* const read_buf = (uint8_t*)read_buf_u32;
+    uint32_t sig_len;
 
     while (flash_check_busy())
         ;
-
-    flash_write_page((uint32_t)program_data, FOTA_UPDATE_BANK_INFO_ADDRESS);
+    flash_read_page((uint32_t)(read_buf), OTA_IMG_HEADER_FLASH_ADDR);
     while (flash_check_busy())
         ;
-    leave_critical_section();
 
-    ota_printf("bootinfo ready");
+    sig_len = ((uint32_t)read_buf[28] << 24) | ((uint32_t)read_buf[29] << 16)
+              | ((uint32_t)read_buf[30] << 8) | (uint32_t)read_buf[31];
+
+    /* Erased flash reads 0xFF: an old tool never wrote the field. */
+    return (sig_len == 0xFFFFFFFF) ? 0 : sig_len;
 }
 
-void ota_bootinfo_reset() {
+/* Rebuilds the whole record in one erase+program; signature_len must be re-read here because the early write happens before the image header lands. */
+static bool ota_bootinfo_write(bool mark_ready) {
     uint32_t program_data_u32[256 / 4] __attribute__((aligned(4)));
     uint8_t* const program_data = (uint8_t*)program_data_u32;
     fota_information_t t_bootloader_ota_info = {0};
@@ -1417,16 +1438,33 @@ void ota_bootinfo_reset() {
         log_error("[FOTA] Core param corrupt! Flash write rejected to prevent "
                   "bricking. Size:0x%X, Ver:0x%X",
                   (unsigned int)img_size, (unsigned int)img_ver);
-        return;
+        return false;
     }
 
-    t_bootloader_ota_info.fotabank_startaddr = (OTA_FLASH_START
-                                                + OTA_INFO_HEADER_OFFSET);
-    t_bootloader_ota_info.signature_len = 0;
+    /* Only meaningful when arming: before that the header sector still holds the previous image's. */
+    uint32_t sig_len = mark_ready ? ota_flash_read_signature_len() : 0;
+
+    t_bootloader_ota_info.fotabank_startaddr = OTA_FLASH_START;
     t_bootloader_ota_info.target_startaddr = APP_START_ADDRESS;
-    t_bootloader_ota_info.fotabank_datalen = img_size - OTA_INFO_HEADER_OFFSET;
-    t_bootloader_ota_info.fota_image_info = FOTA_IMAGE_INFO_COMPRESSED;
+    t_bootloader_ota_info.fotabank_datalen = (img_size
+                                              - OTA_IMG_FILE_HEADER_SIZE);
+
+    /* Excludes the pad and signature page, so it must be < datalen. */
+    if (sig_len >= t_bootloader_ota_info.fotabank_datalen) {
+        log_error("[FOTA] signature_len 0x%X >= datalen 0x%X, header corrupt! "
+                  "Flash write rejected.",
+                  (unsigned int)sig_len,
+                  (unsigned int)t_bootloader_ota_info.fotabank_datalen);
+        return false;
+    }
+
+    t_bootloader_ota_info.signature_len = sig_len;
+    t_bootloader_ota_info.fota_image_info = FOTA_IMAGE_INFO_COMPRESSED
+                                            | (sig_len
+                                                   ? FOTA_IMAGE_INFO_SIGNATURE
+                                                   : 0);
     t_bootloader_ota_info.reserved[0] = img_ver;
+    t_bootloader_ota_info.fotabank_ready = mark_ready ? FOTA_IMAGE_READY : 0;
     t_bootloader_ota_info.fota_result = 0xFF;
     t_bootloader_ota_info.fotabank_crc = img_crc;
 
@@ -1446,7 +1484,19 @@ void ota_bootinfo_reset() {
         ;
     leave_critical_section();
 
-    ota_printf("bootinfo reset status success");
+    ota_printf("bootinfo write ok (ready=%u, siglen=0x%X)",
+               (unsigned int)mark_ready, (unsigned int)sig_len);
+    return true;
+}
+
+/* Start of a download: signature_len is not knowable yet, this only invalidates the previous record. */
+bool ota_bootinfo_reset() { return ota_bootinfo_write(false); }
+
+/* Image complete and CRC-verified: re-read signature_len and arm. On failure the flag stays clear and the device reboots into the old app. */
+static void ota_bootinfo_ready() {
+    if (!ota_bootinfo_write(true)) {
+        log_error("[FOTA] bootinfo arm rejected, not flagging image ready");
+    }
 }
 
 void ota_flash_read_bin_type(uint8_t out_bin_type[12]) {
@@ -1455,7 +1505,7 @@ void ota_flash_read_bin_type(uint8_t out_bin_type[12]) {
     uint8_t* const read_buf = (uint8_t*)read_buf_u32;
     while (flash_check_busy())
         ;
-    flash_read_page((uint32_t)(read_buf), FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB);
+    flash_read_page((uint32_t)(read_buf), OTA_IMG_HEADER_FLASH_ADDR);
     while (flash_check_busy())
         ;
     memcpy(out_bin_type, read_buf + 4, 12);
@@ -2007,9 +2057,12 @@ static void ota_data_send_handler() {
         ota_data.interval = g_ota_data_interval;
         ota_data.is_unicast = is_unicst;
         enter_critical_section();
-        start_addr = (OTA_FLASH_START + (ota_data.seq * ota_data.segments));
+        /* seq*segments is a file offset: the header-sector padding is local to
+         * this flash, so map each byte and keep the air stream file-sized. */
+        start_addr = (ota_data.seq * ota_data.segments);
         for (int i = 0; i < ota_data_lens; i++) {
-            hosal_flash_read(HOSAL_FLASH_READ_BYTE, (start_addr + i),
+            hosal_flash_read(HOSAL_FLASH_READ_BYTE,
+                             OTA_WIRE_TO_FLASH(start_addr + i),
                              &ota_data.data[i]);
         }
         leave_critical_section();
@@ -2146,9 +2199,10 @@ static void ota_push_send_handler(void) {
     ota_response.seq = (uint16_t)g_ota_start_index;
     ota_response.segments = g_ota_segments_size;
     enter_critical_section();
-    start_addr = OTA_FLASH_START + (g_ota_start_index * g_ota_segments_size);
+    start_addr = (g_ota_start_index * g_ota_segments_size);
     for (i = 0; i < ota_data_lens; i++) {
-        hosal_flash_read(HOSAL_FLASH_READ_BYTE, (start_addr + i),
+        hosal_flash_read(HOSAL_FLASH_READ_BYTE,
+                         OTA_WIRE_TO_FLASH(start_addr + i),
                          &ota_response.data[i]);
     }
     leave_critical_section();
@@ -2207,11 +2261,11 @@ static void ota_response_send_handler() {
             ota_response_data_lens = g_ota_image_size % g_ota_segments_size;
         }
         enter_critical_section();
-        start_addr = (OTA_FLASH_START
-                      + (ota_response.seq * g_ota_segments_size));
+        start_addr = (ota_response.seq * g_ota_segments_size);
 
         for (int i = 0; i < ota_response_data_lens; i++) {
-            hosal_flash_read(HOSAL_FLASH_READ_BYTE, (start_addr + i),
+            hosal_flash_read(HOSAL_FLASH_READ_BYTE,
+                             OTA_WIRE_TO_FLASH(start_addr + i),
                              &ota_response.data[i]);
         }
         leave_critical_section();
@@ -2334,8 +2388,8 @@ static void ota_image_received_handler() {
                    : (int)(((toatol_num - remain) * 100) / toatol_num));
 
     if (remain == 0) {
-        crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-                              (g_ota_image_size - OTA_INFO_HEADER_OFFSET));
+        crc32 = crc32checksum((OTA_FLASH_START),
+                              (g_ota_image_size - OTA_IMG_FILE_HEADER_SIZE));
         if (crc32 != g_ota_image_crc) {
             ota_printf("ota data upgrade fail ");
             ota_change_state_and_timer(OTA_IDLE, 0);
@@ -2375,8 +2429,8 @@ static void ota_unicast_received_handler() {
                ((remain * 100) / (toatol_num - 1)));
 
     if (remain == 0) {
-        crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-                              (g_ota_image_size - OTA_INFO_HEADER_OFFSET));
+        crc32 = crc32checksum((OTA_FLASH_START),
+                              (g_ota_image_size - OTA_IMG_FILE_HEADER_SIZE));
         if (crc32 != g_ota_image_crc) {
             ota_printf("ota data upgrade fail ");
             ota_change_state_and_timer(OTA_IDLE, 0);
@@ -2649,8 +2703,8 @@ static void ota_data_received_event_handler(uint8_t* data, uint16_t lens,
 
         if (ota_get_state() == OTA_IDLE
             && ota_get_image_version() == ota_data.version) {
-            crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-                                  (ota_data.size - OTA_INFO_HEADER_OFFSET));
+            crc32 = crc32checksum((OTA_FLASH_START),
+                                  (ota_data.size - OTA_IMG_FILE_HEADER_SIZE));
             if (crc32 == ota_get_image_crc()) {
                 // Initiator bitmap set all
                 if (g_ota_bitmap) {
@@ -2696,13 +2750,12 @@ static void ota_data_received_event_handler(uint8_t* data, uint16_t lens,
 #endif
         }
 
-        // Phase1 restart: a multicast DATA arriving while we are NOT already mid-Phase1 means the Leader started a fresh round, so whatever we were holding is superseded — drop it and re-download onto erased flash, same version or new. OTA_PHASE1_RECEIVING is the only non-interruptible state; the one other exception is already holding this exact image complete (the same-version shortcut above), which must stay a no-op.
+        // Phase1 restart: a multicast DATA from a DIFFERENT image than the one we hold means the Leader started a fresh round, so whatever we were holding is superseded — drop it and re-download onto erased flash. OTA_PHASE1_RECEIVING is the only non-interruptible state.
+        // The version test is what separates a new round from our own round's tail: Phase1's multicast keeps arriving for tens of seconds after the receive window elapses (mesh forwarding delay), and those late frames carry the version we already hold. Erasing on them threw away a 90%-full bitmap and forced Phase2 to unicast the whole image back, 8.8x slower per Router. A same-version frame now falls through to the normal receive path below, where the bitmap duplicate test drops it or it fills a gap.
         if (ota_data.is_unicast == false && g_ota_bitmap != NULL
             && ota_get_state() != OTA_IDLE
             && ota_get_state() != OTA_PHASE1_RECEIVING
-            && !(ota_get_image_version() == ota_data.version
-                 && ota_bitmap_get_remain(g_ota_bitmap, g_ota_total_num)
-                        == 0)) {
+            && ota_get_image_version() != ota_data.version) {
             log_info(
                 "[Rafael] Phase1 restart from %s, erasing and re-downloading",
                 OtaStateToString(ota_get_state()));
@@ -2810,19 +2863,20 @@ static void ota_data_received_event_handler(uint8_t* data, uint16_t lens,
         ota_bitmap_set(g_ota_bitmap, ota_data.seq);
 
         enter_critical_section();
-        tmp_addr = OTA_FLASH_START + (ota_data.segments * ota_data.seq);
+        tmp_addr = (ota_data.segments * ota_data.seq);
         for (i = 0; i < ota_data_lens; i++) {
             while (flash_check_busy())
                 ;
-            flash_write_byte(tmp_addr + i, ota_data.data[i]);
+            flash_write_byte(OTA_WIRE_TO_FLASH(tmp_addr + i),
+                             ota_data.data[i]);
             while (flash_check_busy())
                 ;
         }
         leave_critical_section();
 
         if (0 == ota_bitmap_get_remain(g_ota_bitmap, toatol_num)) {
-            crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-                                  (ota_data.size - OTA_INFO_HEADER_OFFSET));
+            crc32 = crc32checksum((OTA_FLASH_START),
+                                  (ota_data.size - OTA_IMG_FILE_HEADER_SIZE));
             if (crc32 != ota_data.crc) {
                 ota_printf("ota data upgrade fail %X %X", crc32, ota_data.crc);
                 ota_change_state_and_timer(OTA_IDLE, 0);
@@ -2974,8 +3028,8 @@ static void ota_response_received_event_handler(uint8_t* data, uint16_t lens) {
             ota_printf("ota response %s", OtaStateToString(g_ota_state));
             if (ota_get_image_version() == ota_response.version) {
                 crc32 = crc32checksum(
-                    (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-                    (ota_response.size - OTA_INFO_HEADER_OFFSET));
+                    (OTA_FLASH_START),
+                    (ota_response.size - OTA_IMG_FILE_HEADER_SIZE));
                 if (crc32 == ota_get_image_crc()) {
                     // Initiator bitmap set all
                     ota_printf("response same version and idle ");
@@ -3082,14 +3136,14 @@ static void ota_response_received_event_handler(uint8_t* data, uint16_t lens) {
                        ota_bitmap_get_remain(g_ota_bitmap, toatol_num));
 
             enter_critical_section();
-            tmp_addr = OTA_FLASH_START
-                       + (ota_response.segments * ota_response.seq);
+            tmp_addr = (ota_response.segments * ota_response.seq);
             // ota_bitmap_print(ota_bitmap,toatol_num);
 
             for (i = 0; i < ota_data_lens; i++) {
                 while (flash_check_busy())
                     ;
-                flash_write_byte(tmp_addr + i, ota_response.data[i]);
+                flash_write_byte(OTA_WIRE_TO_FLASH(tmp_addr + i),
+                                 ota_response.data[i]);
                 while (flash_check_busy())
                     ;
             }
@@ -3103,8 +3157,8 @@ static void ota_response_received_event_handler(uint8_t* data, uint16_t lens) {
             }
             if (0 == ota_bitmap_get_remain(g_ota_bitmap, toatol_num)) {
                 crc32 = crc32checksum(
-                    (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-                    (ota_response.size - OTA_INFO_HEADER_OFFSET));
+                    (OTA_FLASH_START),
+                    (ota_response.size - OTA_IMG_FILE_HEADER_SIZE));
                 if (crc32 != ota_response.crc) {
                     ota_printf("ota response upgrade fail %X %X", crc32,
                                ota_response.crc);
@@ -3385,8 +3439,8 @@ static void ota_execute_received_event_handler(uint8_t* data, uint16_t lens,
 #endif
         if (ota_get_state() == OTA_DONE) {
             uint32_t crc32 = crc32checksum(
-                (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-                (g_ota_image_size - OTA_INFO_HEADER_OFFSET));
+                (OTA_FLASH_START),
+                (g_ota_image_size - OTA_IMG_FILE_HEADER_SIZE));
             if (crc32 != g_ota_image_crc) {
                 ota_printf("ota request upgrade fail %X %X", crc32,
                            g_ota_image_crc);
@@ -3532,8 +3586,8 @@ void ota_start(uint16_t segments_size, uint16_t interval) {
 
     ota_printf("ota_toatol_num %u ", g_ota_total_num);
     uint32_t crc32 = crc32checksum(
-        (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-        (ota_get_image_size() - OTA_INFO_HEADER_OFFSET));
+        (OTA_FLASH_START),
+        (ota_get_image_size() - OTA_IMG_FILE_HEADER_SIZE));
     if (crc32 != ota_get_image_crc()) {
         log_info("crc fail %x %x ", crc32, ota_get_image_crc());
         return;
@@ -3580,8 +3634,8 @@ void ota_send(char* ipaddr_str) {
         }
         ota_printf("ota_toatol_num %u ", g_ota_total_num);
         uint32_t crc32 = crc32checksum(
-            (OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-            (ota_get_image_size() - OTA_INFO_HEADER_OFFSET));
+            (OTA_FLASH_START),
+            (ota_get_image_size() - OTA_IMG_FILE_HEADER_SIZE));
         if (crc32 != ota_get_image_crc()) {
             log_info("crc fail %x %x ", crc32, ota_get_image_crc());
             return;
@@ -3674,15 +3728,28 @@ void ota_send_execute(otIp6Address dst_ipaddr, uint8_t execute_flag,
 void ota_stop() { ota_change_state_and_timer(OTA_IDLE, 0); }
 
 void ota_update_self() {
-    uint32_t crc32 = crc32checksum((OTA_FLASH_START + OTA_INFO_HEADER_OFFSET),
-                                   (g_ota_image_size - OTA_INFO_HEADER_OFFSET));
+    /* Zero when nothing restored it this boot; the subtraction below would underflow. */
+    if (g_ota_image_size <= OTA_IMG_FILE_HEADER_SIZE) {
+        ota_printf("ota self: no image info in RAM (size %X)", g_ota_image_size);
+        ota_change_state_and_timer(OTA_IDLE, 0);
+        return;
+    }
+
+    uint32_t crc32 = crc32checksum((OTA_FLASH_START),
+                                   (g_ota_image_size - OTA_IMG_FILE_HEADER_SIZE));
     if (crc32 != g_ota_image_crc) {
         ota_printf("ota request upgrade fail %X %X", crc32, g_ota_image_crc);
         ota_change_state_and_timer(OTA_IDLE, 0);
-    } else {
-        ota_bootinfo_ready();
-        ota_change_state_and_timer(OTA_REBOOT, 10);
+        return;
     }
+
+    /* Unlike the other arm sites this one can refuse to reboot at all, so keep the guard. */
+    if (!ota_bootinfo_write(true)) {
+        ota_printf("ota self: bootinfo rebuild rejected, not arming");
+        ota_change_state_and_timer(OTA_IDLE, 0);
+        return;
+    }
+    ota_change_state_and_timer(OTA_REBOOT, 10);
 }
 
 void ota_debug_level(unsigned int level) { ota_debug_flags = level; }

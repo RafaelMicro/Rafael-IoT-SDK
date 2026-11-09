@@ -160,7 +160,7 @@ Build-time knobs (e.g. `BLE_SUPPORT_NUM_CONN_MAX`) are Kconfig options
 `sdk_add_compile_options(...)` in the project's `CMakeLists.txt`.
 
 More details on building and running each demo are in
-`RT58x_BLE_SDK_Application_Guide.pdf` (see `docs/BLE/[SW_07]RT58x_BLE_SDK_Application_Guide_V1.4.pdf`).
+`RT58x_BLE_SDK_Application_Guide.md` (see `docs/BLE/RT58x_BLE_SDK_Application_Guide.md`).
 
 ### 1.2 BLE System Architecture
 
@@ -597,8 +597,8 @@ Available BLE services under
 | `mesh_prov/`, `mesh_proxy/` | BLE Mesh Provisioning / Proxy services |
 
 For the instructions to create a custom BLE service and profile, refer to
-`RT58x_BLE_SDK_Service_Profile_Guide.pdf`
-(`docs/BLE/[SW_09]RT58x_BLE_SDK_Service_Profile_Guide_V1.0.pdf`).
+`RT58x_BLE_SDK_Service_Profile_Guide.md`
+(`docs/BLE/RT58x_BLE_SDK_Service_Profile_Guide.md`).
 
 ### 3.2 Step 3: Implement User Data for BLE Profiles
 

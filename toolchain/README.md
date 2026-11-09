@@ -3,14 +3,36 @@
 This directory contains the toolchains and build tools required for compiling ARM projects.  
 The following provides installation instructions, recommended versions, and licensing information.
 
+ARM GCC has no automatic installer. Always install it by hand, as below. You can install CMake
+and Ninja the same way. Or you can install them automatically. First install the Rafael VS Code
+extension. Then run **Rafael: Install / Manage Toolchain**. This command installs both tools
+through your system's package manager: winget, Homebrew, apt, dnf, pacman, or zypper. We
+recommend the automatic method for CMake and Ninja. See
+[sdk_extension.md](../docs/SDK_Setup/sdk_extension.md#tools-toolchain-manager-and-settings).
+
+**Recommended: install outside the SDK checkout, on the PATH.** The steps below unzip tools into
+this `toolchain/` folder, as an example. This was the old method, from before the extension could
+detect a PATH install. It meant every fresh `git clone` of the SDK needed its own copy of the
+tools. The extension still detects tools placed here. Its **Tools** panel shows this source as
+"SDK bundled". This method still works, but we no longer recommend it. Instead, unzip ARM GCC to
+a permanent folder outside any SDK checkout. Add it to the PATH. This install then serves every
+SDK clone you make in the future. You do not need to redo it.
+
 ---
 
 ## Usage Instructions
 
-1. Download the appropriate toolchain and build tools for your platform.
-2. Unzip the files to the specified directories.
-3. Add the `bin` directory to your system's PATH, so the tools can be used from the terminal or command prompt.
-4. **Linux users note**: After unzipping, use `chmod +x` to set executable permissions.
+1. Download the toolchain and build tools for your platform.
+2. Unzip the files to a permanent location outside the SDK checkout. This is the recommended
+   method. Or unzip them under this `toolchain/` folder, for the older, per-clone method.
+3. Add the `bin` directory to your system's PATH. This lets you use the tools from the terminal
+   or the command prompt. The example PATH commands below use the current directory (`%CD%` or
+   `$(pwd)`). They assume you unzipped the tools under this `toolchain/` folder, and that you run
+   the commands from the SDK root. If you unzipped the tools elsewhere, use that path instead.
+   After this step, close VS Code. Open it again. The Rafael extension then picks up the new
+   PATH.
+4. **Linux users note**: After you unzip the files, run `chmod +x` to set the executable
+   permission.
 5. Verify the installation:
    ```bash
    arm-none-eabi-gcc --version
@@ -70,14 +92,14 @@ The following provides installation instructions, recommended versions, and lice
 
 **Download cmake**:  
     
-  - **Linux**: [v3.30.4](https://cmake.org/files/v3.24/cmake-3.24.0-linux-x86_64.sh)  
+  - **Linux**: [v3.24.0](https://cmake.org/files/v3.24/cmake-3.24.0-linux-x86_64.sh)  
     Unzip to path: `toolchain/cmake/Linux/`  
     ```bash
     export PATH=$PATH:$(pwd)/toolchain/cmake/Linux/bin
     chmod +x toolchain/cmake/Linux/bin/*
     ```
 
-  - **Windows**: [v3.30.4](https://cmake.org/files/v3.24/cmake-3.24.0-windows-x86_64.zip)  
+  - **Windows**: [v3.24.0](https://cmake.org/files/v3.24/cmake-3.24.0-windows-x86_64.zip)  
     Unzip to path: `toolchain/cmake/Windows/`  
     ```powershell
     setx PATH "%PATH%;%CD%\toolchain\cmake\Windows\bin"

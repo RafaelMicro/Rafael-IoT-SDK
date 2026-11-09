@@ -1,6 +1,6 @@
 ![image](/docs/SDK_Overview/picture/logo.JPG)
 
-![Date](https://img.shields.io/badge/Date-2026--09--07-green) ![Release](https://img.shields.io/badge/Release-v2.2.4-blue)
+![Date](https://img.shields.io/badge/Date-2026--11--09-green) ![Release](https://img.shields.io/badge/Release-v2.2.5-blue)
 
 # Rafael IoT SDK
 
@@ -66,7 +66,6 @@ Download ZIP
 ⚠️ Note: ZIP archive does not include submodules. You must download and add them manually.
 
 ###  Development Environment Setup
-- [Environment Setup Guide](docs/SDK_Setup/sdk-env-setup.md) 
 - [Setup Guide](docs/SDK_Setup/sdk_setup.md)
 - [Extension Guide](docs/SDK_Setup/sdk_extension.md)   
  Install ARM GCC Toolchain, CMake, and Ninja   
@@ -79,7 +78,7 @@ Download ZIP
 - [Debug Guide](docs/SDK_Setup/sdk_debug.md)  
   **Flashing to the Development Board**
 Use the 20-pin SWD interface together with a CMSIS-DAP or SEGGER J-Link probe to flash and debug the firmware.   
-On Windows, add the SDK directory to the Windows Defender exclusion list to improve build performance. Otherwise can build the project in a **WSL** or **Linux** environment for significantly faster compilation times.
+On Windows, add the SDK directory to the Windows Defender exclusion list to improve build performance. Otherwise can build the project in a **WSL** or **Linux** environment for significantly faster compilation times. See the [WSL setup guide](docs/SDK_Setup/sdk-wsl-setup.md).
 
 
 
@@ -124,7 +123,6 @@ The Rafael EVK provides a standard 20-pin SWD connector:
 
 ## 🔗 Reference Documents and Links <a id="links"></a>
 
-- [Enviroment Setup Guide](docs/SDK_Setup/sdk-env-setup.md) 
 - [Setup Guide](docs/SDK_Setup/sdk_setup.md)  
 - [Extension Guide](docs/SDK_Setup/sdk_extension.md)  
 - [Build Examples Guide](docs/SDK_Setup/sdk_build_examples.md)  

@@ -6,7 +6,7 @@
 
 ## Quick Start
 
-If you're already familiar with the basic workflow, follow these steps to get started quickly:
+If you are already familiar with the basic workflow, follow these steps to get started quickly:
 
 ```bash
 # 1. Windows: Attach debugger to WSL
@@ -16,7 +16,7 @@ usbipd attach --wsl --busid <BUSID>
 lsusb | grep "0d28:0204"
 
 # 3. Start OpenOCD
-cd /path/to/matter_sdk
+cd /path/to/Rafael-IoT-SDK/tools/Debugger/OpenOCD/script
 ./openocd_rt58x.sh
 
 # 4. VS Code: Press F5 to start debugging
@@ -32,7 +32,7 @@ cd /path/to/matter_sdk
 2. [Prerequisites Check](#2-prerequisites-check)
 3. [Windows Configuration](#3-windows-configuration)
 4. [WSL Configuration](#4-wsl-configuration)
-5. [Matter SDK Setup](#5-matter-sdk-setup)
+5. [Rafael-IoT-SDK Setup](#5-rafael-iot-sdk-setup)
 6. [Firmware Flashing](#6-firmware-flashing)
 7. [OpenOCD Startup](#7-openocd-startup)
 8. [OpenOCD Configuration Optimization](#8-openocd-configuration-optimization)
@@ -98,7 +98,7 @@ cd /path/to/matter_sdk
 
 - [ ] CMSIS-DAP compatible debugger (e.g., DAPLink)
 - [ ] RT58x/RT584x development board
-- [ ] USB cable (ensure it's a data cable, not charge-only)
+- [ ] USB cable (check that it is a data cable, not a charge-only cable)
 - [ ] Proper SWD wiring:
   - VTref (target reference voltage)
   - SWDIO (data line)
@@ -261,7 +261,7 @@ sudo apt upgrade -y
 
 ### 4.2 Install OpenOCD Dependencies
 
-⚠️ **This step is critical**. Missing these libraries will cause OpenOCD to fail or produce mysterious errors.
+⚠️ **This step is critical**. Missing these libraries causes OpenOCD to fail, or to show errors that are hard to diagnose.
 
 ```bash
 sudo apt install -y \
@@ -292,15 +292,15 @@ ii  libusb-1.0-0:amd64       2:1.0.26  amd64  ...
 
 ---
 
-## 5. Rafael-Iot-SDK Setup
+## 5. Rafael-IoT-SDK Setup
 
 
 ### 5.1 Required Files Checklist
 
-From **Rafael-Iot-SDK**, you need to copy the following directories:
+From **Rafael-IoT-SDK**, you need to copy the following directories:
 
 ```
-Rafael-Iot-SDK/tools/
+Rafael-IoT-SDK/tools/
 ├── Debugger/OpenOCD/
 │   ├── bin/
 │   │   └── linux/
@@ -344,7 +344,7 @@ Licensed under GNU GPL v2
 
 ### 6.1 Flash Command
 
-Execute in Rafael-Iot-SDK directory:
+Execute in Rafael-IoT-SDK directory:
 
 ```bash
 ./tools/Debugger/OpenOCD/bin/linux/openocd \
@@ -371,8 +371,8 @@ Execute in Rafael-Iot-SDK directory:
 
 | Chip Model | Firmware Address | Bootloader Address |
 | ---------- | ---------------- | ------------------ |
-| RT58x      | 0x00008000       | 0x0000             |
-| RT584x     | 0x10010000       | 0x0000             |
+| RT58x      | 0x00008000       | 0x00000000         |
+| RT584x     | 0x10010000       | 0x10000000         |
 
 ### 6.4 Flash Output Example
 
@@ -396,7 +396,7 @@ Info : Padding image section 0 at 0x00008000 with 256 bytes
 shutdown command invoked
 ```
 
-✅ Seeing `Verified OK` indicates successful flashing.
+✅ If you see `Verified OK`, the flash succeeded.
 
 ❌ **Common errors**:
 - `Error: init mode failed`: See section 12 Troubleshooting
@@ -441,9 +441,9 @@ Info : starting gdb server for rt58x.cpu on 50000
 Info : Listening on port 50000 for gdb connections
 ```
 
-✅ Seeing `Listening on port 50000 for gdb connections` indicates GDB Server is ready.
+✅ If you see `Listening on port 50000 for gdb connections`, the GDB server is ready.
 
-⚠️ **Keep this terminal open**, OpenOCD needs to run continuously for debugging.
+⚠️ **Keep this terminal open.** OpenOCD must keep running for the debug session.
 
 ### 7.4 Stop OpenOCD
 
@@ -463,7 +463,7 @@ Error: Error connecting DP: cannot read IDR
 
 **Root cause:**
 
-RT58x chip's SWD interface is sensitive to clock speed. The default 1000 kHz may be too fast, causing communication failure.
+The RT58x chip's SWD interface is sensitive to clock speed. The default speed of 1000 kHz can be too fast. This can cause the communication to fail.
 
 
 ### 8.2 Speed Recommendations
@@ -538,7 +538,7 @@ If problems persist, check the following factors:
 | Operation | Shortcut            | Description                              |
 | --------- | ------------------- | ---------------------------------------- |
 | Continue  | `F5`                | Continue program execution               |
-| Step Over | `F10`               | Execute next line (don't enter function) |
+| Step Over | `F10`               | Run the next line. Do not step into the called function. |
 | Step Into | `F11`               | Enter function                           |
 | Step Out  | `Shift + F11`       | Exit current function                    |
 | Restart   | `Ctrl + Shift + F5` | Restart debugging                        |
@@ -554,7 +554,7 @@ If problems persist, check the following factors:
 
 ## 10. Python Environment Setup
 
-Some tools in Rafael-Iot-SDK depend on Python environment.
+Some tools in Rafael-IoT-SDK need a Python environment.
 
 ### 10.1 Install Python and Basic Tools
 
@@ -636,7 +636,7 @@ pyserial       3.5
                      │
 ┌────────────────────▼────────────────────────────────────┐
 │ 5. VS Code: Start debugging                             │
-│    - Open Matter SDK workspace                          │
+│    - Open Rafael-IoT-SDK workspace                       │
 │    - Press F5 to start debugging                        │
 │    - Select project and board                           │
 │    - Debugger halts at main                             │
@@ -727,7 +727,7 @@ If debugger disconnects:
 
 ```bash
 $ lsusb
-# Don't see 0d28:0204
+# Device 0d28:0204 is missing from the output
 ```
 
 **Solution:**
@@ -930,7 +930,7 @@ Breakpoint shows as gray circle or warning symbol
    ```
 
 2. **Check if source file path matches:**
-   - File path opened in VS Code should match path used during compilation
+   - The file path open in VS Code must match the path used during compilation
 
 3. **Use `set breakpoint pending on`:**
    This command is already included in `postAttachCommands` in `launch.json`
@@ -982,9 +982,8 @@ pip3 install --user click pyserial cryptography cbor2 coloredlogs
 - **OpenOCD official documentation**: http://openocd.org/documentation/
 - **ARM Cortex-M development guide**: https://developer.arm.com/documentation/
 
-#### Matter SDK
-- **Matter official repository**: https://github.com/project-chip/connectedhomeip
-- **Matter development guide**: https://project-chip.github.io/connectedhomeip-doc/
+#### Rafael IoT SDK
+- **Repository**: https://github.com/RafaelMicro/Rafael-IoT-SDK
 
 #### VS Code Extensions
 - **Cortex-Debug**: https://marketplace.visualstudio.com/items?itemName=marus25.cortex-debug
@@ -1000,7 +999,7 @@ pip3 install --user click pyserial cryptography cbor2 coloredlogs
 ### 14.3 File Path Quick Reference
 
 ```
-Rafael-IoT-sdk/
+Rafael-IoT-SDK/
 ├── .vscode/
 │   └── launch.json                    # VS Code debug configuration
 ├── tools/
@@ -1088,21 +1087,21 @@ telnet localhost 50002
 | RESET (optional) | RESET / nRST | Hardware reset (recommended)                         |
 
 ⚠️ **Important Notes:**
-- VTref is for voltage detection only, cannot be used for power supply
-- Ensure good GND connection - this is a common issue source
-- Dupont wire length recommended < 20cm, too long introduces interference
-- RESET wire is optional but strongly recommended for more stable debugging
+- VTref is for voltage detection only. Do not use it to power the board.
+- Check the GND connection. A bad GND connection is a common cause of problems.
+- Keep Dupont wires shorter than 20 cm. Longer wires cause interference.
+- The RESET wire is optional, but it makes debugging more stable.
 
 ### 14.6 Version Compatibility
 
 | Component | Recommended | Minimum    | Notes                               |
 | --------- | ----------- | ---------- | ----------------------------------- |
 | Windows   | 11          | 10 (1903+) | Must support WSL2                   |
-| WSL       | 2           | 2          | WSL1 doesn't support USB forwarding |
+| WSL       | 2           | 2          | WSL1 does not support USB forwarding |
 | Ubuntu    | 22.04 LTS   | 20.04 LTS  | Recommend using LTS versions        |
 | OpenOCD   | 0.12.0      | 0.11.0     | From RT58x SDK                      |
 | VS Code   | Latest      | 1.70.0     | Must support cortex-debug extension |
-| Python    | 3.10+       | 3.8+       | Matter SDK requirement              |
+| Python    | 3.10+       | 3.8+       | Needed for the Kconfig editor       |
 
 ### 14.7 Performance Optimization Recommendations
 
@@ -1163,7 +1162,7 @@ telnet localhost 50002
 
 3. **Network security**:
    - GDB Server only listens on 127.0.0.1 (localhost)
-   - Don't expose ports 50000-50002 to external networks
+   - Do not expose ports 50000-50002 to external networks
 
 ### 14.9 License Information
 
@@ -1184,7 +1183,7 @@ If you find any errors in this document or have improvement suggestions, please 
 
 ## Conclusion
 
-This guide covers the complete workflow for debugging RT58x chips using OpenOCD in WSL environment. By following the steps in this document, you should be able to:
+This guide covers the complete workflow for debugging RT58x chips with OpenOCD in a WSL environment. After you complete the steps in this document, you can:
 
 ✅ Successfully configure Windows + WSL2 development environment  
 ✅ Use CMSIS-DAP debugger to connect to RT58x  

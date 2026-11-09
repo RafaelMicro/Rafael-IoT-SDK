@@ -16,8 +16,8 @@ else()
     # Release: prevent GCC from embedding its version string in .comment sections
     sdk_add_compile_options(-fno-ident)
     sdk_add_compile_options(
-        -fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=./
-        -ffile-prefix-map=${CMAKE_SOURCE_DIR}/=./
+        "-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=./"
+        "-ffile-prefix-map=${CMAKE_SOURCE_DIR}/=./"
     )
 endif()
 

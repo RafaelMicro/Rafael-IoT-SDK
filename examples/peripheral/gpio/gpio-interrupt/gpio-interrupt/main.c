@@ -60,8 +60,8 @@ void pin_init(void) {
     pin_cfg2.usr_cb = gpio_cb;
 
     hosal_gpio_set_debounce_time(DEBOUNCE_SLOWCLOCKS_1024);
-    hosal_pin_set_pullopt(GPIO2, HOSAL_PULL_UP_100K);
-    hosal_gpio_cfg_input_parameters(GPIO1, pin_cfg2, true);
+    hosal_pin_set_pullopt(GPIO4, HOSAL_PULL_UP_100K);
+    hosal_gpio_cfg_input_parameters(GPIO4, pin_cfg2, true);
 
     NVIC_EnableIRQ(Gpio_IRQn);
 

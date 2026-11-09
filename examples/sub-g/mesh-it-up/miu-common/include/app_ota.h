@@ -63,7 +63,17 @@ extern "C" {
 
 #define OTA_FLASH_SECTOR_SIZE  0x1000 // 4KB
 #define OTA_MAX_IMAGE_SECTORS  (SIZE_OF_FOTA_BANK_1MB / OTA_FLASH_SECTOR_SIZE)
-#define OTA_INFO_HEADER_OFFSET 0x20 // Firmware offset
+/* The payload starts at the 4K-aligned bank base so the bootloader gets an
+ * aligned fotabank_startaddr, the 32-byte file header is parked in the bank's
+ * last sector, and OTA_WIRE_TO_FLASH() maps an unchanged wire/file offset to
+ * its flash address. */
+#define OTA_IMG_FILE_HEADER_SIZE 0x20
+#define OTA_IMG_HEADER_FLASH_ADDR                                              \
+    (OTA_FLASH_START + SIZE_OF_FOTA_BANK_1MB - OTA_FLASH_SECTOR_SIZE)
+#define OTA_WIRE_TO_FLASH(off)                                                 \
+    (((off) < OTA_IMG_FILE_HEADER_SIZE)                                        \
+         ? (OTA_IMG_HEADER_FLASH_ADDR + (off))                                 \
+         : (OTA_FLASH_START + (off) - OTA_IMG_FILE_HEADER_SIZE))
 
 typedef enum {
     OTA_IDLE = 0x10,
@@ -228,7 +238,7 @@ void ota_start(uint16_t segments_size, uint16_t interval);
 uint8_t ota_get_state();
 void ota_bootloader_info_check();
 void ota_event_handler();
-void ota_bootinfo_reset();
+bool ota_bootinfo_reset();
 uint8_t ota_reset();
 uint32_t ota_get_image_version();
 uint32_t ota_get_image_size();

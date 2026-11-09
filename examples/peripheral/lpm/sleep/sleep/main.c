@@ -88,6 +88,7 @@ void pwr_level1_int_callback(uint32_t pin, void* isr_param) {
     #if defined(CONFIG_RT581) || defined(CONFIG_RT582) || defined(CONFIG_RT583)
     hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LOW_POWER_LEVEL_SLEEP1);
     #else
+    hosal_lpm_ioctrl(HOSAL_LPM_SUBSYSTEM_ENTER_LOW_POWER,HOSAL_COMMUMICATION_SUBSYSTEM_PWR_STATE_DEEP_SLEEP);
     hosal_lpm_ioctrl(HOSAL_LPM_SET_POWER_LEVEL, HOSAL_LPM_DEEP_SLEEP);
     #endif
 

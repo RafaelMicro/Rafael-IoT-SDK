@@ -477,7 +477,7 @@ uint32_t bootloader_run_loop(void) {
         // }
         if (evt & BLDER_EVENT_TIMEOUT) {
             DEBUG_PRINT("[BOOT] Timeout\r\n");
-            hosal_wdt_stop();
+            keep_alive_stop();
             break;
         }
     }
