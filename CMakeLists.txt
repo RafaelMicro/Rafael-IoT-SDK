@@ -45,6 +45,7 @@ sdk_add_subdirectory_ifdef(CONFIG_BLE_CENTRAL_ROLE ${CMAKE_CURRENT_LIST_DIR}/exa
 sdk_add_subdirectory_ifdef(CONFIG_BLE_MULTI_LINK ${CMAKE_CURRENT_LIST_DIR}/examples/bluetooth-le/multi-link/${CONFIG_BUILD_PROJECT})
 sdk_add_subdirectory_ifdef(CONFIG_BLE_OTHERS ${CMAKE_CURRENT_LIST_DIR}/examples/bluetooth-le/others/${CONFIG_BUILD_PROJECT})
 sdk_add_subdirectory_ifdef(CONFIG_BLE_MESH ${CMAKE_CURRENT_LIST_DIR}/examples/bluetooth-le/mesh/${CONFIG_BUILD_PROJECT})
+sdk_add_subdirectory_ifdef(CONFIG_THREAD_EXAMPLE ${CMAKE_CURRENT_LIST_DIR}/examples/thread/${CONFIG_BUILD_PROJECT})
 if(CONFIG_MESH_IT_UP_EXAMPLE)
     sdk_add_subdirectory_ifdef(CONFIG_MESH_IT_UP_EXAMPLE ${CMAKE_CURRENT_LIST_DIR}/examples/sub-g/mesh-it-up/${CONFIG_BUILD_PROJECT})
 else()

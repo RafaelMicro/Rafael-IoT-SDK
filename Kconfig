@@ -4,7 +4,7 @@ menu "-------- SDK   Configuration --------"
 endmenu
 source "config/devices.config"
 
-if (RT581 || RT582 || RT583 || RT584H ||  RT584HA4 || RF1301 || RT584L)
+if (RT581 || RT582 || RT583 || RT584H || RT584HA4 || RF1301 || RT584L)
 choice APPLICATION_EXAMPLES_TYPE
 	prompt "Select Application"
 	default BASIC_EXAMPLE
@@ -22,6 +22,9 @@ config BASIC_EXAMPLE
 
 config BLUETOOTH_LE_EXAMPLE
 	bool "Bluetooth"
+	
+config THREAD_EXAMPLE
+	bool "Thread"
 
 config SUBG_EXAMPLE
 	bool "Sub-G"
@@ -37,6 +40,11 @@ endif
 if BLUETOOTH_LE_EXAMPLE
 source "config/examples/ble_example.config"
 source "config/components/network/bluetooth/ble.config"
+endif
+
+if THREAD_EXAMPLE 
+source "config/examples/thread_examples.config"
+source "config/components/network/thread/thread.config"
 endif
 
 if SUBG_EXAMPLE 
